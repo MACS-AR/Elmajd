@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>بوابة المبيعات - المجد للأعلاف</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
+</head>
+<body class="bg-gray-100 flex flex-col h-screen overflow-hidden">
+
+  <!-- Header -->
+  <header class="bg-white shadow-sm p-4 flex justify-between items-center z-10 border-b-2 border-[#10b981]">
+    <div class="flex items-center gap-3">
+      <img src="assets/images/logo.png" alt="Logo" class="h-10">
+      <div>
+        <h1 class="font-bold text-[#047857]">نظام المبيعات</h1>
+        <p class="text-xs text-gray-500" id="salesName">جاري التحميل...</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <button onclick="document.getElementById('newOrderModal').classList.remove('hidden')" class="btn-primary text-sm shadow-md">
+        <i class="fa-solid fa-plus ml-1"></i> طلب جديد
+      </button>
+      <button id="logoutBtn" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition">
+        <i class="fa-solid fa-power-off text-xl"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 overflow-y-auto p-4 md:p-6">
+    <!-- Stats -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="card p-4 border-r-4 border-[#10b981]">
+        <p class="text-xs text-gray-500">مبيعاتي اليوم</p>
+        <h3 class="text-xl font-bold text-[#047857] mt-1" id="todaySales">0 ج.م</h3>
+      </div>
+      <div class="card p-4 border-r-4 border-[#d97706]">
+        <p class="text-xs text-gray-500">طلبات قيد المراجعة</p>
+        <h3 class="text-xl font-bold text-[#d97706] mt-1" id="pendingOrders">0</h3>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      
+      <!-- My Customers List -->
+      <div class="card p-5 lg:col-span-1 min-h-[400px]">
+        <div class="flex justify-between items-center mb-4 border-b pb-2">
+          <h3 class="font-bold text-gray-800"><i class="fa-solid fa-users text-[#10b981]"></i> عملائي</h3>
+          <span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600" id="customersCount">0</span>
+        </div>
+        <div class="relative mb-3">
+          <i class="fa-solid fa-search absolute right-3 top-3 text-gray-400"></i>
+          <input type="text" placeholder="بحث برقم الهاتف أو الاسم..." class="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 pr-9 pl-3 text-sm focus:outline-none focus:border-[#10b981]">
+        </div>
+        <ul id="customersList" class="space-y-2 overflow-y-auto max-h-[300px]">
+          <!-- يتم عرض العملاء المربوطين بهذا المندوب فقط -->
+          <li class="text-center text-sm text-gray-500 py-4">جاري تحميل العملاء...</li>
+        </ul>
+      </div>
+
+      <!-- Recent Orders by this Rep -->
+      <div class="card p-5 lg:col-span-2">
+        <h3 class="font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-list-check text-[#d97706]"></i> سجل طلباتي</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-sm">
+            <thead>
+              <tr class="bg-gray-100 text-gray-600">
+                <th class="p-3">التاريخ</th>
+                <th class="p-3">العميل</th>
+                <th class="p-3">الإجمالي</th>
+                <th class="p-3">الحالة</th>
+              </tr>
+            </thead>
+            <tbody id="salesOrdersTable">
+              <!-- الطلبات تُعرض هنا -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- New Order Modal -->
+  <div id="newOrderModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="card w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden">
+      <div class="bg-[#047857] p-4 flex justify-between items-center text-white">
+        <h3 class="font-bold">إنشاء طلب جديد</h3>
+        <button onclick="document.getElementById('newOrderModal').classList.add('hidden')" class="hover:text-red-300"><i class="fa-solid fa-times text-xl"></i></button>
+      </div>
+      <form id="createOrderForm" class="p-6 space-y-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">اختر العميل</label>
+            <select id="selectCustomer" class="w-full border rounded-lg p-2.5 focus:border-[#10b981] outline-none" required>
+              <option value="">جاري التحميل...</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">اختر المنتج</label>
+            <select id="selectProduct" class="w-full border rounded-lg p-2.5 focus:border-[#10b981] outline-none" required>
+              <option value="">جاري التحميل...</option>
+            </select>
+          </div>
+        </div>
+        
+        <div class="grid grid-cols-3 gap-4">
+          <div>
+            <label class="block text-sm font-semibold mb-1">الكمية</label>
+            <input type="number" id="orderQty" min="1" class="w-full border rounded-lg p-2.5 outline-none focus:border-[#10b981]" required>
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1">الخصم (ج.م)</label>
+            <input type="number" id="orderDiscount" value="0" min="0" class="w-full border rounded-lg p-2.5 outline-none focus:border-[#10b981]">
+          </div>
+          <div>
+            <label class="block text-sm font-semibold mb-1 text-gray-500">الصافي المتوقع</label>
+            <input type="text" id="orderTotal" class="w-full border rounded-lg p-2.5 bg-gray-50 font-bold text-[#10b981]" readonly value="0 ج.م">
+          </div>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-semibold mb-1">ملاحظات الطلب</label>
+          <textarea id="orderNotes" rows="2" class="w-full border rounded-lg p-2.5 outline-none focus:border-[#10b981]"></textarea>
+        </div>
+
+        <div class="flex gap-3 pt-4 border-t">
+          <button type="submit" class="btn-primary flex-1">إرسال الطلب للإدارة</button>
+          <button type="button" onclick="document.getElementById('newOrderModal').classList.add('hidden')" class="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg">إلغاء</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { auth } from "./assets/js/firebase/config.js";
+    import { logoutUser } from "./assets/js/firebase/auth.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    // حماية الصفحة للمناديب فقط
+    onAuthStateChanged(auth, (user) => {
+      if (!user) window.location.href = "login.html";
+      // سيتم جلب بيانات المندوب وعملائه هنا لاحقاً عبر db.js
+      document.getElementById('salesName').innerText = user.email;
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+  </script>
+</body>
+</html>
