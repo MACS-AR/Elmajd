@@ -1,0 +1,23 @@
+{
+  "name": "المجد للأعلاف ERP",
+  "short_name": "المجد للأعلاف",
+  "description": "النظام الشامل لإدارة مصنع المجد للأعلاف ونظام الولاء",
+  "start_url": "/login.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#10b981",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "assets/images/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/images/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
+
