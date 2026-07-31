@@ -2,9 +2,7 @@
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>الإدارة - المجد للأعلاف</title>
-  <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="assets/css/theme.css">
@@ -12,109 +10,110 @@
 <body class="bg-gray-100 flex h-screen overflow-hidden">
 
   <!-- Sidebar -->
-  <aside class="w-64 bg-[#047857] text-white flex flex-col transition-all duration-300">
-    <div class="p-4 flex items-center gap-3 border-b border-green-800">
-      <img src="assets/images/logo.png" alt="Logo" class="h-10 bg-white rounded-md p-1">
+  <aside class="w-64 bg-[#047857] text-white flex flex-col">
+    <div class="p-4 flex gap-3 border-b border-green-800">
+      <img src="https://raw.githubusercontent.com/username/elmajd-erp/main/assets/images/logo.png" alt="Logo" class="h-10 bg-white rounded p-1" onerror="this.outerHTML='<i class=\'fa-solid fa-wheat-awn text-3xl\'></i>'">
       <h1 class="font-bold text-lg">لوحة الإدارة</h1>
     </div>
-    
-    <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-      <a href="#dashboard" class="flex items-center gap-3 bg-green-800/50 p-3 rounded-lg text-amber-400 font-bold">
-        <i class="fa-solid fa-chart-pie"></i> الرئيسية
-      </a>
-      <a href="#orders" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
-        <i class="fa-solid fa-boxes-stacked"></i> الطلبات
-      </a>
-      <a href="#sales" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
-        <i class="fa-solid fa-users-gear"></i> المناديب
-      </a>
-      <a href="#customers" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
-        <i class="fa-solid fa-users"></i> العملاء
-      </a>
-      <a href="#products" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
-        <i class="fa-solid fa-wheat-awn"></i> المنتجات والمخزون
-      </a>
-      <a href="#loyalty" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
-        <i class="fa-solid fa-qrcode"></i> نظام الولاء والأكواد
-      </a>
-      <a href="#reports" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
-        <i class="fa-solid fa-file-invoice-dollar"></i> التقارير الماليـة
-      </a>
+    <nav class="flex-1 p-4 space-y-2">
+      <button onclick="switchTab('dashboard')" class="w-full text-right p-3 rounded hover:bg-green-800"><i class="fa-solid fa-chart-pie w-6"></i> الرئيسية</button>
+      <button onclick="switchTab('orders')" class="w-full text-right p-3 rounded hover:bg-green-800"><i class="fa-solid fa-boxes-stacked w-6"></i> الطلبات</button>
     </nav>
-    
-    <div class="p-4 border-t border-green-800">
-      <button id="logoutBtn" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 p-2 rounded-lg transition">
-        <i class="fa-solid fa-power-off"></i> تسجيل خروج
-      </button>
-    </div>
+    <div class="p-4"><button id="logoutBtn" class="w-full bg-red-600 p-2 rounded">خروج <i class="fa-solid fa-power-off"></i></button></div>
   </aside>
 
   <!-- Main Content -->
   <main class="flex-1 flex flex-col h-screen overflow-y-auto">
-    <!-- Top Nav -->
-    <header class="bg-white shadow-sm p-4 flex justify-between items-center">
-      <h2 class="text-xl font-bold text-gray-800" id="pageTitle">نظرة عامة</h2>
-      <div class="flex items-center gap-4">
-        <button class="text-gray-500 hover:text-[#10b981]"><i class="fa-solid fa-bell text-xl"></i></button>
-        <div class="w-10 h-10 bg-[#d97706] text-white rounded-full flex items-center justify-center font-bold">
-          م
-        </div>
-      </div>
+    <header class="bg-white p-4 shadow-sm flex justify-between">
+      <h2 class="text-xl font-bold" id="pageTitle">نظرة عامة</h2>
     </header>
 
-    <!-- Dashboard Content -->
-    <div class="p-6">
-      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div class="card p-5 border-t-4 border-[#10b981]">
-          <p class="text-sm text-gray-500">إجمالي المبيعات (الشهر)</p>
-          <h3 class="text-2xl font-black text-gray-800 mt-1" id="statSales">0 ج.م</h3>
-        </div>
-        <div class="card p-5 border-t-4 border-[#d97706]">
-          <p class="text-sm text-gray-500">الطلبات قيد المراجعة</p>
-          <h3 class="text-2xl font-black text-gray-800 mt-1" id="statOrders">0</h3>
-        </div>
-        <div class="card p-5 border-t-4 border-blue-500">
-          <p class="text-sm text-gray-500">العملاء النشطين</p>
-          <h3 class="text-2xl font-black text-gray-800 mt-1" id="statCustomers">0</h3>
-        </div>
-        <div class="card p-5 border-t-4 border-red-500">
-          <p class="text-sm text-gray-500">منتجات منخفضة المخزون</p>
-          <h3 class="text-2xl font-black text-gray-800 mt-1" id="statAlerts">0</h3>
+    <div class="p-6 relative">
+      <!-- Tab: Dashboard -->
+      <div id="tab-dashboard" class="tab-content">
+        <div class="grid grid-cols-4 gap-4 mb-6">
+          <div class="card p-5 border-t-4 border-[#10b981]"><p class="text-sm">إجمالي المبيعات</p><h3 class="text-2xl font-bold" id="statSales">0</h3></div>
+          <div class="card p-5 border-t-4 border-[#d97706]"><p class="text-sm">طلبات للمراجعة</p><h3 class="text-2xl font-bold" id="statOrders">0</h3></div>
+          <div class="card p-5 border-t-4 border-blue-500"><p class="text-sm">العملاء</p><h3 class="text-2xl font-bold" id="statCustomers">0</h3></div>
         </div>
       </div>
 
-      <!-- Area for dynamic injection -->
-      <div id="mainView" class="card p-6 min-h-[400px]">
-        <h3 class="font-bold text-lg mb-4 text-[#047857]">آخر الطلبات</h3>
-        <div class="overflow-x-auto">
-          <table class="w-full text-right text-sm">
-            <thead>
-              <tr class="bg-gray-100 text-gray-600">
-                <th class="p-3 rounded-r-lg">رقم الطلب</th>
-                <th class="p-3">العميل</th>
-                <th class="p-3">المندوب</th>
-                <th class="p-3">الإجمالي</th>
-                <th class="p-3">الحالة</th>
-                <th class="p-3 rounded-l-lg">إجراء</th>
-              </tr>
-            </thead>
-            <tbody id="recentOrdersTable">
-              <!-- سيتم جلب البيانات هنا من Firestore -->
-            </tbody>
-          </table>
-        </div>
+      <!-- Tab: Orders Management -->
+      <div id="tab-orders" class="tab-content hidden card p-5">
+        <h3 class="font-bold mb-4">إدارة الطلبات</h3>
+        <table class="w-full text-right text-sm">
+          <thead class="bg-gray-100">
+            <tr><th class="p-3">رقم</th><th class="p-3">العميل</th><th class="p-3">المندوب</th><th class="p-3">الإجمالي</th><th class="p-3">الحالة</th><th class="p-3">إجراء</th></tr>
+          </thead>
+          <tbody id="adminOrdersTable"></tbody>
+        </table>
       </div>
     </div>
   </main>
 
   <script type="module">
-    import { auth } from "./assets/js/firebase/config.js";
-    import { signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    // سيتم استدعاء دوال الحماية وجلب البيانات هنا
-    
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      await signOut(auth);
-      window.location.href = "login.html";
+    import { auth, db } from "./assets/js/firebase/config.js";
+    import { logoutUser } from "./assets/js/firebase/auth.js";
+    import { updateOrderStatus } from "./assets/js/services/db.js";
+    import { formatCurrency } from "./assets/js/utils/helpers.js";
+    import { showToast } from "./assets/js/utils/ui.js";
+    import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { collection, query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+    document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+
+    // نظام التبويبات البسيط
+    window.switchTab = (tabId) => {
+      document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+      document.getElementById('pageTitle').innerText = tabId === 'dashboard' ? 'الرئيسية' : 'إدارة الطلبات';
+    };
+
+    onAuthStateChanged(auth, (user) => {
+      if (!user) window.location.href = "login.html";
+
+      // مراقبة الطلبات
+      onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
+        const table = document.getElementById('adminOrdersTable'); table.innerHTML = '';
+        let pending = 0, sales = 0;
+
+        snapshot.forEach(docSnap => {
+          const order = { id: docSnap.id, ...docSnap.data() };
+          if(order.status === 'تحت المراجعة') pending++;
+          if(order.status === 'مقبول' || order.status === 'تم التسليم') sales += order.netTotal;
+
+          const tr = document.createElement('tr'); tr.className = "border-b";
+          tr.innerHTML = `
+            <td class="p-3">#${order.id.slice(-6)}</td>
+            <td class="p-3 font-bold">${order.customerName}</td>
+            <td class="p-3">${order.salesEmail}</td>
+            <td class="p-3 text-[#10b981] font-bold">${formatCurrency(order.netTotal)}</td>
+            <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-gray-100">${order.status}</span></td>
+            <td class="p-3 flex gap-2">
+              <button class="approve-btn bg-green-500 text-white px-2 py-1 rounded text-xs">قبول</button>
+              <button class="reject-btn bg-red-500 text-white px-2 py-1 rounded text-xs">رفض</button>
+            </td>
+          `;
+          
+          tr.querySelector('.approve-btn').onclick = async () => {
+            await updateOrderStatus(order.id, 'مقبول'); showToast('تم الاعتماد');
+          };
+          tr.querySelector('.reject-btn').onclick = async () => {
+            await updateOrderStatus(order.id, 'مرفوض'); showToast('تم الرفض', 'error');
+          };
+          
+          table.appendChild(tr);
+        });
+        
+        document.getElementById('statOrders').innerText = pending;
+        document.getElementById('statSales').innerText = formatCurrency(sales);
+      });
+
+      // عدد العملاء
+      onSnapshot(collection(db, "users"), (snapshot) => {
+        let count = 0; snapshot.forEach(d => { if(d.data().role === 'customer') count++; });
+        document.getElementById('statCustomers').innerText = count;
+      });
     });
   </script>
 </body>
