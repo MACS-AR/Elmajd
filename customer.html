@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>بوابة العميل - المجد للأعلاف</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <!-- Top Nav -->
+  <nav class="bg-white shadow-sm p-4 sticky top-0 z-50">
+    <div class="max-w-5xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <img src="assets/images/logo.png" alt="المجد للأعلاف" class="h-10">
+        <div>
+          <h1 class="font-bold text-[#047857]">مرحباً، <span id="customerName">...</span></h1>
+          <p class="text-xs text-[#d97706] font-bold" id="customerTier"><i class="fa-solid fa-medal"></i> مستوى الحساب</p>
+        </div>
+      </div>
+      <button id="logoutBtn" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition"><i class="fa-solid fa-right-from-bracket"></i></button>
+    </div>
+  </nav>
+
+  <main class="max-w-5xl mx-auto p-4 space-y-6 mt-4">
+    
+    <!-- Loyalty Wallet Card -->
+    <div class="bg-gradient-to-r from-[#047857] to-[#10b981] rounded-2xl p-6 text-white shadow-lg relative overflow-hidden">
+      <i class="fa-solid fa-wheat-awn absolute left-[-20px] bottom-[-20px] text-9xl opacity-10"></i>
+      <div class="flex justify-between items-start relative z-10">
+        <div>
+          <p class="text-green-100 mb-1">رصيد النقاط المتاح</p>
+          <h2 class="text-5xl font-black text-[#d97706] drop-shadow-md" id="pointsBalance">0</h2>
+        </div>
+        <button onclick="window.location.href='scanner.html'" class="bg-white text-[#047857] px-4 py-2 rounded-lg font-bold shadow hover:scale-105 transition">
+          <i class="fa-solid fa-qrcode mr-1"></i> مسح كود جديد
+        </button>
+      </div>
+      
+      <div class="mt-6 bg-black/20 p-3 rounded-lg flex justify-between text-sm">
+        <span>النقاط المستهلكة: <b id="usedPoints">0</b></span>
+        <span>الهدف القادم: <b id="nextGoal">1000</b> نقطة</span>
+      </div>
+    </div>
+
+    <!-- Recent Orders & Financials -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      
+      <!-- Financial Summary -->
+      <div class="card p-5">
+        <h3 class="font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-wallet text-[#d97706]"></i> الموقف المالي</h3>
+        <ul class="space-y-3 text-sm">
+          <li class="flex justify-between bg-gray-50 p-3 rounded">
+            <span class="text-gray-500">الرصيد الحالي (مديونية)</span>
+            <span class="font-bold text-red-600" id="currentDebt">0.00 ج.م</span>
+          </li>
+          <li class="flex justify-between bg-gray-50 p-3 rounded">
+            <span class="text-gray-500">الحد الائتماني</span>
+            <span class="font-bold text-[#10b981]" id="creditLimit">0.00 ج.م</span>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Orders Timeline -->
+      <div class="card p-5">
+        <h3 class="font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-box text-[#047857]"></i> آخر الطلبات</h3>
+        <div id="customerOrders" class="space-y-3">
+          <!-- سيتم ضخ الطلبات هنا -->
+          <p class="text-sm text-gray-500 text-center py-4">جاري التحميل...</p>
+        </div>
+      </div>
+      
+    </div>
+  </main>
+
+  <script type="module">
+    import { auth, db } from "./assets/js/firebase/config.js";
+    import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+    onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const docRef = doc(db, "users", user.uid);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          document.getElementById('customerName').innerText = data.name || user.phoneNumber || "عميل مميز";
+          document.getElementById('pointsBalance').innerText = data.points || 0;
+          document.getElementById('customerTier').innerHTML = `<i class="fa-solid fa-medal"></i> ${data.tier || 'برونزي'}`;
+          document.getElementById('currentDebt').innerText = (data.currentDebt || 0) + ' ج.م';
+        }
+      } else {
+        window.location.href = "login.html";
+      }
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      signOut(auth).then(() => window.location.href = "login.html");
+    });
+  </script>
+</body>
+</html>
