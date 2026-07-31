@@ -1,0 +1,61 @@
+@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&display=swap');
+
+:root {
+  --majd-green: #10b981; /* أخضر زمردي */
+  --majd-green-dark: #047857;
+  --majd-gold: #d97706; /* ذهبي فاخر */
+  --majd-white: #ffffff;
+  --bg-light: #f3f4f6;
+  --bg-dark: #111827;
+  --card-dark: #1f2937;
+}
+
+body {
+  font-family: 'Tajawal', sans-serif;
+  background-color: var(--bg-light);
+  color: #1f2937;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+/* الوضع الداكن */
+body.dark-mode {
+  background-color: var(--bg-dark);
+  color: var(--majd-white);
+}
+
+.dark-mode .card {
+  background-color: var(--card-dark);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* البطاقات والأزرار المخصصة لهوية المصنع */
+.card {
+  background: var(--majd-white);
+  border-radius: 16px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(16, 185, 129, 0.1);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--majd-green), var(--majd-green-dark));
+  color: var(--majd-white);
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-weight: 700;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.3);
+}
+
+.btn-gold {
+  background: var(--majd-gold);
+  color: var(--majd-white);
+}
+
+/* تخصيص شريط التمرير (Scrollbar) */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-thumb { background: var(--majd-green); border-radius: 10px; }
+
