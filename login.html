@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>المجد للأعلاف - دخول النظام</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+  <div class="card max-w-md w-full p-8 relative overflow-hidden shadow-xl">
+    <!-- Header & Logo -->
+    <div class="text-center mb-8">
+      <!-- الشعار من GitHub حسب اشتراطك -->
+      <img src="https://raw.githubusercontent.com/username/elmajd-erp/main/assets/images/logo.png" 
+           alt="مصنع المجد للأعلاف" 
+           class="h-20 mx-auto mb-4 drop-shadow-md"
+           onerror="this.outerHTML='<i class=\'fa-solid fa-wheat-awn text-5xl text-[#10b981]\'></i>'">
+      
+      <h1 class="text-2xl font-black text-[#047857]">المجد للأعلاف</h1>
+      <p class="text-sm text-gray-500 mt-1">بوابة النظام الموحدة</p>
+    </div>
+
+    <!-- Toggles for Login Type -->
+    <div class="flex bg-gray-100 rounded-lg p-1 mb-6">
+      <button id="tabEmail" class="flex-1 py-2 rounded-md bg-white shadow text-[#10b981] font-bold text-sm transition">الموظفين (إدارة / مبيعات)</button>
+      <button id="tabPhone" class="flex-1 py-2 rounded-md text-gray-500 font-bold text-sm transition">العملاء (بالهاتف)</button>
+    </div>
+
+    <!-- Email Form (Admins/Sales) -->
+    <form id="emailForm" class="space-y-4">
+      <div>
+        <label class="text-sm font-semibold mb-1 block">البريد الإلكتروني</label>
+        <div class="relative">
+          <i class="fa-solid fa-envelope absolute right-3 top-3.5 text-gray-400"></i>
+          <input type="email" id="email" required class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 pr-10 pl-4 focus:outline-none focus:border-[#10b981]">
+        </div>
+      </div>
+      <div>
+        <label class="text-sm font-semibold mb-1 block">كلمة المرور</label>
+        <div class="relative">
+          <i class="fa-solid fa-lock absolute right-3 top-3.5 text-gray-400"></i>
+          <input type="password" id="password" required class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 pr-10 pl-4 focus:outline-none focus:border-[#10b981]">
+        </div>
+      </div>
+      <button type="submit" class="btn-primary w-full py-3 mt-4 flex items-center justify-center gap-2">
+        <span>دخول للإدارة / المبيعات</span>
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+    </form>
+
+    <!-- Phone Form (Customers) -->
+    <form id="phoneForm" class="space-y-4 hidden">
+      <div id="phoneStep">
+        <label class="text-sm font-semibold mb-1 block">رقم الهاتف المسجل مسبقاً</label>
+        <div class="relative text-left" dir="ltr">
+          <i class="fa-solid fa-phone absolute left-3 top-3.5 text-gray-400"></i>
+          <input type="tel" id="phoneNumber" placeholder="+201000000000" required class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 pl-10 pr-4 focus:outline-none focus:border-[#10b981]">
+        </div>
+        <button type="button" id="sendOtpBtn" class="btn-primary w-full py-3 mt-4">إرسال كود التحقق</button>
+      </div>
+
+      <div id="otpStep" class="hidden">
+        <label class="text-sm font-semibold mb-1 block text-center">أدخل كود التحقق المرسل</label>
+        <input type="text" id="otpCode" class="w-full bg-gray-50 border border-gray-200 rounded-lg py-3 text-center tracking-widest font-bold text-xl focus:outline-none focus:border-[#d97706]" placeholder="123456">
+        <button type="button" id="verifyOtpBtn" class="btn-gold w-full py-3 mt-4 rounded-lg font-bold text-white shadow-md">تأكيد الدخول</button>
+      </div>
+    </form>
+    
+    <div id="recaptcha-container"></div>
+  </div>
+
+  <script type="module">
+    import { loginWithEmail, setupRecaptcha, sendPhoneOTP, verifyPhoneOTP } from "./assets/js/firebase/auth.js";
+
+    const tabEmail = document.getElementById('tabEmail');
+    const tabPhone = document.getElementById('tabPhone');
+    const emailForm = document.getElementById('emailForm');
+    const phoneForm = document.getElementById('phoneForm');
+
+    tabPhone.addEventListener('click', () => {
+      tabEmail.className = "flex-1 py-2 rounded-md text-gray-500 font-bold text-sm transition";
+      tabPhone.className = "flex-1 py-2 rounded-md bg-white shadow text-[#10b981] font-bold text-sm transition";
+      emailForm.classList.add('hidden'); phoneForm.classList.remove('hidden');
+      setupRecaptcha('sendOtpBtn');
+    });
+
+    tabEmail.addEventListener('click', () => {
+      tabPhone.className = "flex-1 py-2 rounded-md text-gray-500 font-bold text-sm transition";
+      tabEmail.className = "flex-1 py-2 rounded-md bg-white shadow text-[#10b981] font-bold text-sm transition";
+      phoneForm.classList.add('hidden'); emailForm.classList.remove('hidden');
+    });
+
+    emailForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      loginWithEmail(document.getElementById('email').value, document.getElementById('password').value);
+    });
+
+    document.getElementById('sendOtpBtn').addEventListener('click', async () => {
+      const phone = document.getElementById('phoneNumber').value;
+      const sent = await sendPhoneOTP(phone);
+      if(sent) {
+        document.getElementById('phoneStep').classList.add('hidden');
+        document.getElementById('otpStep').classList.remove('hidden');
+      }
+    });
+
+    document.getElementById('verifyOtpBtn').addEventListener('click', () => {
+      verifyPhoneOTP(document.getElementById('otpCode').value);
+    });
+  </script>
+</body>
+</html>
+
