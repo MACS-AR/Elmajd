@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>الإدارة - المجد للأعلاف</title>
+  <link rel="manifest" href="manifest.json">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <link rel="stylesheet" href="assets/css/theme.css">
+</head>
+<body class="bg-gray-100 flex h-screen overflow-hidden">
+
+  <!-- Sidebar -->
+  <aside class="w-64 bg-[#047857] text-white flex flex-col transition-all duration-300">
+    <div class="p-4 flex items-center gap-3 border-b border-green-800">
+      <img src="assets/images/logo.png" alt="Logo" class="h-10 bg-white rounded-md p-1">
+      <h1 class="font-bold text-lg">لوحة الإدارة</h1>
+    </div>
+    
+    <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+      <a href="#dashboard" class="flex items-center gap-3 bg-green-800/50 p-3 rounded-lg text-amber-400 font-bold">
+        <i class="fa-solid fa-chart-pie"></i> الرئيسية
+      </a>
+      <a href="#orders" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
+        <i class="fa-solid fa-boxes-stacked"></i> الطلبات
+      </a>
+      <a href="#sales" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
+        <i class="fa-solid fa-users-gear"></i> المناديب
+      </a>
+      <a href="#customers" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
+        <i class="fa-solid fa-users"></i> العملاء
+      </a>
+      <a href="#products" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
+        <i class="fa-solid fa-wheat-awn"></i> المنتجات والمخزون
+      </a>
+      <a href="#loyalty" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
+        <i class="fa-solid fa-qrcode"></i> نظام الولاء والأكواد
+      </a>
+      <a href="#reports" class="flex items-center gap-3 hover:bg-green-800 p-3 rounded-lg transition">
+        <i class="fa-solid fa-file-invoice-dollar"></i> التقارير الماليـة
+      </a>
+    </nav>
+    
+    <div class="p-4 border-t border-green-800">
+      <button id="logoutBtn" class="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 p-2 rounded-lg transition">
+        <i class="fa-solid fa-power-off"></i> تسجيل خروج
+      </button>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="flex-1 flex flex-col h-screen overflow-y-auto">
+    <!-- Top Nav -->
+    <header class="bg-white shadow-sm p-4 flex justify-between items-center">
+      <h2 class="text-xl font-bold text-gray-800" id="pageTitle">نظرة عامة</h2>
+      <div class="flex items-center gap-4">
+        <button class="text-gray-500 hover:text-[#10b981]"><i class="fa-solid fa-bell text-xl"></i></button>
+        <div class="w-10 h-10 bg-[#d97706] text-white rounded-full flex items-center justify-center font-bold">
+          م
+        </div>
+      </div>
+    </header>
+
+    <!-- Dashboard Content -->
+    <div class="p-6">
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+        <div class="card p-5 border-t-4 border-[#10b981]">
+          <p class="text-sm text-gray-500">إجمالي المبيعات (الشهر)</p>
+          <h3 class="text-2xl font-black text-gray-800 mt-1" id="statSales">0 ج.م</h3>
+        </div>
+        <div class="card p-5 border-t-4 border-[#d97706]">
+          <p class="text-sm text-gray-500">الطلبات قيد المراجعة</p>
+          <h3 class="text-2xl font-black text-gray-800 mt-1" id="statOrders">0</h3>
+        </div>
+        <div class="card p-5 border-t-4 border-blue-500">
+          <p class="text-sm text-gray-500">العملاء النشطين</p>
+          <h3 class="text-2xl font-black text-gray-800 mt-1" id="statCustomers">0</h3>
+        </div>
+        <div class="card p-5 border-t-4 border-red-500">
+          <p class="text-sm text-gray-500">منتجات منخفضة المخزون</p>
+          <h3 class="text-2xl font-black text-gray-800 mt-1" id="statAlerts">0</h3>
+        </div>
+      </div>
+
+      <!-- Area for dynamic injection -->
+      <div id="mainView" class="card p-6 min-h-[400px]">
+        <h3 class="font-bold text-lg mb-4 text-[#047857]">آخر الطلبات</h3>
+        <div class="overflow-x-auto">
+          <table class="w-full text-right text-sm">
+            <thead>
+              <tr class="bg-gray-100 text-gray-600">
+                <th class="p-3 rounded-r-lg">رقم الطلب</th>
+                <th class="p-3">العميل</th>
+                <th class="p-3">المندوب</th>
+                <th class="p-3">الإجمالي</th>
+                <th class="p-3">الحالة</th>
+                <th class="p-3 rounded-l-lg">إجراء</th>
+              </tr>
+            </thead>
+            <tbody id="recentOrdersTable">
+              <!-- سيتم جلب البيانات هنا من Firestore -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module">
+    import { auth } from "./assets/js/firebase/config.js";
+    import { signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    // سيتم استدعاء دوال الحماية وجلب البيانات هنا
+    
+    document.getElementById('logoutBtn').addEventListener('click', async () => {
+      await signOut(auth);
+      window.location.href = "login.html";
+    });
+  </script>
+</body>
+</html>
