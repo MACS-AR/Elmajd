@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>المجد للأعلاف - جاري التحويل...</title>
+    <script type="module">
+        import { auth } from "./assets/js/firebase/config.js";
+        import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // سيتم تحديد التوجيه بناءً على الصلاحية في ملفات الدخول
+                window.location.href = "login.html";
+            } else {
+                window.location.href = "login.html";
+            }
+        });
+    </script>
+</head>
+<body style="background-color: #f3f4f6; display: flex; justify-content: center; align-items: center; height: 100vh;">
+    <h2 style="color: #047857; font-family: sans-serif;">جاري تحميل النظام...</h2>
+</body>
+</html>
