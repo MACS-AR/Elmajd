@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>بوابة المبيعات - المجد للأعلاف</title>
+  <title>المبيعات - المجد للأعلاف</title>
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
@@ -11,143 +11,176 @@
 </head>
 <body class="bg-gray-100 flex flex-col h-screen overflow-hidden">
 
-  <!-- Header -->
-  <header class="bg-white shadow-sm p-4 flex justify-between items-center z-10 border-b-2 border-[#10b981]">
+  <header class="bg-white shadow-sm p-4 flex justify-between items-center border-b-2 border-[#10b981]">
     <div class="flex items-center gap-3">
-      <img src="assets/images/logo.png" alt="Logo" class="h-10">
+      <img src="https://raw.githubusercontent.com/username/elmajd-erp/main/assets/images/logo.png" alt="Logo" class="h-10" onerror="this.outerHTML='<i class=\'fa-solid fa-wheat-awn text-3xl text-[#10b981]\'></i>'">
       <div>
         <h1 class="font-bold text-[#047857]">نظام المبيعات</h1>
         <p class="text-xs text-gray-500" id="salesName">جاري التحميل...</p>
       </div>
     </div>
     <div class="flex items-center gap-3">
-      <button onclick="document.getElementById('newOrderModal').classList.remove('hidden')" class="btn-primary text-sm shadow-md">
+      <button onclick="document.getElementById('newOrderModal').classList.remove('hidden')" class="btn-primary text-sm">
         <i class="fa-solid fa-plus ml-1"></i> طلب جديد
       </button>
-      <button id="logoutBtn" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition">
-        <i class="fa-solid fa-power-off text-xl"></i>
-      </button>
+      <button id="logoutBtn" class="text-red-500 hover:bg-red-50 p-2 rounded-lg transition"><i class="fa-solid fa-power-off text-xl"></i></button>
     </div>
   </header>
 
-  <!-- Main Workspace -->
   <main class="flex-1 overflow-y-auto p-4 md:p-6">
-    <!-- Stats -->
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
       <div class="card p-4 border-r-4 border-[#10b981]">
         <p class="text-xs text-gray-500">مبيعاتي اليوم</p>
-        <h3 class="text-xl font-bold text-[#047857] mt-1" id="todaySales">0 ج.م</h3>
+        <h3 class="text-xl font-bold text-[#047857]" id="todaySales">0 ج.م</h3>
       </div>
       <div class="card p-4 border-r-4 border-[#d97706]">
         <p class="text-xs text-gray-500">طلبات قيد المراجعة</p>
-        <h3 class="text-xl font-bold text-[#d97706] mt-1" id="pendingOrders">0</h3>
+        <h3 class="text-xl font-bold text-[#d97706]" id="pendingOrders">0</h3>
       </div>
     </div>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      
-      <!-- My Customers List -->
       <div class="card p-5 lg:col-span-1 min-h-[400px]">
         <div class="flex justify-between items-center mb-4 border-b pb-2">
-          <h3 class="font-bold text-gray-800"><i class="fa-solid fa-users text-[#10b981]"></i> عملائي</h3>
-          <span class="text-xs bg-gray-100 px-2 py-1 rounded text-gray-600" id="customersCount">0</span>
+          <h3 class="font-bold"><i class="fa-solid fa-users text-[#10b981]"></i> عملائي</h3>
+          <span class="text-xs bg-gray-100 px-2 rounded" id="customersCount">0</span>
         </div>
-        <div class="relative mb-3">
-          <i class="fa-solid fa-search absolute right-3 top-3 text-gray-400"></i>
-          <input type="text" placeholder="بحث برقم الهاتف أو الاسم..." class="w-full bg-gray-50 border border-gray-200 rounded-lg py-2 pr-9 pl-3 text-sm focus:outline-none focus:border-[#10b981]">
-        </div>
-        <ul id="customersList" class="space-y-2 overflow-y-auto max-h-[300px]">
-          <!-- يتم عرض العملاء المربوطين بهذا المندوب فقط -->
-          <li class="text-center text-sm text-gray-500 py-4">جاري تحميل العملاء...</li>
-        </ul>
+        <ul id="customersList" class="space-y-2 max-h-[300px] overflow-y-auto"></ul>
       </div>
 
-      <!-- Recent Orders by this Rep -->
       <div class="card p-5 lg:col-span-2">
-        <h3 class="font-bold text-gray-800 mb-4 border-b pb-2"><i class="fa-solid fa-list-check text-[#d97706]"></i> سجل طلباتي</h3>
+        <h3 class="font-bold mb-4 border-b pb-2"><i class="fa-solid fa-list-check text-[#d97706]"></i> طلباتي</h3>
         <div class="overflow-x-auto">
           <table class="w-full text-right text-sm">
-            <thead>
-              <tr class="bg-gray-100 text-gray-600">
+            <thead class="bg-gray-100 text-gray-600">
+              <tr>
                 <th class="p-3">التاريخ</th>
                 <th class="p-3">العميل</th>
                 <th class="p-3">الإجمالي</th>
                 <th class="p-3">الحالة</th>
+                <th class="p-3">طباعة</th>
               </tr>
             </thead>
-            <tbody id="salesOrdersTable">
-              <!-- الطلبات تُعرض هنا -->
-            </tbody>
+            <tbody id="salesOrdersTable"></tbody>
           </table>
         </div>
       </div>
     </div>
   </main>
 
-  <!-- New Order Modal -->
-  <div id="newOrderModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="card w-full max-w-2xl bg-white rounded-2xl shadow-2xl overflow-hidden">
-      <div class="bg-[#047857] p-4 flex justify-between items-center text-white">
+  <!-- Modal إنشاء طلب -->
+  <div id="newOrderModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="card w-full max-w-2xl bg-white rounded-2xl overflow-hidden">
+      <div class="bg-[#047857] p-4 flex justify-between text-white">
         <h3 class="font-bold">إنشاء طلب جديد</h3>
-        <button onclick="document.getElementById('newOrderModal').classList.add('hidden')" class="hover:text-red-300"><i class="fa-solid fa-times text-xl"></i></button>
+        <button onclick="document.getElementById('newOrderModal').classList.add('hidden')"><i class="fa-solid fa-times text-xl"></i></button>
       </div>
       <form id="createOrderForm" class="p-6 space-y-4">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label class="block text-sm font-semibold mb-1">اختر العميل</label>
-            <select id="selectCustomer" class="w-full border rounded-lg p-2.5 focus:border-[#10b981] outline-none" required>
-              <option value="">جاري التحميل...</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">اختر المنتج</label>
-            <select id="selectProduct" class="w-full border rounded-lg p-2.5 focus:border-[#10b981] outline-none" required>
-              <option value="">جاري التحميل...</option>
-            </select>
-          </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div><label class="block text-sm font-semibold">العميل</label><select id="selectCustomer" class="w-full border p-2 rounded outline-none focus:border-[#10b981]" required></select></div>
+          <div><label class="block text-sm font-semibold">المنتج</label><select id="selectProduct" class="w-full border p-2 rounded outline-none focus:border-[#10b981]" required></select></div>
         </div>
-        
         <div class="grid grid-cols-3 gap-4">
-          <div>
-            <label class="block text-sm font-semibold mb-1">الكمية</label>
-            <input type="number" id="orderQty" min="1" class="w-full border rounded-lg p-2.5 outline-none focus:border-[#10b981]" required>
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1">الخصم (ج.م)</label>
-            <input type="number" id="orderDiscount" value="0" min="0" class="w-full border rounded-lg p-2.5 outline-none focus:border-[#10b981]">
-          </div>
-          <div>
-            <label class="block text-sm font-semibold mb-1 text-gray-500">الصافي المتوقع</label>
-            <input type="text" id="orderTotal" class="w-full border rounded-lg p-2.5 bg-gray-50 font-bold text-[#10b981]" readonly value="0 ج.م">
-          </div>
+          <div><label class="block text-sm font-semibold">الكمية</label><input type="number" id="orderQty" min="1" class="w-full border p-2 rounded outline-none" required></div>
+          <div><label class="block text-sm font-semibold">الخصم</label><input type="number" id="orderDiscount" value="0" min="0" class="w-full border p-2 rounded outline-none"></div>
+          <div><label class="block text-sm font-semibold">الصافي</label><input type="text" id="orderTotal" class="w-full border p-2 rounded bg-gray-50 font-bold text-[#10b981]" readonly value="0 ج.م"></div>
         </div>
-        
-        <div>
-          <label class="block text-sm font-semibold mb-1">ملاحظات الطلب</label>
-          <textarea id="orderNotes" rows="2" class="w-full border rounded-lg p-2.5 outline-none focus:border-[#10b981]"></textarea>
-        </div>
-
-        <div class="flex gap-3 pt-4 border-t">
-          <button type="submit" class="btn-primary flex-1">إرسال الطلب للإدارة</button>
-          <button type="button" onclick="document.getElementById('newOrderModal').classList.add('hidden')" class="bg-gray-200 text-gray-800 font-bold py-2 px-6 rounded-lg">إلغاء</button>
-        </div>
+        <button type="submit" class="btn-primary w-full py-3 mt-4">إرسال للإدارة</button>
       </form>
     </div>
   </div>
 
   <script type="module">
-    import { auth } from "./assets/js/firebase/config.js";
+    import { auth, db } from "./assets/js/firebase/config.js";
     import { logoutUser } from "./assets/js/firebase/auth.js";
+    import { getCustomersBySales, createNewOrder } from "./assets/js/services/db.js";
+    import { formatCurrency, formatDate } from "./assets/js/utils/helpers.js";
+    import { showToast } from "./assets/js/utils/ui.js";
+    import { printOrderInvoice } from "./assets/js/utils/print.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+    import { collection, query, where, onSnapshot, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-    // حماية الصفحة للمناديب فقط
-    onAuthStateChanged(auth, (user) => {
-      if (!user) window.location.href = "login.html";
-      // سيتم جلب بيانات المندوب وعملائه هنا لاحقاً عبر db.js
-      document.getElementById('salesName').innerText = user.email;
+    let currentUser = null, selectedProductPrice = 0;
+    document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+
+    onAuthStateChanged(auth, async (user) => {
+      if (!user) return window.location.href = "login.html";
+      currentUser = user; document.getElementById('salesName').innerText = user.email;
+
+      // عملاء المندوب
+      const customers = await getCustomersBySales(user.uid);
+      document.getElementById('customersCount').innerText = customers.length;
+      customers.forEach(c => {
+        document.getElementById('customersList').innerHTML += `<li class="bg-white p-3 rounded border text-sm flex justify-between font-bold">${c.name} <span>${c.phone}</span></li>`;
+        document.getElementById('selectCustomer').innerHTML += `<option value="${c.id}" data-name="${c.name}">${c.name}</option>`;
+      });
+
+      // المنتجات
+      const pSnapshot = await getDocs(collection(db, "products"));
+      pSnapshot.forEach(doc => {
+        const p = doc.data();
+        if(p.status === 'active') document.getElementById('selectProduct').innerHTML += `<option value="${doc.id}" data-price="${p.price}" data-name="${p.name}">${p.name} - ${p.price} ج.م</option>`;
+      });
+
+      // الطلبات
+      onSnapshot(query(collection(db, "orders"), where("salesId", "==", user.uid)), (snapshot) => {
+        const table = document.getElementById('salesOrdersTable'); table.innerHTML = '';
+        let pending = 0, total = 0;
+        
+        snapshot.forEach(docSnap => {
+          const order = { id: docSnap.id, ...docSnap.data() };
+          if(order.status === 'تحت المراجعة') pending++;
+          if(order.status === 'تم التسليم') total += order.netTotal;
+
+          const color = order.status === 'مرفوض' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+          
+          const tr = document.createElement('tr');
+          tr.className = "border-b";
+          tr.innerHTML = `
+            <td class="p-3">${formatDate(order.createdAt?.toDate())}</td>
+            <td class="p-3 font-bold">${order.customerName}</td>
+            <td class="p-3 text-[#10b981] font-bold">${formatCurrency(order.netTotal)}</td>
+            <td class="p-3"><span class="px-2 py-1 rounded text-xs ${color}">${order.status}</span></td>
+            <td class="p-3"><button class="print-btn text-gray-500 hover:text-blue-500"><i class="fa-solid fa-print"></i></button></td>
+          `;
+          tr.querySelector('.print-btn').onclick = () => printOrderInvoice(order, { name: order.customerName, phone: '---' });
+          table.appendChild(tr);
+        });
+        document.getElementById('pendingOrders').innerText = pending;
+        document.getElementById('todaySales').innerText = formatCurrency(total);
+      });
     });
 
-    document.getElementById('logoutBtn').addEventListener('click', logoutUser);
+    // الحساب التلقائي
+    const calc = () => {
+      const qty = parseFloat(document.getElementById('orderQty').value) || 0;
+      const disc = parseFloat(document.getElementById('orderDiscount').value) || 0;
+      document.getElementById('orderTotal').value = formatCurrency((qty * selectedProductPrice) - disc);
+    };
+    document.getElementById('selectProduct').addEventListener('change', e => {
+      selectedProductPrice = parseFloat(e.target.options[e.target.selectedIndex].dataset.price) || 0; calc();
+    });
+    document.getElementById('orderQty').addEventListener('input', calc);
+    document.getElementById('orderDiscount').addEventListener('input', calc);
+
+    // إرسال الطلب
+    document.getElementById('createOrderForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const c = document.getElementById('selectCustomer');
+      const p = document.getElementById('selectProduct');
+      const sub = (parseFloat(document.getElementById('orderQty').value) || 0) * selectedProductPrice;
+      const net = sub - (parseFloat(document.getElementById('orderDiscount').value) || 0);
+
+      const res = await createNewOrder({
+        salesId: currentUser.uid, salesEmail: currentUser.email,
+        customerId: c.value, customerName: c.options[c.selectedIndex].dataset.name,
+        productId: p.value, productName: p.options[p.selectedIndex].dataset.name,
+        qty: parseFloat(document.getElementById('orderQty').value), unitPrice: selectedProductPrice,
+        subTotal: sub, discount: parseFloat(document.getElementById('orderDiscount').value), netTotal: net
+      });
+
+      if(res.success) { showToast("تم الإرسال بنجاح!", "success"); document.getElementById('newOrderModal').classList.add('hidden'); }
+    });
   </script>
 </body>
 </html>
