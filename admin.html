@@ -2,81 +2,160 @@
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8">
-  <title>الإدارة - المجد للأعلاف</title>
+  <title>الإدارة المركزية - المجد للأعلاف</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
   <link rel="stylesheet" href="assets/css/theme.css">
 </head>
 <body class="bg-gray-100 flex h-screen overflow-hidden">
 
-  <!-- Sidebar -->
+  <!-- القائمة الجانبية (Sidebar) -->
   <aside class="w-64 bg-[#047857] text-white flex flex-col">
-    <div class="p-4 flex gap-3 border-b border-green-800">
-      <img src="https://raw.githubusercontent.com/username/elmajd-erp/main/assets/images/logo.png" alt="Logo" class="h-10 bg-white rounded p-1" onerror="this.outerHTML='<i class=\'fa-solid fa-wheat-awn text-3xl\'></i>'">
-      <h1 class="font-bold text-lg">لوحة الإدارة</h1>
+    <div class="p-4 flex gap-3 border-b border-green-800 items-center">
+      <img src="https://raw.githubusercontent.com/username/elmajd-erp/main/assets/images/logo.png" alt="Logo" class="h-10 bg-white rounded p-1">
+      <h1 class="font-bold text-lg leading-tight">المجد للأعلاف<br><span class="text-xs text-amber-300">الإدارة المركزية</span></h1>
     </div>
-    <nav class="flex-1 p-4 space-y-2">
-      <button onclick="switchTab('dashboard')" class="w-full text-right p-3 rounded hover:bg-green-800"><i class="fa-solid fa-chart-pie w-6"></i> الرئيسية</button>
-      <button onclick="switchTab('orders')" class="w-full text-right p-3 rounded hover:bg-green-800"><i class="fa-solid fa-boxes-stacked w-6"></i> الطلبات</button>
+    <nav class="flex-1 p-4 space-y-1 overflow-y-auto">
+      <button onclick="switchTab('dashboard', 'الرئيسية')" class="w-full text-right p-3 rounded hover:bg-green-800 flex items-center gap-2"><i class="fa-solid fa-chart-pie w-5"></i> الرئيسية</button>
+      <button onclick="switchTab('orders', 'إدارة الطلبات')" class="w-full text-right p-3 rounded hover:bg-green-800 flex items-center gap-2"><i class="fa-solid fa-boxes-stacked w-5"></i> الطلبات</button>
+      <button onclick="switchTab('products', 'إدارة المنتجات')" class="w-full text-right p-3 rounded hover:bg-green-800 flex items-center gap-2"><i class="fa-solid fa-wheat-awn w-5"></i> المنتجات</button>
+      <button onclick="switchTab('reps', 'إدارة المناديب')" class="w-full text-right p-3 rounded hover:bg-green-800 flex items-center gap-2"><i class="fa-solid fa-users-gear w-5"></i> المناديب</button>
+      <button onclick="switchTab('loyalty', 'مولد الأكواد ونظام الولاء')" class="w-full text-right p-3 rounded hover:bg-green-800 flex items-center gap-2 text-amber-300 font-bold"><i class="fa-solid fa-qrcode w-5"></i> أكواد الولاء</button>
     </nav>
-    <div class="p-4"><button id="logoutBtn" class="w-full bg-red-600 p-2 rounded">خروج <i class="fa-solid fa-power-off"></i></button></div>
+    <div class="p-4 flex gap-2 border-t border-green-800">
+      <a href="profile.html" class="bg-green-700 hover:bg-green-600 p-2 rounded text-center flex-1 transition"><i class="fa-solid fa-user"></i></a>
+      <button id="logoutBtn" class="bg-red-600 hover:bg-red-700 p-2 rounded text-center flex-1 transition"><i class="fa-solid fa-power-off"></i></button>
+    </div>
   </aside>
 
-  <!-- Main Content -->
+  <!-- المحتوى الرئيسي (Main Content) -->
   <main class="flex-1 flex flex-col h-screen overflow-y-auto">
-    <header class="bg-white p-4 shadow-sm flex justify-between">
-      <h2 class="text-xl font-bold" id="pageTitle">نظرة عامة</h2>
+    <header class="bg-white p-4 shadow-sm">
+      <h2 class="text-xl font-bold text-gray-800" id="pageTitle">الرئيسية</h2>
     </header>
 
     <div class="p-6 relative">
-      <!-- Tab: Dashboard -->
-      <div id="tab-dashboard" class="tab-content">
-        <div class="grid grid-cols-4 gap-4 mb-6">
-          <div class="card p-5 border-t-4 border-[#10b981]"><p class="text-sm">إجمالي المبيعات</p><h3 class="text-2xl font-bold" id="statSales">0</h3></div>
-          <div class="card p-5 border-t-4 border-[#d97706]"><p class="text-sm">طلبات للمراجعة</p><h3 class="text-2xl font-bold" id="statOrders">0</h3></div>
-          <div class="card p-5 border-t-4 border-blue-500"><p class="text-sm">العملاء</p><h3 class="text-2xl font-bold" id="statCustomers">0</h3></div>
+      
+      <!-- 1. الرئيسية (Dashboard) -->
+      <div id="tab-dashboard" class="tab-content block">
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <div class="card p-5 border-t-4 border-[#10b981]"><p class="text-sm text-gray-500">إجمالي المبيعات</p><h3 class="text-2xl font-bold" id="statSales">0 ج.م</h3></div>
+          <div class="card p-5 border-t-4 border-[#d97706]"><p class="text-sm text-gray-500">طلبات للمراجعة</p><h3 class="text-2xl font-bold" id="statOrders">0</h3></div>
+          <div class="card p-5 border-t-4 border-blue-500"><p class="text-sm text-gray-500">العملاء النشطين</p><h3 class="text-2xl font-bold" id="statCustomers">0</h3></div>
+          <div class="card p-5 border-t-4 border-red-500"><p class="text-sm text-gray-500">أكواد ولاء مستخدمة</p><h3 class="text-2xl font-bold" id="statCodes">0</h3></div>
         </div>
       </div>
 
-      <!-- Tab: Orders Management -->
+      <!-- 2. الطلبات (Orders) -->
       <div id="tab-orders" class="tab-content hidden card p-5">
-        <h3 class="font-bold mb-4">إدارة الطلبات</h3>
+        <h3 class="font-bold mb-4 border-b pb-2">أحدث الطلبات</h3>
         <table class="w-full text-right text-sm">
-          <thead class="bg-gray-100">
-            <tr><th class="p-3">رقم</th><th class="p-3">العميل</th><th class="p-3">المندوب</th><th class="p-3">الإجمالي</th><th class="p-3">الحالة</th><th class="p-3">إجراء</th></tr>
+          <thead class="bg-gray-100 text-gray-600">
+            <tr><th class="p-3">رقم</th><th class="p-3">العميل</th><th class="p-3">الإجمالي</th><th class="p-3">الحالة</th><th class="p-3">إجراء</th></tr>
           </thead>
           <tbody id="adminOrdersTable"></tbody>
         </table>
       </div>
+
+      <!-- 3. المنتجات (Products) -->
+      <div id="tab-products" class="tab-content hidden space-y-6">
+        <div class="card p-5 bg-gray-50 border border-gray-200">
+          <h3 class="font-bold mb-4 text-[#047857]"><i class="fa-solid fa-plus-circle"></i> إضافة منتج جديد</h3>
+          <form id="addProductForm" class="grid grid-cols-4 gap-4">
+            <input type="text" id="pName" placeholder="اسم المنتج" class="border p-2 rounded col-span-2 outline-none focus:border-[#10b981]" required>
+            <input type="number" id="pPrice" placeholder="السعر (ج.م)" class="border p-2 rounded outline-none focus:border-[#10b981]" required>
+            <input type="number" id="pStock" placeholder="الكمية الافتتاحية" class="border p-2 rounded outline-none focus:border-[#10b981]" required>
+            <button type="submit" class="btn-primary col-span-4 py-2">حفظ المنتج</button>
+          </form>
+        </div>
+        <div class="card p-5">
+          <h3 class="font-bold mb-4 border-b pb-2">قائمة المنتجات</h3>
+          <table class="w-full text-right text-sm">
+            <thead class="bg-[#047857] text-white">
+              <tr><th class="p-2">المنتج</th><th class="p-2">السعر</th><th class="p-2">المخزون</th><th class="p-2">الحالة</th></tr>
+            </thead>
+            <tbody id="productsTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 4. المناديب (Sales Reps) -->
+      <div id="tab-reps" class="tab-content hidden card p-5">
+        <h3 class="font-bold mb-4 border-b pb-2">فريق المبيعات (المناديب)</h3>
+        <div class="bg-blue-50 text-blue-800 p-3 rounded text-sm mb-4">
+          <i class="fa-solid fa-circle-info"></i> لإنشاء حساب مندوب جديد، يرجى استخدام لوحة Firebase Authentication للأمان، ثم إضافة بياناته هنا وربطه بـ UID.
+        </div>
+        <table class="w-full text-right text-sm">
+          <thead class="bg-gray-100 text-gray-600">
+            <tr><th class="p-3">الاسم</th><th class="p-3">البريد الإلكتروني</th><th class="p-3">تاريخ الانضمام</th><th class="p-3">الحالة</th></tr>
+          </thead>
+          <tbody id="repsTable"></tbody>
+        </table>
+      </div>
+
+      <!-- 5. مولد أكواد الولاء (Loyalty Generator) -->
+      <div id="tab-loyalty" class="tab-content hidden card p-5 border-t-4 border-[#d97706]">
+        <h3 class="font-bold mb-4 text-[#d97706]"><i class="fa-solid fa-wand-magic-sparkles"></i> إنشاء أكواد QR فريدة لدفعة إنتاج</h3>
+        <p class="text-sm text-gray-500 mb-6">سيتم توليد أكواد عشوائية فريدة لاستخدامها في المطبوعات وعلى العبوات. كل كود يستخدم لمرة واحدة فقط.</p>
+        
+        <form id="generateCodesForm" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div class="col-span-2">
+            <label class="block text-sm font-bold mb-1">اختر المنتج</label>
+            <select id="lProduct" class="w-full border p-2 rounded outline-none focus:border-[#d97706]" required></select>
+          </div>
+          <div>
+            <label class="block text-sm font-bold mb-1">رقم التشغيلة (Batch)</label>
+            <input type="text" id="lBatch" class="w-full border p-2 rounded outline-none focus:border-[#d97706]" required placeholder="B-2024-001">
+          </div>
+          <div>
+            <label class="block text-sm font-bold mb-1">عدد الأكواد المطلوبة</label>
+            <input type="number" id="lCount" class="w-full border p-2 rounded outline-none focus:border-[#d97706]" required min="1" max="5000" placeholder="مثال: 1000">
+          </div>
+          <div>
+            <label class="block text-sm font-bold mb-1">النقاط لكل كود</label>
+            <input type="number" id="lPoints" class="w-full border p-2 rounded outline-none focus:border-[#d97706]" required min="1" placeholder="مثال: 10">
+          </div>
+          <div class="col-span-3 flex items-end">
+            <button type="submit" class="btn-gold w-full py-2 shadow font-bold text-white"><i class="fa-solid fa-gears"></i> توليد الأكواد الآن</button>
+          </div>
+        </form>
+
+        <div id="codesResultArea" class="hidden mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+          <h4 class="font-bold text-green-800 mb-2">تم توليد الأكواد بنجاح!</h4>
+          <p class="text-sm text-green-700">يمكنك الآن تصدير هذه الأكواد لملف Excel وإرسالها للمطبعة لطباعتها كـ QR Code.</p>
+          <button type="button" onclick="alert('في بيئة الإنتاج: سيتم تفعيل تصدير Excel للأكواد المولدة')" class="mt-3 bg-green-600 text-white px-4 py-2 rounded text-sm shadow">تصدير الأكواد (Excel)</button>
+        </div>
+      </div>
+
     </div>
   </main>
 
   <script type="module">
     import { auth, db } from "./assets/js/firebase/config.js";
     import { logoutUser } from "./assets/js/firebase/auth.js";
-    import { updateOrderStatus } from "./assets/js/services/db.js";
+    import { updateOrderStatus, createProduct } from "./assets/js/services/db.js";
+    import { generateBatchCodes } from "./assets/js/services/loyalty.js";
     import { formatCurrency } from "./assets/js/utils/helpers.js";
     import { showToast } from "./assets/js/utils/ui.js";
     import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { collection, query, onSnapshot, orderBy } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+    import { collection, query, onSnapshot, orderBy, where, getDocs } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
     document.getElementById('logoutBtn').addEventListener('click', logoutUser);
 
-    // نظام التبويبات البسيط
-    window.switchTab = (tabId) => {
+    // نظام التحكم في التبويبات (Tabs Logic)
+    window.switchTab = (tabId, title) => {
       document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
       document.getElementById(`tab-${tabId}`).classList.remove('hidden');
-      document.getElementById('pageTitle').innerText = tabId === 'dashboard' ? 'الرئيسية' : 'إدارة الطلبات';
+      document.getElementById('pageTitle').innerText = title;
     };
 
     onAuthStateChanged(auth, (user) => {
       if (!user) window.location.href = "login.html";
 
-      // مراقبة الطلبات
+      // === 1. جلب الطلبات (Realtime) ===
       onSnapshot(query(collection(db, "orders"), orderBy("createdAt", "desc")), (snapshot) => {
         const table = document.getElementById('adminOrdersTable'); table.innerHTML = '';
         let pending = 0, sales = 0;
-
         snapshot.forEach(docSnap => {
           const order = { id: docSnap.id, ...docSnap.data() };
           if(order.status === 'تحت المراجعة') pending++;
@@ -84,36 +163,89 @@
 
           const tr = document.createElement('tr'); tr.className = "border-b";
           tr.innerHTML = `
-            <td class="p-3">#${order.id.slice(-6)}</td>
-            <td class="p-3 font-bold">${order.customerName}</td>
-            <td class="p-3">${order.salesEmail}</td>
-            <td class="p-3 text-[#10b981] font-bold">${formatCurrency(order.netTotal)}</td>
-            <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-gray-100">${order.status}</span></td>
+            <td class="p-3">#${order.id.slice(-6)}</td><td class="p-3 font-bold">${order.customerName}</td>
+            <td class="p-3 font-bold text-[#10b981]">${formatCurrency(order.netTotal)}</td>
+            <td class="p-3"><span class="px-2 py-1 rounded text-xs bg-gray-200">${order.status}</span></td>
             <td class="p-3 flex gap-2">
-              <button class="approve-btn bg-green-500 text-white px-2 py-1 rounded text-xs">قبول</button>
-              <button class="reject-btn bg-red-500 text-white px-2 py-1 rounded text-xs">رفض</button>
+              <button class="approve text-green-600 hover:text-green-800"><i class="fa-solid fa-check-circle text-lg"></i></button>
+              <button class="reject text-red-600 hover:text-red-800"><i class="fa-solid fa-times-circle text-lg"></i></button>
             </td>
           `;
-          
-          tr.querySelector('.approve-btn').onclick = async () => {
-            await updateOrderStatus(order.id, 'مقبول'); showToast('تم الاعتماد');
-          };
-          tr.querySelector('.reject-btn').onclick = async () => {
-            await updateOrderStatus(order.id, 'مرفوض'); showToast('تم الرفض', 'error');
-          };
-          
+          tr.querySelector('.approve').onclick = () => { updateOrderStatus(order.id, 'مقبول'); showToast('تم الاعتماد', 'success'); };
+          tr.querySelector('.reject').onclick = () => { updateOrderStatus(order.id, 'مرفوض'); showToast('تم الرفض', 'error'); };
           table.appendChild(tr);
         });
-        
         document.getElementById('statOrders').innerText = pending;
         document.getElementById('statSales').innerText = formatCurrency(sales);
       });
 
-      // عدد العملاء
-      onSnapshot(collection(db, "users"), (snapshot) => {
-        let count = 0; snapshot.forEach(d => { if(d.data().role === 'customer') count++; });
-        document.getElementById('statCustomers').innerText = count;
+      // === 2. جلب المنتجات (Realtime) ===
+      onSnapshot(collection(db, "products"), (snapshot) => {
+        const table = document.getElementById('productsTable'); table.innerHTML = '';
+        const lProductSelect = document.getElementById('lProduct'); lProductSelect.innerHTML = '<option value="">اختر...</option>';
+        
+        snapshot.forEach(docSnap => {
+          const p = { id: docSnap.id, ...docSnap.data() };
+          table.innerHTML += `<tr class="border-b"><td class="p-2 font-bold">${p.name}</td><td class="p-2 text-[#10b981]">${formatCurrency(p.price)}</td><td class="p-2">${p.stock}</td><td class="p-2 text-green-600">نشط</td></tr>`;
+          lProductSelect.innerHTML += `<option value="${p.name}">${p.name}</option>`;
+        });
       });
+
+      // === 3. جلب المناديب والإحصائيات ===
+      onSnapshot(collection(db, "users"), (snapshot) => {
+        const table = document.getElementById('repsTable'); table.innerHTML = '';
+        let cCount = 0;
+        snapshot.forEach(docSnap => {
+          const u = docSnap.data();
+          if(u.role === 'customer') cCount++;
+          if(u.role === 'sales') {
+            table.innerHTML += `<tr class="border-b"><td class="p-3 font-bold">${u.name || 'مندوب'}</td><td class="p-3">${u.email}</td><td class="p-3">نشط</td></tr>`;
+          }
+        });
+        document.getElementById('statCustomers').innerText = cCount;
+      });
+
+      // === 4. إحصائية الأكواد المستخدمة ===
+      onSnapshot(query(collection(db, "loyalty_codes"), where("used", "==", true)), (snapshot) => {
+        document.getElementById('statCodes').innerText = snapshot.size;
+      });
+    });
+
+    // === أحداث النماذج (Forms) ===
+    
+    // نموذج إضافة منتج
+    document.getElementById('addProductForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const res = await createProduct({
+        name: document.getElementById('pName').value,
+        price: parseFloat(document.getElementById('pPrice').value),
+        stock: parseInt(document.getElementById('pStock').value),
+        status: 'active'
+      });
+      if(res) { showToast('تمت إضافة المنتج', 'success'); e.target.reset(); }
+    });
+
+    // نموذج توليد الأكواد
+    document.getElementById('generateCodesForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = e.target.querySelector('button'); btn.disabled = true; btn.innerHTML = 'جاري التوليد...';
+      
+      const productName = document.getElementById('lProduct').value;
+      const batchNo = document.getElementById('lBatch').value;
+      const count = parseInt(document.getElementById('lCount').value);
+      const points = parseInt(document.getElementById('lPoints').value);
+      
+      const expiry = new Date(); expiry.setFullYear(expiry.getFullYear() + 1); // صلاحية سنة
+      
+      const res = await generateBatchCodes(productName, batchNo, count, points, expiry);
+      if(res.success) {
+        showToast(`تم إنشاء ${res.count} كود بنجاح`, 'success');
+        document.getElementById('codesResultArea').classList.remove('hidden');
+        e.target.reset();
+      } else {
+        showToast('حدث خطأ أثناء التوليد', 'error');
+      }
+      btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-gears"></i> توليد الأكواد الآن';
     });
   </script>
 </body>
