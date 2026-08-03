@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>نظام إدارة نقل مصنع المجد للأعلاف</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+  <!-- Babel Standalone for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- Recharts (Charts) -->
+  <script src="https://unpkg.com/recharts/umd/Recharts.js"></script>
+
+  <!-- SheetJS (Excel Export) -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- Tailwind Config Custom Extensions -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: {
+              light: '#F5E0A3',
+              DEFAULT: '#D4AF37',
+              dark: '#AA820A',
+            },
+            dark: {
+              950: '#050608',
+              900: '#090A0F',
+              800: '#12141D',
+              700: '#1D202F',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #090A0F;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      overflow-x: hidden;
+    }
+    .gold-gradient {
+      background: linear-gradient(135deg, #F5E0A3 0%, #D4AF37 50%, #AA820A 100%);
+    }
+    .gold-text {
+      background: linear-gradient(135deg, #F5E0A3 0%, #D4AF37 50%, #AA820A 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .glass-card {
+      background: rgba(18, 20, 29, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(212, 175, 55, 0.15);
+    }
+    .glass-card:hover {
+      border-color: rgba(212, 175, 55, 0.4);
+    }
+    .gold-glow {
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.18);
+    }
+    /* الطباعة A4 */
+    @media print {
+      body * { visibility: hidden; }
+      #print-area, #print-area * { visibility: visible; }
+      #print-area {
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        background: #ffffff !important;
+        color: #000000 !important;
+        padding: 20px;
+      }
+      .no-print { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Firebase v10 SDK Setup -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+    import { getFirestore, collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, increment, writeBatch, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBgRkceRq7FRbhCevLlULYNy-A5Tl_cr0w",
+      authDomain: "sr-test-c9e06.firebaseapp.com",
+      databaseURL: "https://sr-test-c9e06-default-rtdb.firebaseio.com",
+      projectId: "sr-test-c9e06",
+      storageBucket: "sr-test-c9e06.firebasestorage.app",
+      messagingSenderId: "658396508062",
+      appId: "1:658396508062:web:c56cd84f93daa2e176308f",
+      measurementId: "G-3ZZV344NDK"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    window.auth = getAuth(app);
+    window.db = getFirestore(app);
+    window.fb = {
+      signInWithEmailAndPassword, signOut, onAuthStateChanged,
+      collection, onSnapshot, addDoc, updateDoc, deleteDoc, doc, increment, writeBatch, getDocs, query, orderBy, limit
+    };
+  </script>
+
+  <!-- React Logic Application -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+    const { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid } = window.Recharts || {};
+
+    function App() {
+      const [user, setUser] = useState(null);
+      const [loading, setLoading] = useState(true);
+      const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, drivers, clients, reports, logs, settings
+      
+      // Collections
+      const [drivers, setDrivers] = useState([]);
+      const [clients, setClients] = useState([]);
+      const [trips, setTrips] = useState([]);
+      const [logs, setLogs] = useState([]);
+
+      // System Settings State
+      const [settings, setSettings] = useState({
+        factoryName: 'مصنع المجد للأعلاف',
+        phone: '01000000000',
+        whatsapp: '01000000000',
+        email: 'info@elmajd.com',
+        address: 'المنطقة الصناعية - مصر'
+      });
+
+      // Filter & Search
+      const [searchQuery, setSearchQuery] = useState('');
+      const [dateFilter, setDateFilter] = useState({ from: '', to: '' });
+
+      // Modals & Dynamic Selection
+      const [activeModal, setActiveModal] = useState(null); // driverForm, clientForm, tripForm, statementModal, deleteConfirm
+      const [selectedDriver, setSelectedDriver] = useState(null);
+      const [selectedClient, setSelectedClient] = useState(null);
+      const [deleteTarget, setDeleteTarget] = useState(null); // { type, id, name }
+
+      // Toast Notifications
+      const [toast, setToast] = useState(null); // { message, type: 'success' | 'error' }
+
+      // Auth inputs
+      const [emailInput, setEmailInput] = useState('');
+      const [passwordInput, setPasswordInput] = useState('');
+
+      // Forms State
+      const [driverData, setDriverData] = useState({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', plateNumber: '', notes: '', status: 'active' });
+      const [clientData, setClientData] = useState({ name: '', address: '', phone: '', city: '', region: '', notes: '' });
+      const [tripData, setTripData] = useState({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: 10, truckNumber: '', notes: '' });
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3500);
+      };
+
+      // Logging Utility
+      const addLog = async (action, target, description) => {
+        if (!window.db) return;
+        try {
+          await window.fb.addDoc(window.fb.collection(window.db, 'logs'), {
+            action, target, description,
+            userEmail: user ? user.email : 'Admin',
+            timestamp: new Date().toISOString()
+          });
+        } catch (e) { console.error(e); }
+      };
+
+      // Init Firebase Watchers
+      useEffect(() => {
+        const interval = setInterval(() => {
+          if (window.auth && window.fb) {
+            clearInterval(interval);
+            window.fb.onAuthStateChanged(window.auth, (u) => {
+              setUser(u);
+              setLoading(false);
+            });
+          }
+        }, 100);
+      }, []);
+
+      useEffect(() => {
+        if (!user || !window.db) return;
+        const { collection, onSnapshot, query, orderBy, limit } = window.fb;
+
+        const u1 = onSnapshot(collection(window.db, 'drivers'), s => setDrivers(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const u2 = onSnapshot(collection(window.db, 'clients'), s => setClients(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const u3 = onSnapshot(collection(window.db, 'trips'), s => setTrips(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+        const u4 = onSnapshot(query(collection(window.db, 'logs'), orderBy('timestamp', 'desc'), limit(100)), s => setLogs(s.docs.map(d => ({ id: d.id, ...d.data() }))));
+
+        return () => { u1(); u2(); u3(); u4(); };
+      }, [user]);
+
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      });
+
+      // Handlers
+      const handleLogin = async (e) => {
+        e.preventDefault();
+        try {
+          await window.fb.signInWithEmailAndPassword(window.auth, emailInput, passwordInput);
+          showToast('تم تسجيل الدخول بنجاح');
+          addLog('LOGIN', 'SYSTEM', 'تم تسجيل الدخول إلى النظام');
+        } catch (err) {
+          showToast('بيانات الدخول غير صحيحة', 'error');
+        }
+      };
+
+      const handleSaveDriver = async (e) => {
+        e.preventDefault();
+        try {
+          if (selectedDriver) {
+            await window.fb.updateDoc(window.fb.doc(window.db, 'drivers', selectedDriver.id), driverData);
+            showToast('تم تعديل بيانات السائق بنجاح');
+            addLog('UPDATE', 'DRIVER', `تعديل بيانات السائق: ${driverData.name}`);
+          } else {
+            await window.fb.addDoc(window.fb.collection(window.db, 'drivers'), {
+              ...driverData,
+              totalTripsCount: 0,
+              createdAt: new Date().toISOString()
+            });
+            showToast('تمت إضافة السائق بنجاح');
+            addLog('CREATE', 'DRIVER', `إضافة سائق جديد: ${driverData.name}`);
+          }
+          setActiveModal(null);
+          setSelectedDriver(null);
+          setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', plateNumber: '', notes: '', status: 'active' });
+        } catch (e) { showToast('حدث خطأ أثناء الحفظ', 'error'); }
+      };
+
+      const handleSaveClient = async (e) => {
+        e.preventDefault();
+        try {
+          if (selectedClient) {
+            await window.fb.updateDoc(window.fb.doc(window.db, 'clients', selectedClient.id), clientData);
+            showToast('تم تعديل بيانات العميل بنجاح');
+            addLog('UPDATE', 'CLIENT', `تعديل بيانات العميل: ${clientData.name}`);
+          } else {
+            await window.fb.addDoc(window.fb.collection(window.db, 'clients'), {
+              ...clientData,
+              createdAt: new Date().toISOString()
+            });
+            showToast('تم إضافة العميل بنجاح');
+            addLog('CREATE', 'CLIENT', `إضافة عميل جديد: ${clientData.name}`);
+          }
+          setActiveModal(null);
+          setSelectedClient(null);
+          setClientData({ name: '', address: '', phone: '', city: '', region: '', notes: '' });
+        } catch (e) { showToast('حدث خطأ أثناء الحفظ', 'error'); }
+      };
+
+      const handleSaveTrip = async (e) => {
+        e.preventDefault();
+        if (!selectedDriver) return;
+        const client = clients.find(c => c.id === tripData.clientId);
+        const today = new Date().toISOString().slice(0, 10);
+        const timeNow = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+
+        try {
+          await window.fb.addDoc(window.fb.collection(window.db, 'trips'), {
+            driverId: selectedDriver.id,
+            driverName: selectedDriver.name,
+            clientId: tripData.clientId,
+            clientName: client ? client.name : 'غير محدد',
+            clientAddress: client ? client.address : '',
+            date: today,
+            time: timeNow,
+            tripsCount: Number(tripData.tripsCount),
+            cargoType: tripData.cargoType,
+            weightTons: Number(tripData.weightTons),
+            truckNumber: tripData.truckNumber || selectedDriver.truckNumber,
+            notes: tripData.notes,
+            createdAt: new Date().toISOString()
+          });
+
+          await window.fb.updateDoc(window.fb.doc(window.db, 'drivers', selectedDriver.id), {
+            totalTripsCount: window.fb.increment(Number(tripData.tripsCount)),
+            lastTripDate: today
+          });
+
+          showToast('تمت إضافة النقلة وتحديث العداد مباشرة');
+          addLog('CREATE', 'TRIP', `إضافة ${tripData.tripsCount} نقلة للسائق ${selectedDriver.name}`);
+          setActiveModal(null);
+          setTripData({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: 10, truckNumber: '', notes: '' });
+        } catch (e) { showToast('فشل في حفظ النقلة', 'error'); }
+      };
+
+      const confirmDelete = async () => {
+        if (!deleteTarget) return;
+        try {
+          await window.fb.deleteDoc(window.fb.doc(window.db, deleteTarget.collection, deleteTarget.id));
+          showToast(`تم حذف ${deleteTarget.name} بنجاح`);
+          addLog('DELETE', deleteTarget.collection.toUpperCase(), `حذف: ${deleteTarget.name}`);
+          setDeleteTarget(null);
+          setActiveModal(null);
+        } catch (e) { showToast('فشلت عملية الحذف', 'error'); }
+      };
+
+      // Backup & Restore
+      const handleExportJSON = async () => {
+        const data = { drivers, clients, trips, settings, logs };
+        const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `AlMajd_Logistics_Backup_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        showToast('تم تصدير نسخة Firestore الاحتياطية بنجاح');
+      };
+
+      const handleRestoreJSON = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+          try {
+            const parsed = JSON.parse(evt.target.result);
+            for (const colName of ['drivers', 'clients', 'trips']) {
+              if (parsed[colName]) {
+                const batch = window.fb.writeBatch(window.db);
+                parsed[colName].forEach(item => {
+                  const { id, ...rest } = item;
+                  const ref = id ? window.fb.doc(window.db, colName, id) : window.fb.doc(window.fb.collection(window.db, colName));
+                  batch.set(ref, rest);
+                });
+                await batch.commit();
+              }
+            }
+            showToast('تم استعادة البيانات بنجاح');
+          } catch (err) { showToast('خطأ في استعادة الملف', 'error'); }
+        };
+        reader.readAsText(file);
+      };
+
+      // Export Excel
+      const handleExportExcel = () => {
+        const wsData = trips.map(t => ({
+          'التاريخ': t.date,
+          'الوقت': t.time,
+          'السائق': t.driverName,
+          'العميل': t.clientName,
+          'العنوان': t.clientAddress,
+          'عدد النقلات': t.tripsCount,
+          'الوزن (طن)': t.weightTons,
+          'نوع الحمولة': t.cargoType,
+          'الملاحظات': t.notes || ''
+        }));
+        const ws = XLSX.utils.json_to_sheet(wsData);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "تقرير النقلات");
+        XLSX.writeFile(wb, `AlMajd_Trips_Report_${new Date().toISOString().slice(0, 10)}.xlsx`);
+      };
+
+      // Statistics Calculators
+      const stats = useMemo(() => {
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const tripsToday = trips.filter(t => t.date === todayStr).reduce((a, b) => a + (b.tripsCount || 0), 0);
+        const totalTripsSum = trips.reduce((a, b) => a + (b.tripsCount || 0), 0);
+        const totalWeightSum = trips.reduce((a, b) => a + (b.weightTons || 0), 0);
+        const lastTrip = trips.length > 0 ? trips[trips.length - 1] : null;
+
+        return {
+          totalDrivers: drivers.length,
+          totalClients: clients.length,
+          totalTrips: totalTripsSum,
+          totalWeight: totalWeightSum,
+          tripsToday,
+          lastTrip
+        };
+      }, [drivers, clients, trips]);
+
+      // Chart Data
+      const chartData = useMemo(() => {
+        const daysMap = {};
+        trips.forEach(t => {
+          daysMap[t.date] = (daysMap[t.date] || 0) + (t.tripsCount || 0);
+        });
+        return Object.keys(daysMap).sort().slice(-10).map(date => ({
+          date,
+          trips: daysMap[date]
+        }));
+      }, [trips]);
+
+      if (loading) {
+        return (
+          <div className="min-h-screen flex flex-col items-center justify-center bg-dark-950 text-gold">
+            <div className="w-12 h-12 border-4 border-gold border-t-transparent rounded-full animate-spin mb-4"></div>
+            <p className="font-bold tracking-wider">جاري تحميل نظام المجد للأعلاف...</p>
+          </div>
+        );
+      }
+
+      // LOGIN SCREEN
+      if (!user) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4 bg-dark-950 relative overflow-hidden">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gold/10 rounded-full filter blur-3xl"></div>
+            <form onSubmit={handleLogin} className="glass-card p-8 rounded-3xl w-full max-w-md gold-glow relative z-10 space-y-6">
+              <div className="text-center">
+                <div className="w-16 h-16 gold-gradient rounded-2xl mx-auto flex items-center justify-center text-dark-950 font-black text-2xl mb-3 shadow-xl">م</div>
+                <h1 className="text-2xl font-black text-white">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
+                <p className="text-xs text-gray-400 mt-1">نظام إدارة ومتابعة نقل السائقين</p>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-gray-300 block mb-1">البريد الإلكتروني للمسؤول</label>
+                  <input type="email" required value={emailInput} onChange={e => setEmailInput(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm focus:border-gold outline-none transition-all" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 block mb-1">كلمة المرور</label>
+                  <input type="password" required value={passwordInput} onChange={e => setPasswordInput(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm focus:border-gold outline-none transition-all" />
+                </div>
+                <button type="submit" className="w-full gold-gradient text-dark-950 font-black py-3 rounded-xl hover:brightness-110 transition-all text-sm shadow-lg">
+                  تسجيل الدخول للنظام
+                </button>
+              </div>
+            </form>
+          </div>
+        );
+      }
+
+      // MAIN DASHBOARD LAYOUT
+      return (
+        <div className="min-h-screen flex flex-col bg-dark-900 text-white">
+          {/* Toast Notification */}
+          {toast && (
+            <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-950 text-red-300 border-red-800' : 'bg-dark-800 text-gold border-gold/40'}`}>
+              <i data-lucide={toast.type === 'error' ? 'alert-triangle' : 'check-circle'} className="w-5 h-5"></i>
+              {toast.message}
+            </div>
+          )}
+
+          {/* Top Bar */}
+          <header className="glass-card sticky top-0 z-40 px-6 py-4 flex items-center justify-between border-b border-dark-700">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 gold-gradient rounded-xl flex items-center justify-center text-dark-950 font-black text-lg">م</div>
+              <div>
+                <h1 className="font-bold text-base tracking-wide">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
+                <p className="text-[10px] text-gray-400">لوحة التحكم الإدارية الفاخرة</p>
+              </div>
+            </div>
+
+            {/* Navigation Tabs */}
+            <nav className="hidden md:flex items-center gap-2 bg-dark-800/80 p-1.5 rounded-2xl border border-dark-700">
+              {[
+                { id: 'dashboard', label: 'الرئيسية', icon: 'layout-dashboard' },
+                { id: 'drivers', label: 'السائقين', icon: 'truck' },
+                { id: 'clients', label: 'العملاء', icon: 'users' },
+                { id: 'reports', label: 'التقارير', icon: 'bar-chart-3' },
+                { id: 'logs', label: 'سجل العمليات', icon: 'shield-alert' },
+                { id: 'settings', label: 'الإعدادات', icon: 'settings' }
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === tab.id ? 'gold-gradient text-dark-950 shadow-md' : 'text-gray-400 hover:text-white'}`}>
+                  <i data-lucide={tab.icon} className="w-4 h-4"></i>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-3">
+              <button onClick={() => window.fb.signOut(window.auth)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition-all">
+                <i data-lucide="log-out" className="w-4 h-4"></i>
+                <span className="hidden sm:inline">خروج</span>
+              </button>
+            </div>
+          </header>
+
+          {/* Main Content View */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
+
+            {/* TAB: DASHBOARD */}
+            {activeTab === 'dashboard' && (
+              <div className="space-y-8">
+                {/* Statistics Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="glass-card p-5 rounded-2xl relative overflow-hidden">
+                    <div className="flex justify-between items-center text-gray-400 text-xs mb-2">
+                      <span>إجمالي السائقين</span>
+                      <i data-lucide="truck" className="w-5 h-5 text-gold"></i>
+                    </div>
+                    <p className="text-3xl font-black text-white">{stats.totalDrivers}</p>
+                  </div>
+
+                  <div className="glass-card p-5 rounded-2xl relative overflow-hidden">
+                    <div className="flex justify-between items-center text-gray-400 text-xs mb-2">
+                      <span>إجمالي العملاء</span>
+                      <i data-lucide="users" className="w-5 h-5 text-gold"></i>
+                    </div>
+                    <p className="text-3xl font-black text-white">{stats.totalClients}</p>
+                  </div>
+
+                  <div className="glass-card p-5 rounded-2xl relative overflow-hidden">
+                    <div className="flex justify-between items-center text-gray-400 text-xs mb-2">
+                      <span>إجمالي النقلات</span>
+                      <i data-lucide="package-check" className="w-5 h-5 text-gold"></i>
+                    </div>
+                    <p className="text-3xl font-black gold-text">{stats.totalTrips}</p>
+                  </div>
+
+                  <div className="glass-card p-5 rounded-2xl relative overflow-hidden">
+                    <div className="flex justify-between items-center text-gray-400 text-xs mb-2">
+                      <span>نقلات اليوم</span>
+                      <i data-lucide="calendar" className="w-5 h-5 text-gold"></i>
+                    </div>
+                    <p className="text-3xl font-black text-white">{stats.tripsToday}</p>
+                  </div>
+                </div>
+
+                {/* Chart Section */}
+                <div className="glass-card p-6 rounded-3xl">
+                  <h3 className="text-base font-bold text-white mb-6 flex items-center gap-2">
+                    <span className="w-2 h-6 gold-gradient rounded-full"></span>
+                    معدل النقلات اليومي (آخر 10 أيام)
+                  </h3>
+                  <div className="h-64 w-full">
+                    {ResponsiveContainer && (
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart data={chartData}>
+                          <defs>
+                            <linearGradient id="goldGradient" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#D4AF37" stopOpacity={0.7}/>
+                              <stop offset="95%" stopColor="#D4AF37" stopOpacity={0}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#1D202F" />
+                          <XAxis dataKey="date" stroke="#9CA3AF" />
+                          <YAxis stroke="#9CA3AF" />
+                          <Tooltip contentStyle={{ backgroundColor: '#12141D', borderColor: '#D4AF37', borderRadius: '12px' }} />
+                          <Area type="monotone" dataKey="trips" stroke="#D4AF37" strokeWidth={3} fillOpacity={1} fill="url(#goldGradient)" />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    )}
+                  </div>
+                </div>
+
+                {/* Driver Cards Section (Main Request) */}
+                <div>
+                  <div className="flex justify-between items-center mb-6">
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      <i data-lucide="users" className="w-5 h-5 text-gold"></i>
+                      السائقين المتاحين بالنظام
+                    </h2>
+                    <input type="text" placeholder="بحث سريع عن سائق..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="bg-dark-800 border border-dark-700 px-4 py-2 rounded-xl text-xs w-64 focus:border-gold outline-none" />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {drivers.filter(d => d.name.includes(searchQuery)).map(driver => (
+                      <div key={driver.id} className="glass-card p-6 rounded-3xl relative overflow-hidden group hover:border-gold/50 transition-all flex flex-col justify-between space-y-4">
+                        <div className="flex items-center gap-4">
+                          <div className="w-14 h-14 rounded-2xl bg-dark-800 border border-gold/30 flex items-center justify-center text-gold shadow-md">
+                            <i data-lucide="truck" className="w-7 h-7"></i>
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-lg text-white">{driver.name}</h4>
+                            <p className="text-xs text-gray-400 mt-0.5">سيارة: <span className="text-gold font-semibold">{driver.truckNumber}</span> ({driver.plateNumber})</p>
+                          </div>
+                        </div>
+
+                        <div className="bg-dark-950/60 p-3 rounded-2xl border border-dark-700/50 flex justify-between items-center text-xs">
+                          <div>
+                            <span className="text-gray-400 block">إجمالي النقلات</span>
+                            <span className="text-base font-black text-white">{driver.totalTripsCount || 0}</span>
+                          </div>
+                          <div className="text-left">
+                            <span className="text-gray-400 block">آخر نقلة</span>
+                            <span className="text-xs font-bold text-gold">{driver.lastTripDate || 'لا يوجد'}</span>
+                          </div>
+                        </div>
+
+                        <div className="flex gap-2 pt-2">
+                          <button onClick={() => { setSelectedDriver(driver); setActiveModal('tripForm'); }} className="flex-1 gold-gradient text-dark-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 hover:brightness-110 transition-all">
+                            <i data-lucide="plus-circle" className="w-4 h-4"></i> إضافة نقلة
+                          </button>
+                          <button onClick={() => { setSelectedDriver(driver); setActiveModal('statementModal'); }} className="bg-dark-800 border border-dark-700 hover:border-gold/40 text-gray-300 p-2.5 rounded-xl text-xs" title="كشف الحساب">
+                            <i data-lucide="file-text" className="w-4 h-4 text-gold"></i>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: DRIVERS MANAGEMENT */}
+            {activeTab === 'drivers' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">إدارة السائقين</h2>
+                  <button onClick={() => { setSelectedDriver(null); setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', plateNumber: '', notes: '', status: 'active' }); setActiveModal('driverForm'); }} className="gold-gradient text-dark-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                    <i data-lucide="plus" className="w-4 h-4"></i> إضافة سائق جديد
+                  </button>
+                </div>
+
+                <div className="glass-card rounded-2xl overflow-hidden border border-dark-700">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-dark-800 text-gold font-bold">
+                      <tr>
+                        <th className="p-4">اسم السائق</th>
+                        <th className="p-4">رقم الهاتف</th>
+                        <th className="p-4">رقم السيارة</th>
+                        <th className="p-4">اللوحة</th>
+                        <th className="p-4">الحالة</th>
+                        <th className="p-4">إجمالي النقلات</th>
+                        <th className="p-4 text-center">الإجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-700">
+                      {drivers.map(d => (
+                        <tr key={d.id} className="hover:bg-dark-800/40 transition-all">
+                          <td className="p-4 font-bold">{d.name}</td>
+                          <td className="p-4 text-gray-300">{d.phone}</td>
+                          <td className="p-4 text-gold">{d.truckNumber}</td>
+                          <td className="p-4">{d.plateNumber}</td>
+                          <td className="p-4">
+                            <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${d.status === 'active' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'}`}>
+                              {d.status === 'active' ? 'نشط' : 'متوقف'}
+                            </span>
+                          </td>
+                          <td className="p-4 font-bold">{d.totalTripsCount || 0}</td>
+                          <td className="p-4 text-center flex justify-center gap-2">
+                            <button onClick={() => { setSelectedDriver(d); setDriverData(d); setActiveModal('driverForm'); }} className="p-2 bg-dark-700 hover:text-gold rounded-lg"><i data-lucide="edit" className="w-4 h-4"></i></button>
+                            <button onClick={() => { setDeleteTarget({ collection: 'drivers', id: d.id, name: d.name }); setActiveModal('deleteConfirm'); }} className="p-2 bg-dark-700 text-red-400 hover:bg-red-500/20 rounded-lg"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: CLIENTS MANAGEMENT */}
+            {activeTab === 'clients' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">إدارة العملاء</h2>
+                  <button onClick={() => { setSelectedClient(null); setClientData({ name: '', address: '', phone: '', city: '', region: '', notes: '' }); setActiveModal('clientForm'); }} className="gold-gradient text-dark-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                    <i data-lucide="plus" className="w-4 h-4"></i> إضافة عميل جديد
+                  </button>
+                </div>
+
+                <div className="glass-card rounded-2xl overflow-hidden border border-dark-700">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-dark-800 text-gold font-bold">
+                      <tr>
+                        <th className="p-4">اسم العميل</th>
+                        <th className="p-4">الهاتف</th>
+                        <th className="p-4">العنوان</th>
+                        <th className="p-4">المدينة / المنطقة</th>
+                        <th className="p-4 text-center">الإجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-700">
+                      {clients.map(c => (
+                        <tr key={c.id} className="hover:bg-dark-800/40 transition-all">
+                          <td className="p-4 font-bold">{c.name}</td>
+                          <td className="p-4 text-gray-300">{c.phone}</td>
+                          <td className="p-4">{c.address}</td>
+                          <td className="p-4 text-gray-400">{c.city} - {c.region}</td>
+                          <td className="p-4 text-center flex justify-center gap-2">
+                            <button onClick={() => { setSelectedClient(c); setClientData(c); setActiveModal('clientForm'); }} className="p-2 bg-dark-700 hover:text-gold rounded-lg"><i data-lucide="edit" className="w-4 h-4"></i></button>
+                            <button onClick={() => { setDeleteTarget({ collection: 'clients', id: c.id, name: c.name }); setActiveModal('deleteConfirm'); }} className="p-2 bg-dark-700 text-red-400 hover:bg-red-500/20 rounded-lg"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: REPORTS */}
+            {activeTab === 'reports' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">التقارير الشاملة</h2>
+                  <button onClick={handleExportExcel} className="bg-dark-800 border border-gold/40 text-gold font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 hover:bg-dark-700">
+                    <i data-lucide="file-spreadsheet" className="w-4 h-4"></i> تصدير Excel
+                  </button>
+                </div>
+
+                <div className="glass-card rounded-2xl p-4 overflow-x-auto">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-dark-800 text-gold">
+                      <tr>
+                        <th className="p-3">التاريخ</th>
+                        <th className="p-3">السائق</th>
+                        <th className="p-3">العميل</th>
+                        <th className="p-3">عدد النقلات</th>
+                        <th className="p-3">الحمولة</th>
+                        <th className="p-3">الوزن (طن)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-700">
+                      {trips.map(t => (
+                        <tr key={t.id} className="hover:bg-dark-800/50">
+                          <td className="p-3">{t.date}</td>
+                          <td className="p-3 font-bold">{t.driverName}</td>
+                          <td className="p-3">{t.clientName}</td>
+                          <td className="p-3 text-gold font-black">{t.tripsCount}</td>
+                          <td className="p-3">{t.cargoType}</td>
+                          <td className="p-3">{t.weightTons}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: LOGS */}
+            {activeTab === 'logs' && (
+              <div className="space-y-6">
+                <h2 className="text-xl font-bold">سجل العمليات والأمان</h2>
+                <div className="glass-card rounded-2xl p-4">
+                  <div className="space-y-3">
+                    {logs.map(log => (
+                      <div key={log.id} className="bg-dark-800 p-3 rounded-xl flex justify-between items-center text-xs border border-dark-700">
+                        <div>
+                          <span className="font-bold text-gold block">{log.description}</span>
+                          <span className="text-[10px] text-gray-400">المستخدم: {log.userEmail}</span>
+                        </div>
+                        <span className="text-[10px] text-gray-400">{new Date(log.timestamp).toLocaleString('ar-EG')}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: SETTINGS & BACKUP */}
+            {activeTab === 'settings' && (
+              <div className="space-y-6 max-w-2xl mx-auto">
+                <h2 className="text-xl font-bold">الإعدادات والنسخ الاحتياطي</h2>
+                <div className="glass-card p-6 rounded-3xl space-y-4">
+                  <h3 className="text-sm font-bold text-gold">تصدير واستعادة Firestore JSON</h3>
+                  <div className="flex gap-4">
+                    <button onClick={handleExportJSON} className="flex-1 gold-gradient text-dark-950 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2">
+                      <i data-lucide="download" className="w-4 h-4"></i> إنتاج نسخة احتياطية
+                    </button>
+                    <label className="flex-1 bg-dark-800 border border-dark-700 hover:border-gold/40 text-gray-200 font-bold py-3 rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer">
+                      <i data-lucide="upload" className="w-4 h-4 text-gold"></i> استعادة النسخة
+                      <input type="file" accept=".json" onChange={handleRestoreJSON} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            )}
+
+          </main>
+
+          {/* MODAL: DRIVER FORM */}
+          {activeModal === 'driverForm' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <form onSubmit={handleSaveDriver} className="glass-card p-6 rounded-3xl w-full max-w-lg space-y-4 border-gold/40">
+                <h3 className="text-lg font-bold text-gold">{selectedDriver ? 'تعديل بيانات السائق' : 'إضافة سائق جديد'}</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="اسم السائق" required value={driverData.name} onChange={e => setDriverData({...driverData, name: e.target.value})} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                  <input type="text" placeholder="رقم الهاتف" required value={driverData.phone} onChange={e => setDriverData({...driverData, phone: e.target.value})} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="رقم السيارة" required value={driverData.truckNumber} onChange={e => setDriverData({...driverData, truckNumber: e.target.value})} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                  <input type="text" placeholder="رقم اللوحة" required value={driverData.plateNumber} onChange={e => setDriverData({...driverData, plateNumber: e.target.value})} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2.5 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
+                  <button type="submit" className="px-5 py-2.5 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ البيانات</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* MODAL: CLIENT FORM */}
+          {activeModal === 'clientForm' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <form onSubmit={handleSaveClient} className="glass-card p-6 rounded-3xl w-full max-w-lg space-y-4 border-gold/40">
+                <h3 className="text-lg font-bold text-gold">{selectedClient ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'}</h3>
+                <input type="text" placeholder="اسم العميل" required value={clientData.name} onChange={e => setClientData({...clientData, name: e.target.value})} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                <div className="grid grid-cols-2 gap-3">
+                  <input type="text" placeholder="رقم الهاتف" required value={clientData.phone} onChange={e => setClientData({...clientData, phone: e.target.value})} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                  <input type="text" placeholder="العنوان" required value={clientData.address} onChange={e => setClientData({...clientData, address: e.target.value})} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2.5 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
+                  <button type="submit" className="px-5 py-2.5 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ العميل</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* MODAL: ADD TRIP */}
+          {activeModal === 'tripForm' && selectedDriver && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <form onSubmit={handleSaveTrip} className="glass-card p-6 rounded-3xl w-full max-w-md space-y-4 border-gold/40">
+                <h3 className="text-lg font-bold text-gold">إضافة نقلة للسائق: {selectedDriver.name}</h3>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">اختر العميل</label>
+                  <select required value={tripData.clientId} onChange={e => setTripData({...tripData, clientId: e.target.value})} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white focus:border-gold outline-none">
+                    <option value="">-- اختر من قائمة العملاء --</option>
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name} - {c.address}</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">عدد النقلات</label>
+                    <input type="number" min="1" required value={tripData.tripsCount} onChange={e => setTripData({...tripData, tripsCount: e.target.value})} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">الوزن (طناً)</label>
+                    <input type="number" min="1" required value={tripData.weightTons} onChange={e => setTripData({...tripData, weightTons: e.target.value})} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">نوع الحمولة</label>
+                  <input type="text" required value={tripData.cargoType} onChange={e => setTripData({...tripData, cargoType: e.target.value})} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs focus:border-gold outline-none" />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2.5 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
+                  <button type="submit" className="px-5 py-2.5 rounded-xl gold-gradient text-dark-950 font-bold text-xs">تأكيد وحفظ النقلة</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* MODAL: DRIVER STATEMENT & A4 PRINT */}
+          {activeModal === 'statementModal' && selectedDriver && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="glass-card p-6 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-6">
+                <div className="flex justify-between items-center border-b border-dark-700 pb-4">
+                  <h3 className="text-lg font-bold text-gold">كشف حساب السائق: {selectedDriver.name}</h3>
+                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5">
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة A4
+                  </button>
+                </div>
+
+                <div id="print-area" className="space-y-6">
+                  {/* Head Print Header */}
+                  <div className="text-center border-b border-gray-300 pb-4">
+                    <h1 className="text-2xl font-black">{settings.factoryName}</h1>
+                    <p className="text-sm">تقرير وكشف نقلات سائق</p>
+                    <div className="mt-2 text-xs flex justify-between">
+                      <span>اسم السائق: <strong>{selectedDriver.name}</strong></span>
+                      <span>رقم السيارة: <strong>{selectedDriver.truckNumber}</strong></span>
+                      <span>تاريخ الإصدار: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></span>
+                    </div>
+                  </div>
+
+                  {/* Print Table */}
+                  <table className="w-full text-right text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-dark-800 text-gold border-b">
+                        <th className="p-2 border">التاريخ</th>
+                        <th className="p-2 border">العميل</th>
+                        <th className="p-2 border">عدد النقلات</th>
+                        <th className="p-2 border">الحمولة</th>
+                        <th className="p-2 border">الوزن (طن)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {trips.filter(t => t.driverId === selectedDriver.id).map(t => (
+                        <tr key={t.id} className="border-b">
+                          <td className="p-2 border">{t.date}</td>
+                          <td className="p-2 border">{t.clientName}</td>
+                          <td className="p-2 border font-bold">{t.tripsCount}</td>
+                          <td className="p-2 border">{t.cargoType}</td>
+                          <td className="p-2 border">{t.weightTons}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  {/* Totals Summary */}
+                  <div className="flex justify-between items-center bg-dark-800 p-4 rounded-xl text-xs font-bold">
+                    <span>إجمالي النقلات: {trips.filter(t => t.driverId === selectedDriver.id).reduce((a, b) => a + (b.tripsCount || 0), 0)}</span>
+                    <span>إجمالي الوزن: {trips.filter(t => t.driverId === selectedDriver.id).reduce((a, b) => a + (b.weightTons || 0), 0)} طن</span>
+                  </div>
+
+                  {/* Signatures */}
+                  <div className="hidden print:flex justify-between pt-12 text-center text-xs">
+                    <div>
+                      <p>توقيع السائق</p>
+                      <p className="mt-8">........................</p>
+                    </div>
+                    <div>
+                      <p>اعتماد إدارة المصنع</p>
+                      <p className="mt-8">........................</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2">
+                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-dark-800 text-gray-300 text-xs">إغلاق</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* MODAL: DELETE CONFIRMATION */}
+          {activeModal === 'deleteConfirm' && deleteTarget && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="glass-card p-6 rounded-3xl w-full max-w-sm text-center space-y-4 border-red-500/30">
+                <i data-lucide="alert-triangle" className="w-12 h-12 text-red-400 mx-auto"></i>
+                <h3 className="font-bold text-base text-white">تأكيد حذف العنصر</h3>
+                <p className="text-xs text-gray-400">هل أنت متأكد من حذف <strong>{deleteTarget.name}</strong>؟ لا يمكن التراجع عن هذه العملية.</p>
+                <div className="flex gap-2 pt-2">
+                  <button onClick={() => setActiveModal(null)} className="flex-1 py-2.5 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
+                  <button onClick={confirmDelete} className="flex-1 py-2.5 rounded-xl bg-red-600 text-white font-bold text-xs">تأكيد الحذف</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
