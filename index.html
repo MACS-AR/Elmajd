@@ -69,12 +69,14 @@
       box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
     }
 
-    @media print {
+        @media print {
       @page {
-        size: auto;
-        margin: 8mm;
+        size: A4 portrait;
+        margin: 5mm; /* تقليل الهوامش لمنع الخروج لورقة ثانية */
       }
-      body {
+      html, body {
+        height: max-content !important;
+        overflow: hidden !important;
         background: #ffffff !important;
         color: #000000 !important;
       }
@@ -93,6 +95,8 @@
         padding: 0 !important;
         background: #ffffff !important;
         color: #000000 !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
       }
       .no-print {
         display: none !important;
@@ -100,17 +104,18 @@
       table {
         width: 100% !important;
         border-collapse: collapse !important;
-        margin-top: 10px !important;
+        margin-top: 8px !important;
+        page-break-inside: avoid !important; /* يمنع تكرار الجدول في ورقة ثانية */
       }
       th, td {
         border: 1.5px solid #000000 !important;
         color: #000000 !important;
-        padding: 8px !important;
-        font-size: 12px !important;
+        padding: 5px 8px !important;
+        font-size: 11px !important;
         text-align: right !important;
       }
       th {
-        background-color: #e5e7eb !important;
+        background-color: #f3f4f6 !important;
         font-weight: bold !important;
       }
     }
@@ -122,7 +127,7 @@
   <!-- Firebase Integration Script -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, remove, update } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+    import { getDatabase, ref, set, push, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBgRkceRq7FRbhCevLlULYNy-A5Tl_cr0w",
@@ -139,7 +144,7 @@
     const rtdb = getDatabase(app);
 
     window.rtdbMethods = {
-      ref, set, push, onValue, remove, update, db: rtdb
+      ref, set, push, onValue, remove, update, get, db: rtdb
     };
   </script>
 
@@ -157,11 +162,12 @@
 
       // Active View
       const [activeTab, setActiveTab] = useState('dashboard');
-      const [orderStatusFilter, setOrderStatusFilter] = useState('قيد الانتظار'); // قيد الانتظار, مقبول, ملغي, الكل
+      const [orderStatusFilter, setOrderStatusFilter] = useState('قيد الانتظار');
 
       // Database Collections
       const [salesReps, setSalesReps] = useState([]);
       const [orders, setOrders] = useState([]);
+      const [prevOrdersCount, setPrevOrdersCount] = useState(0);
       const [drivers, setDrivers] = useState([]);
       const [clients, setClients] = useState([]);
       const [products, setProducts] = useState([]);
@@ -174,7 +180,7 @@
 
       // Modal Controls
       const [activeModal, setActiveModal] = useState(null); 
-      const [selectedOrderDetails, setSelectedOrderDetails] = useState(null); // معاينة الفاتورة المكتملة
+      const [selectedOrderDetails, setSelectedOrderDetails] = useState(null);
       const [selectedDriver, setSelectedDriver] = useState(null);
       const [selectedClient, setSelectedClient] = useState(null);
       const [selectedSalesRep, setSelectedSalesRep] = useState(null);
@@ -200,7 +206,46 @@
         setTimeout(() => setToast(null), 3000);
       };
 
-      // Realtime Database Sync
+      // 🔔 دالة تشغيل صوت تنبيه نغمة رسالة/هاتف لمدة 5 ثوانٍ عند استلام طلب جديد
+      const playNotificationSound = () => {
+        try {
+          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+          const duration = 5; // مدة الصوت 5 ثوانٍ
+          const startTime = audioCtx.currentTime;
+
+          for (let i = 0; i < duration; i++) {
+            const time = startTime + i;
+            
+            // النغمة الأولى
+            const osc1 = audioCtx.createOscillator();
+            const gain1 = audioCtx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(587.33, time); // Nole D5
+            gain1.gain.setValueAtTime(0.3, time);
+            gain1.gain.exponentialRampToValueAtTime(0.0001, time + 0.15);
+            osc1.connect(gain1);
+            gain1.connect(audioCtx.destination);
+            osc1.start(time);
+            osc1.stop(time + 0.15);
+
+            // النغمة الثانية
+            const osc2 = audioCtx.createOscillator();
+            const gain2 = audioCtx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(880, time + 0.15); // Note A5
+            gain2.gain.setValueAtTime(0.4, time + 0.15);
+            gain2.gain.exponentialRampToValueAtTime(0.0001, time + 0.35);
+            osc2.connect(gain2);
+            gain2.connect(audioCtx.destination);
+            osc2.start(time + 0.15);
+            osc2.stop(time + 0.35);
+          }
+        } catch (e) {
+          console.error("Audio Notification Error:", e);
+        }
+      };
+
+      // Realtime Database Sync الإبتدائي
       useEffect(() => {
         const interval = setInterval(() => {
           if (window.rtdbMethods) {
@@ -214,7 +259,9 @@
 
             onValue(ref(db, 'orders'), snapshot => {
               const data = snapshot.val();
-              setOrders(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : []);
+              const fetchedOrders = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
+              setOrders(fetchedOrders);
+              setPrevOrdersCount(fetchedOrders.length);
             });
 
             onValue(ref(db, 'drivers'), snapshot => {
@@ -244,6 +291,32 @@
           }
         }, 100);
       }, []);
+
+      // 🔄 تحديث أوتوماتيكي لجدول الطلبات فقط كل 5 ثوانٍ مع صوت تنبيه 5 ثوانٍ للطلبات الجديدة
+      useEffect(() => {
+        const ordersInterval = setInterval(() => {
+          if (window.rtdbMethods && isAuthenticated) {
+            const { ref, get, db } = window.rtdbMethods;
+            get(ref(db, 'orders')).then(snapshot => {
+              if (snapshot.exists()) {
+                const data = snapshot.val();
+                const updatedList = Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse();
+                
+                // 🔔 فحص إذا كان هناك طلب جديد
+                if (prevOrdersCount > 0 && updatedList.length > prevOrdersCount) {
+                  playNotificationSound();
+                  showToast('🔔 تم استلام طلب جديد من المندوب!', 'success');
+                }
+
+                setOrders(updatedList);
+                setPrevOrdersCount(updatedList.length);
+              }
+            }).catch(err => console.error("Error updating orders:", err));
+          }
+        }, 5000);
+
+        return () => clearInterval(ordersInterval);
+      }, [isAuthenticated, prevOrdersCount]);
 
       useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
@@ -427,7 +500,7 @@
         setTripData({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: '2.5', truckNumber: '', notes: '' });
       };
 
-      // Delete Handler
+      // Delete Handler (يشمل إمكانية حذف طلب المندوب نهائياً)
       const confirmDelete = () => {
         if (!deleteTarget) return;
         const { ref, remove, update, db } = window.rtdbMethods;
@@ -449,7 +522,7 @@
         setDeleteTarget(null);
       };
 
-      // Update Order Status مع نقل الطلب وإضافة النقلة
+      // 🖨️ تحديث حالة الطلب والتحويل المباشر للطباعة عند القبول
       const updateOrderStatus = (order, newStatus) => {
         const { ref, update, push, set, db } = window.rtdbMethods;
 
@@ -458,45 +531,53 @@
             showToast(`تم تغيير حالة الطلب إلى: ${newStatus}`);
             addLog('UPDATE_ORDER', `تعديل حالة طلب العميل ${order.clientName} إلى ${newStatus}`);
 
-            if (newStatus === 'مقبول' && order.driverId) {
-              const driver = drivers.find(d => d.id === order.driverId);
-              const today = order.date || new Date().toISOString().slice(0, 10);
-              const tripsToAdd = parseInt(order.tripsCount) || 1;
+            if (newStatus === 'مقبول') {
+              // ربط تلقائي بالنقلات والسائق
+              if (order.driverId) {
+                const driver = drivers.find(d => d.id === order.driverId);
+                const today = order.date || new Date().toISOString().slice(0, 10);
+                const tripsToAdd = parseInt(order.tripsCount) || 1;
 
-              const newTripRef = push(ref(db, 'trips'));
-              set(newTripRef, {
-                orderId: order.id,
-                driverId: order.driverId,
-                driverName: order.driverName || (driver ? driver.name : 'سائق'),
-                clientId: order.clientId,
-                clientName: order.clientName,
-                clientAddress: order.clientAddress || '',
-                date: today,
-                time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
-                tripsCount: tripsToAdd,
-                cargoType: order.cargoType || 'علف',
-                weightTons: parseFloat(order.quantity) || 0,
-                truckNumber: order.driverTruck || (driver ? driver.truckNumber : ''),
-                notes: `من طلب المندوب: ${order.repName || ''}`,
-                createdAt: new Date().toISOString()
-              });
-
-              if (driver) {
-                const updatedTrips = (driver.totalTripsCount || 0) + tripsToAdd;
-                update(ref(db, `drivers/${driver.id}`), {
-                  totalTripsCount: updatedTrips,
-                  lastTripDate: today
+                const newTripRef = push(ref(db, 'trips'));
+                set(newTripRef, {
+                  orderId: order.id,
+                  driverId: order.driverId,
+                  driverName: order.driverName || (driver ? driver.name : 'سائق'),
+                  clientId: order.clientId,
+                  clientName: order.clientName,
+                  clientAddress: order.clientAddress || '',
+                  date: today,
+                  time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+                  tripsCount: tripsToAdd,
+                  cargoType: order.cargoType || 'علف',
+                  weightTons: parseFloat(order.quantity) || 0,
+                  truckNumber: order.driverTruck || (driver ? driver.truckNumber : ''),
+                  notes: `من طلب المندوب: ${order.repName || ''}`,
+                  createdAt: new Date().toISOString()
                 });
+
+                if (driver) {
+                  const updatedTrips = (driver.totalTripsCount || 0) + tripsToAdd;
+                  update(ref(db, `drivers/${driver.id}`), {
+                    totalTripsCount: updatedTrips,
+                    lastTripDate: today
+                  });
+                }
               }
+
+              // 🖨️ تحويل تلقائي للطباعة بعد القبول
+              setSelectedOrderDetails(order);
+              setActiveModal('orderDetailsModal');
+              setTimeout(() => {
+                window.print();
+              }, 500);
+            } else if (activeModal === 'orderDetailsModal') {
+              setActiveModal(null);
             }
           });
-
-        if (activeModal === 'orderDetailsModal') {
-          setActiveModal(null);
-        }
       };
 
-      // تصفية الطلبات حسب الواجهة الحالية (جديدة/مقبولة/ملغية/الكل)
+      // تصفية الطلبات
       const filteredOrders = useMemo(() => {
         return orders.filter(o => {
           const matchSearch = (o.clientName && o.clientName.includes(searchQuery)) || 
@@ -618,7 +699,7 @@
                 </div>
 
                 <div className="space-y-4">
-                  {/* شريط التحكم والتصفية */}
+                  {/* شريط التحكم والتصفية وتوضيح التحديث التلقائي */}
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-2 bg-dark-800 p-1.5 rounded-2xl border border-dark-700">
                       {[
@@ -637,13 +718,19 @@
                       ))}
                     </div>
 
-                    <input
-                      type="text"
-                      placeholder="بحث باسم العميل أو المندوب أو السائق..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="bg-dark-800 border border-dark-700 px-4 py-2 rounded-xl text-xs w-full md:w-72 focus:border-gold outline-none"
-                    />
+                    <div className="flex items-center gap-3 w-full md:w-auto">
+                      <span className="text-[10px] text-gold font-bold flex items-center gap-1 bg-dark-800 px-3 py-2 rounded-xl border border-gold/20">
+                        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                        تحديث تلقائي كل 5 ثوانٍ
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="بحث باسم العميل أو المندوب أو السائق..."
+                        value={searchQuery}
+                        onChange={e => setSearchQuery(e.target.value)}
+                        className="bg-dark-800 border border-dark-700 px-4 py-2 rounded-xl text-xs w-full md:w-72 focus:border-gold outline-none"
+                      />
+                    </div>
                   </div>
 
                   {/* جدول الطلبات */}
@@ -658,7 +745,7 @@
                           <th className="p-4">إجمالي الكمية</th>
                           <th className="p-4">المبلغ الإجمالي</th>
                           <th className="p-4">الحالة</th>
-                          <th className="p-4 text-center">الإجراءات والبيع</th>
+                          <th className="p-4 text-center">الإجراءات والحذف</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-dark-700">
@@ -669,7 +756,7 @@
                         ) : (
                           filteredOrders.map(order => (
                             <tr key={order.id} className="hover:bg-dark-800/40 transition-colors">
-                              <td className="p-4">{order.date || 'اليوم'}</td>
+                              <td className="p-4 font-mono">{order.date || new Date().toISOString().slice(0, 10)}</td>
                               <td className="p-4 font-bold text-gold">{order.repName || 'مندوب'}</td>
                               <td className="p-4 font-bold text-white">{order.clientName}</td>
                               <td className="p-4 text-gray-300 font-semibold">{order.driverName || 'غير محدد'}</td>
@@ -688,11 +775,18 @@
                                   <i data-lucide="eye" className="w-3.5 h-3.5"></i> الفاتورة بالكامل
                                 </button>
                                 {order.status !== 'مقبول' && (
-                                  <button onClick={() => updateOrderStatus(order, 'مقبول')} className="p-1.5 bg-green-500/20 hover:bg-green-500/40 text-green-300 rounded-lg text-[10px] font-bold">قبول</button>
+                                  <button onClick={() => updateOrderStatus(order, 'مقبول')} className="p-1.5 bg-green-500/20 hover:bg-green-500/40 text-green-300 rounded-lg text-[10px] font-bold">قبول وطباعة</button>
                                 )}
                                 {order.status !== 'ملغي' && (
                                   <button onClick={() => updateOrderStatus(order, 'ملغي')} className="p-1.5 bg-red-500/20 hover:bg-red-500/40 text-red-300 rounded-lg text-[10px] font-bold">إلغاء</button>
                                 )}
+                                <button
+                                  onClick={() => { setDeleteTarget({ path: 'orders', id: order.id, name: `طلب العميل ${order.clientName}` }); setActiveModal('deleteConfirm'); }}
+                                  className="p-1.5 bg-dark-700 hover:bg-red-950 text-red-400 rounded-lg text-[10px]"
+                                  title="حذف الطلب نهائياً"
+                                >
+                                  <i data-lucide="trash-2" className="w-4 h-4"></i>
+                                </button>
                               </td>
                             </tr>
                           ))
@@ -956,7 +1050,7 @@
 
           </main>
 
-          {/* MODAL: FULL ORDER INVOICE DETAILS (عرض الفاتورة منبسطة للمخزن والإدارة) */}
+          {/* 📄 MODAL: FULL ORDER INVOICE DETAILS (الفاتورة الراقية المطبوعة - بدون تليفون المندوب) */}
           {activeModal === 'orderDetailsModal' && selectedOrderDetails && (
             <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-white text-black p-6 rounded-3xl w-full max-w-4xl max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl">
@@ -965,7 +1059,7 @@
                 <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
                   <h3 className="text-lg font-bold text-black flex items-center gap-2">
                     <i data-lucide="file-text" className="w-5 h-5 text-gold"></i>
-                    فاتورة أذن تحميل وتحضير للعميل
+                    معاينة أذن الفاتورة والشحن
                   </h3>
                   <div className="flex items-center gap-2">
                     <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
@@ -976,47 +1070,51 @@
                 </div>
 
                 {/* Printable Order Invoice Sheet */}
-                <div id="print-area" className="p-2 space-y-4">
-                  {/* المصنع والعنوان */}
-                  <div className="text-center border-b-2 border-black pb-4">
-                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 border border-black object-contain" />
-                    <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
-                    <p className="text-xs font-bold text-gray-700 mt-0.5">فاتورة أذن صرف ونقل وتوريد أعلاف</p>
+                <div id="print-area" className="p-4 space-y-4">
+                  {/* الهيدر واللوجو */}
+                  <div className="flex justify-between items-center border-b-2 border-black pb-4">
+                    <div className="text-right">
+                      <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
+                      <p className="text-xs font-bold text-gray-700 mt-1">فاتورة توريد وأذن صيد صرف وإستلام أعلاف</p>
+                      <p className="text-[10px] text-gray-600">التاريخ: {selectedOrderDetails.date || new Date().toISOString().slice(0, 10)}</p>
+                    </div>
+                    <img src={LOGO_URL} alt="Logo" className="w-20 h-20 rounded-full border border-black object-contain" />
                   </div>
 
-                  {/* معلومات الفاتورة والعميل */}
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-gray-300 text-xs">
+                  {/* معلومات العميل والمندوب (بدون تليفون المندوب) */}
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-black text-xs">
                     <div>
                       <span className="text-gray-500 block">اسم العميل:</span>
                       <strong className="text-sm font-black text-black">{selectedOrderDetails.clientName}</strong>
                     </div>
                     <div>
-                      <span className="text-gray-500 block">العنوان والتوصيل:</span>
+                      <span className="text-gray-500 block">العنوان والمكان:</span>
                       <strong className="text-black">{selectedOrderDetails.clientAddress || 'عنوان المصنع/المزرعة'}</strong>
                     </div>
                     <div>
                       <span className="text-gray-500 block">المندوب المسؤول:</span>
-                      <strong className="text-black">{selectedOrderDetails.repName} ({selectedOrderDetails.repPhone || ''})</strong>
+                      {/* ⚠️ اسم المندوب فقط بدون رقم الهاتف */}
+                      <strong className="text-black text-sm">{selectedOrderDetails.repName || 'مندوب المبيعات'}</strong>
                     </div>
                     <div>
-                      <span className="text-gray-500 block">السائق المكلف بالنقل:</span>
+                      <span className="text-gray-500 block">السائق المكلف:</span>
                       <strong className="text-black">{selectedOrderDetails.driverName || 'لم يحدد'} (سيارة: {selectedOrderDetails.driverTruck || '-'})</strong>
                     </div>
                     <div>
-                      <span className="text-gray-500 block">تاريخ الفاتورة:</span>
-                      <strong className="text-black">{selectedOrderDetails.date}</strong>
+                      <span className="text-gray-500 block">رقم طلب الفاتورة:</span>
+                      <strong className="text-black font-mono">#{selectedOrderDetails.id.slice(-6).toUpperCase()}</strong>
                     </div>
                     <div>
-                      <span className="text-gray-500 block">حالة الفاتورة بالإدارة:</span>
+                      <span className="text-gray-500 block">الحالة:</span>
                       <strong className={selectedOrderDetails.status === 'مقبول' ? 'text-green-700 font-black' : 'text-yellow-700 font-black'}>
                         {selectedOrderDetails.status || 'قيد الانتظار'}
                       </strong>
                     </div>
                   </div>
 
-                  {/* جدول المنتجات والأصناف المكتمل بالتفصيل */}
+                  {/* جدول الأصناف */}
                   <div className="space-y-2">
-                    <h4 className="font-bold text-xs text-black">جدول المنتجات المطلوبة للتحميل:</h4>
+                    <h4 className="font-bold text-xs text-black">جدول المنتجات والأصناف المطلوبة للتحميل:</h4>
                     <table className="w-full text-right text-xs border-collapse">
                       <thead>
                         <tr className="bg-gray-200 text-black border-b border-black">
@@ -1026,7 +1124,7 @@
                           <th className="p-2.5 border border-black font-bold">الوحدة</th>
                           <th className="p-2.5 border border-black font-bold">سعر الوحدة</th>
                           <th className="p-2.5 border border-black font-bold">إجمالي المبلغ</th>
-                          <th className="p-2.5 border border-black font-bold">الوزن المحسوب (طن)</th>
+                          <th className="p-2.5 border border-black font-bold">الوزن (طن)</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1053,23 +1151,23 @@
                     </table>
                   </div>
 
-                  {/* الملاحظات والمجاميع */}
+                  {/* المجاميع والملاحظات */}
                   <div className="flex flex-col md:flex-row justify-between items-center bg-gray-100 p-4 rounded-xl border border-black text-xs space-y-2 md:space-y-0">
                     <div>
-                      <span className="text-gray-600 block">ملاحظات الفاتورة والتسليم:</span>
+                      <span className="text-gray-600 block">ملاحظات التسليم والمصنع:</span>
                       <p className="font-bold text-black">{selectedOrderDetails.notes || 'لا يوجد ملاحظات إضافية'}</p>
                     </div>
                     <div className="text-left space-y-1">
                       <div>إجمالي وزن الشحنة: <strong className="text-black font-black text-sm">{selectedOrderDetails.quantity} طن</strong></div>
-                      <div>إجمالي المطلوب سداده: <strong className="text-black font-black text-base">{Number(selectedOrderDetails.totalAmount || 0).toLocaleString()} جنيه</strong></div>
+                      <div>إجمالي الفاتورة المطلوب سداده: <strong className="text-black font-black text-base">{Number(selectedOrderDetails.totalAmount || 0).toLocaleString()} جنيه</strong></div>
                     </div>
                   </div>
 
-                  {/* التوقيعات والأختام */}
-                  <div className="grid grid-cols-3 gap-4 text-center text-xs pt-6 font-bold border-t border-gray-300">
+                  {/* التوقيعات */}
+                  <div className="grid grid-cols-3 gap-4 text-center text-xs pt-8 font-bold border-t border-gray-300">
                     <div>توقيع أمين المخزن: .........</div>
-                    <div>توقيع السائق بالاستلام: .........</div>
-                    <div>اعتماد الإدارة: .........</div>
+                    <div>توقيع السائق المستلم: .........</div>
+                    <div>اعتماد مدير الحسابات: .........</div>
                   </div>
                 </div>
 
@@ -1081,7 +1179,7 @@
                         onClick={() => updateOrderStatus(selectedOrderDetails, 'مقبول')}
                         className="px-5 py-2.5 bg-green-600 text-white font-bold rounded-xl text-xs flex items-center gap-1.5 shadow hover:bg-green-700"
                       >
-                        <i data-lucide="check-circle" className="w-4 h-4"></i> قبول الطلب وإرساله للمخزن
+                        <i data-lucide="check-circle" className="w-4 h-4"></i> قبول الطلب وطباعة الفاتورة
                       </button>
                     )}
                     {selectedOrderDetails.status !== 'ملغي' && (
@@ -1100,7 +1198,7 @@
             </div>
           )}
 
-          {/* باقي الـ Modals المخصصة للنماذج والحذف */}
+          {/* बाकी الـ Modals المخصصة للنماذج والحذف */}
           {activeModal === 'productForm' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <form onSubmit={handleSaveProduct} className="glass-card p-6 rounded-3xl w-full max-w-lg space-y-4">
@@ -1286,7 +1384,7 @@
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-white text-black p-6 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
                 <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
-                  <h3 className="text-lg font-bold text-black">التقرير الشامل المصمم للطباعة</h3>
+                  <h3 className="text-lg font-bold text-black">التقرير الشامل للطباعة</h3>
                   <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
                     <i data-lucide="printer" className="w-4 h-4"></i> طباعة التقرير
                   </button>
