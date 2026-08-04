@@ -158,6 +158,7 @@
       // Database Collections
       const [salesReps, setSalesReps] = useState([]);
       const [clients, setClients] = useState([]);
+      const [drivers, setDrivers] = useState([]); // السائقين
       const [products, setProducts] = useState([]);
       const [myOrders, setMyOrders] = useState([]);
 
@@ -169,6 +170,7 @@
 
       // Form & Cart States للطلب الجديد
       const [selectedClientId, setSelectedClientId] = useState('');
+      const [selectedDriverId, setSelectedDriverId] = useState(''); // تحديـد السائـق
       const [cartItems, setCartItems] = useState([]);
       const [selectedProductId, setSelectedProductId] = useState('');
       const [unitType, setUnitType] = useState('ton');
@@ -202,6 +204,11 @@
             onValue(ref(db, 'clients'), snapshot => {
               const data = snapshot.val();
               setClients(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+            });
+
+            onValue(ref(db, 'drivers'), snapshot => {
+              const data = snapshot.val();
+              setDrivers(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
             });
 
             onValue(ref(db, 'products'), snapshot => {
@@ -281,11 +288,15 @@
       const totalOrderAmount = useMemo(() => cartItems.reduce((a, b) => a + b.price, 0), [cartItems]);
       const totalOrderWeightTons = useMemo(() => cartItems.reduce((a, b) => a + b.weightTons, 0), [cartItems]);
 
-      // رفع الطلب النهائي للإدارة
+      // رفع الطلب النهائي للإدارة مع ربط السائق والعميل
       const handleSubmitOrder = (e) => {
         e.preventDefault();
         if (!selectedClientId) {
           showToast('يرجى اختيار العميل أولاً', 'error');
+          return;
+        }
+        if (!selectedDriverId) {
+          showToast('يرجى تحديد السائق المكلف بالتوصيل', 'error');
           return;
         }
         if (cartItems.length === 0) {
@@ -295,6 +306,7 @@
 
         const { ref, push, set, db } = window.rtdbMethods;
         const client = clients.find(c => c.id === selectedClientId);
+        const driver = drivers.find(d => d.id === selectedDriverId);
 
         const newOrder = {
           repId: currentRep.id,
@@ -302,11 +314,16 @@
           repPhone: currentRep.phone,
           clientId: selectedClientId,
           clientName: client ? client.name : 'عميل',
-          clientPhone: client ? client.phone : '',
+          clientAddress: client ? client.address : '',
+          driverId: selectedDriverId,
+          driverName: driver ? driver.name : 'سائق',
+          driverTruck: driver ? driver.truckNumber : '',
           region: client ? client.region || currentRep.region : currentRep.region,
           items: cartItems,
+          cargoType: cartItems.map(i => i.productName).join(' + '),
           quantity: totalOrderWeightTons.toFixed(2),
           totalAmount: totalOrderAmount.toFixed(2),
+          tripsCount: 1, // كل طلب يمثل نقلة واحدة تضاف لعداد السائق عند قبول الإدارة
           notes: orderNotes,
           status: 'قيد الانتظار',
           date: new Date().toISOString().slice(0, 10),
@@ -315,18 +332,21 @@
 
         const newRef = push(ref(db, 'orders'));
         set(newRef, newOrder).then(() => {
-          showToast('تم رفع الطلب للإدارة بنجاح!');
+          showToast('تم رفع الطلب بنجاح وتحديد السائق!');
           setCartItems([]);
           setSelectedClientId('');
+          setSelectedDriverId('');
           setOrderNotes('');
           setActiveTab('myOrders');
         });
       };
 
+      // تصفية العملاء (بالاسم فقط دون إظهار التليفون)
       const filteredClients = useMemo(() => {
-        return clients.filter(c => c.name.includes(clientSearch) || (c.phone && c.phone.includes(clientSearch)));
+        return clients.filter(c => c.name.includes(clientSearch));
       }, [clients, clientSearch]);
 
+      // تصفية المنتجات بالاسم مباشرة
       const filteredProducts = useMemo(() => {
         return products.filter(p => p.name.includes(productSearch));
       }, [products, productSearch]);
@@ -420,21 +440,35 @@
             {activeTab === 'newOrder' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
-                  {/* Step 1: Select Client */}
+                  {/* Step 1: Select Client & Driver */}
                   <div className="glass-card p-6 rounded-3xl space-y-4">
                     <h3 className="text-base font-bold text-gold flex items-center gap-2">
                       <i data-lucide="user-check" className="w-5 h-5"></i>
-                      ١. تحديد العميل
+                      ١. تحديد العميل والسائق المكلف
                     </h3>
-                    <div className="flex gap-2">
-                      <input type="text" placeholder="بحث باسم العميل أو الهاتف..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold" />
+                    
+                    {/* اختيار العميل بالاسم فقط بدون تليفون */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-400 block">بحث سريع عن العميل بالاسم:</label>
+                      <input type="text" placeholder="اكتب اسم العميل لظهوره مباشرة..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold" />
+                      <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                        <option value="">-- اختر العميل --</option>
+                        {filteredClients.map(c => (
+                          <option key={c.id} value={c.id}>{c.name} - ({c.address || 'عنوان غير محدد'})</option>
+                        ))}
+                      </select>
                     </div>
-                    <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
-                      <option value="">-- اختر العميل من القائمة المنسدلة --</option>
-                      {filteredClients.map(c => (
-                        <option key={c.id} value={c.id}>{c.name} - {c.phone} ({c.address})</option>
-                      ))}
-                    </select>
+
+                    {/* اختيار السائق المسجل بالإدارة */}
+                    <div className="space-y-2 pt-2 border-t border-dark-700">
+                      <label className="text-xs text-gray-400 block">تحديد السائق المسجل لدى الإدارة:</label>
+                      <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                        <option value="">-- اختر السائق المكلف بالتوصيل --</option>
+                        {drivers.map(d => (
+                          <option key={d.id} value={d.id}>{d.name} (سيارة: {d.truckNumber})</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
 
                   {/* Step 2: Select Products */}
@@ -444,7 +478,7 @@
                       ٢. إضافة الأصناف إلى السلة
                     </h3>
                     <div className="flex gap-2">
-                      <input type="text" placeholder="بحث بالصنف..." value={productSearch} onChange={e => setProductSearch(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold" />
+                      <input type="text" placeholder="بحث باسم المنتج مباشرة..." value={productSearch} onChange={e => setProductSearch(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold" />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -544,10 +578,10 @@
                       <tr>
                         <th className="p-4">تاريخ الطلب</th>
                         <th className="p-4">اسم العميل</th>
+                        <th className="p-4">اسم السائق المكلف</th>
                         <th className="p-4">الكمية الإجمالية</th>
                         <th className="p-4">المبلغ الإجمالي</th>
                         <th className="p-4">حالة الطلب لدى الإدارة</th>
-                        <th className="p-4">ملاحظات</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-700">
@@ -555,6 +589,7 @@
                         <tr key={order.id} className="hover:bg-dark-800/40">
                           <td className="p-4">{order.date}</td>
                           <td className="p-4 font-bold text-white">{order.clientName}</td>
+                          <td className="p-4 font-bold text-gold">{order.driverName || 'سائق'}</td>
                           <td className="p-4 font-black">{order.quantity} طن</td>
                           <td className="p-4 font-bold text-gold">{order.totalAmount ? Number(order.totalAmount).toLocaleString() + ' ج.م' : '-'}</td>
                           <td className="p-4">
@@ -562,7 +597,6 @@
                               {order.status || 'قيد الانتظار'}
                             </span>
                           </td>
-                          <td className="p-4 text-gray-400">{order.notes || '-'}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -571,7 +605,7 @@
               </div>
             )}
 
-            {/* TAB 3: CLIENT STATEMENT (كشف حساب العملاء) */}
+            {/* TAB 3: CLIENT STATEMENT */}
             {activeTab === 'clientStatement' && (
               <div className="space-y-6">
                 <div className="glass-card p-6 rounded-3xl space-y-4">
@@ -600,13 +634,13 @@
                   </div>
                 </div>
 
-                {/* Statement Summary Table */}
                 <div className="glass-card rounded-2xl p-4 overflow-x-auto">
                   <table className="w-full text-right text-xs">
                     <thead className="bg-dark-800 text-gold font-bold">
                       <tr>
                         <th className="p-3">التاريخ</th>
                         <th className="p-3">اسم العميل</th>
+                        <th className="p-3">السائق</th>
                         <th className="p-3">الكمية (طن)</th>
                         <th className="p-3">المبلغ الإجمالي</th>
                         <th className="p-3">الحالة لدى الإدارة</th>
@@ -617,6 +651,7 @@
                         <tr key={o.id} className="hover:bg-dark-800/50">
                           <td className="p-3">{o.date}</td>
                           <td className="p-3 font-bold text-white">{o.clientName}</td>
+                          <td className="p-3 text-gold">{o.driverName || 'سائق'}</td>
                           <td className="p-3 font-black text-gold">{o.quantity} طن</td>
                           <td className="p-3 font-bold">{o.totalAmount ? Number(o.totalAmount).toLocaleString() + ' ج.م' : '-'}</td>
                           <td className="p-3">
@@ -662,6 +697,7 @@
                       <tr className="bg-gray-200 text-black border-b">
                         <th className="p-2 border border-black font-bold">التاريخ</th>
                         <th className="p-2 border border-black font-bold">العميل</th>
+                        <th className="p-2 border border-black font-bold">السائق</th>
                         <th className="p-2 border border-black font-bold">الكمية (طن)</th>
                         <th className="p-2 border border-black font-bold">المبلغ (جنيه)</th>
                         <th className="p-2 border border-black font-bold">الحالة</th>
@@ -672,6 +708,7 @@
                         <tr key={o.id} className="border-b text-black">
                           <td className="p-2 border border-black font-medium">{o.date}</td>
                           <td className="p-2 border border-black font-bold">{o.clientName}</td>
+                          <td className="p-2 border border-black font-medium">{o.driverName || 'سائق'}</td>
                           <td className="p-2 border border-black font-bold">{o.quantity}</td>
                           <td className="p-2 border border-black font-bold">{o.totalAmount ? Number(o.totalAmount).toLocaleString() : '-'}</td>
                           <td className="p-2 border border-black font-medium">{o.status || 'قيد الانتظار'}</td>
