@@ -144,7 +144,8 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    const LOGO_URL = "https://raw.githubusercontent.com/github/explore/main/topics/react/react.png"; 
+    // اللوجو الرسمي
+    const LOGO_URL = "https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png"; 
 
     function RepApp() {
       // Auth State للمندوب
@@ -158,7 +159,7 @@
       // Database Collections
       const [salesReps, setSalesReps] = useState([]);
       const [clients, setClients] = useState([]);
-      const [drivers, setDrivers] = useState([]); // السائقين
+      const [drivers, setDrivers] = useState([]); 
       const [products, setProducts] = useState([]);
       const [myOrders, setMyOrders] = useState([]);
 
@@ -170,7 +171,7 @@
 
       // Form & Cart States للطلب الجديد
       const [selectedClientId, setSelectedClientId] = useState('');
-      const [selectedDriverId, setSelectedDriverId] = useState(''); // تحديـد السائـق
+      const [selectedDriverId, setSelectedDriverId] = useState(''); 
       const [cartItems, setCartItems] = useState([]);
       const [selectedProductId, setSelectedProductId] = useState('');
       const [unitType, setUnitType] = useState('ton');
@@ -227,7 +228,7 @@
 
       useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
-      });
+      }, [activeTab, activeModal, currentRep, cartItems]);
 
       // Login Handler للمندوب
       const handleRepLogin = (e) => {
@@ -373,7 +374,7 @@
           <div className="min-h-screen flex items-center justify-center p-4 bg-dark-950">
             <form onSubmit={handleRepLogin} className="glass-card p-8 rounded-3xl w-full max-w-md gold-glow space-y-6">
               <div className="text-center">
-                <img src={LOGO_URL} alt="Logo" className="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-gold shadow-lg p-1 bg-dark-900" />
+                <img src={LOGO_URL} alt="Logo" className="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-gold shadow-lg p-1 bg-dark-900 object-contain" />
                 <h1 className="text-2xl font-black text-white">بوابة <span className="gold-text">مناديب الأعلاف</span></h1>
                 <p className="text-xs text-gray-400 mt-1">تسجيل دخول المندوب لرفع كشوف الحساب والطلبات</p>
               </div>
@@ -408,7 +409,7 @@
           {/* Header */}
           <header className="glass-card sticky top-0 z-40 px-6 py-4 flex items-center justify-between border-b border-dark-700">
             <div className="flex items-center gap-3">
-              <img src={LOGO_URL} alt="Logo" className="w-10 h-10 rounded-full border border-gold p-0.5 bg-dark-900" />
+              <img src={LOGO_URL} alt="Logo" className="w-10 h-10 rounded-full border border-gold p-0.5 bg-dark-900 object-contain" />
               <div>
                 <h1 className="font-bold text-base">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
                 <p className="text-[10px] text-gray-400">حساب المندوب: <strong className="text-gold">{currentRep.name}</strong> ({currentRep.region || 'عام'})</p>
@@ -682,7 +683,7 @@
 
                 <div id="print-area">
                   <div className="text-center border-b-2 border-black pb-3 mb-4">
-                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 border border-black" />
+                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 border border-black object-contain" />
                     <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
                     <p className="text-sm font-bold text-black">كشف حساب مبيعات وتوريدات عميل</p>
                     <div className="flex justify-between text-xs mt-3 text-black font-semibold">
