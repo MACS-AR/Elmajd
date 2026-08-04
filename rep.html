@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>بوابة مناديب مبيعات مصنع المجد للأعلاف</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- React 18 & ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+
+  <!-- Babel Standalone -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            gold: {
+              light: '#F5E0A3',
+              DEFAULT: '#D4AF37',
+              dark: '#AA820A',
+            },
+            dark: {
+              950: '#050608',
+              900: '#090A0F',
+              800: '#12141D',
+              700: '#1D202F',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #090A0F;
+      color: #ffffff;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+    .gold-gradient {
+      background: linear-gradient(135deg, #F5E0A3 0%, #D4AF37 50%, #AA820A 100%);
+    }
+    .gold-text {
+      background: linear-gradient(135deg, #F5E0A3 0%, #D4AF37 50%, #AA820A 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .glass-card {
+      background: rgba(18, 20, 29, 0.85);
+      backdrop-filter: blur(16px);
+      border: 1px solid rgba(212, 175, 55, 0.2);
+    }
+    .glass-card:hover {
+      border-color: rgba(212, 175, 55, 0.5);
+    }
+    .gold-glow {
+      box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- Firebase Integration Script -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+    import { getDatabase, ref, set, push, onValue } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyBgRkceRq7FRbhCevLlULYNy-A5Tl_cr0w",
+      authDomain: "sr-test-c9e06.firebaseapp.com",
+      databaseURL: "https://sr-test-c9e06-default-rtdb.firebaseio.com",
+      projectId: "sr-test-c9e06",
+      storageBucket: "sr-test-c9e06.firebasestorage.app",
+      messagingSenderId: "658396508062",
+      appId: "1:658396508062:web:c56cd84f93daa2e176308f",
+      measurementId: "G-3ZZV344NDK"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const rtdb = getDatabase(app);
+
+    window.rtdbMethods = {
+      ref, set, push, onValue, db: rtdb
+    };
+  </script>
+
+  <!-- React Logic -->
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    const LOGO_URL = "https://raw.githubusercontent.com/github/explore/main/topics/react/react.png"; 
+
+    function RepApp() {
+      // Auth State للمندوب
+      const [currentRep, setCurrentRep] = useState(null);
+      const [phoneInput, setPhoneInput] = useState('');
+      const [passwordInput, setPasswordInput] = useState('');
+
+      // Active View
+      const [activeTab, setActiveTab] = useState('newOrder'); // newOrder, myOrders, history
+
+      // Database Collections
+      const [salesReps, setSalesReps] = useState([]);
+      const [clients, setClients] = useState([]);
+      const [products, setProducts] = useState([]);
+      const [myOrders, setMyOrders] = useState([]);
+
+      // UI States
+      const [toast, setToast] = useState(null);
+      const [clientSearch, setClientSearch] = useState('');
+      const [productSearch, setProductSearch] = useState('');
+
+      // Form & Cart States للطلب الجديد
+      const [selectedClientId, setSelectedClientId] = useState('');
+      const [cartItems, setCartItems] = useState([]); // الأصناف المضافة للطلب
+      const [selectedProductId, setSelectedProductId] = useState('');
+      const [unitType, setUnitType] = useState('ton'); // 'ton' أو 'bag'
+      const [quantity, setQuantity] = useState('1');
+      const [orderNotes, setOrderNotes] = useState('');
+
+      const showToast = (message, type = 'success') => {
+        setToast({ message, type });
+        setTimeout(() => setToast(null), 3000);
+      };
+
+      // Realtime Database Sync
+      useEffect(() => {
+        const interval = setInterval(() => {
+          if (window.rtdbMethods) {
+            clearInterval(interval);
+            const { ref, onValue, db } = window.rtdbMethods;
+
+            // جلب المناديب
+            onValue(ref(db, 'salesReps'), snapshot => {
+              const data = snapshot.val();
+              setSalesReps(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+            });
+
+            // جلب العملاء
+            onValue(ref(db, 'clients'), snapshot => {
+              const data = snapshot.val();
+              setClients(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+            });
+
+            // جلب المنتجات
+            onValue(ref(db, 'products'), snapshot => {
+              const data = snapshot.val();
+              setProducts(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+            });
+
+            // جلب الطلبات
+            onValue(ref(db, 'orders'), snapshot => {
+              const data = snapshot.val();
+              const list = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
+              setMyOrders(list);
+            });
+          }
+        }, 100);
+      }, []);
+
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      });
+
+      // Login Handler للمندوب
+      const handleRepLogin = (e) => {
+        e.preventDefault();
+        const foundRep = salesReps.find(r => r.phone.trim() === phoneInput.trim() && r.password.trim() === passwordInput.trim());
+
+        if (foundRep) {
+          setCurrentRep(foundRep);
+          showToast(`أهلاً بك يا ${foundRep.name}`);
+        } else {
+          showToast('رقم الهاتف أو كلمة المرور غير صحيحة', 'error');
+        }
+      };
+
+      // إضافة منتج لسلة الطلب
+      const handleAddToCart = () => {
+        if (!selectedProductId) {
+          showToast('يرجى اختيار صنف العلف أولاً', 'error');
+          return;
+        }
+
+        const product = products.find(p => p.id === selectedProductId);
+        if (!product) return;
+
+        const qty = parseFloat(quantity) || 1;
+        let price = 0;
+        let weightTons = 0;
+
+        if (unitType === 'ton') {
+          price = (parseFloat(product.pricePerTon) || 0) * qty;
+          weightTons = qty;
+        } else {
+          price = (parseFloat(product.pricePerBag) || 0) * qty;
+          weightTons = (qty * (parseFloat(product.bagWeightKg) || 25)) / 1000;
+        }
+
+        const newItem = {
+          id: Date.now().toString(),
+          productId: product.id,
+          productName: product.name,
+          unitType,
+          unitLabel: unitType === 'ton' ? 'طن' : `شيكارة (${product.bagWeightKg} كجم)`,
+          quantity: qty,
+          price,
+          weightTons
+        };
+
+        setCartItems([...cartItems, newItem]);
+        setSelectedProductId('');
+        setQuantity('1');
+        showToast('تمت إضافة الصنف إلى الطلب');
+      };
+
+      // إزالة صنف من السلة
+      const removeFromCart = (itemId) => {
+        setCartItems(cartItems.filter(item => item.id !== itemId));
+      };
+
+      // حساب إجمالي كمية الطلب بالطن والإجمالي المالي
+      const totalOrderAmount = useMemo(() => cartItems.reduce((a, b) => a + b.price, 0), [cartItems]);
+      const totalOrderWeightTons = useMemo(() => cartItems.reduce((a, b) => a + b.weightTons, 0), [cartItems]);
+
+      // رفع الطلب النهائي للإدارة
+      const handleSubmitOrder = (e) => {
+        e.preventDefault();
+        if (!selectedClientId) {
+          showToast('يرجى اختيار العميل أولاً', 'error');
+          return;
+        }
+        if (cartItems.length === 0) {
+          showToast('السلة فارغة، أضف منتجاً واحداً على الأقل', 'error');
+          return;
+        }
+
+        const { ref, push, set, db } = window.rtdbMethods;
+        const client = clients.find(c => c.id === selectedClientId);
+
+        const newOrder = {
+          repId: currentRep.id,
+          repName: currentRep.name,
+          repPhone: currentRep.phone,
+          clientId: selectedClientId,
+          clientName: client ? client.name : 'عميل',
+          clientPhone: client ? client.phone : '',
+          region: client ? client.region || currentRep.region : currentRep.region,
+          items: cartItems,
+          quantity: totalOrderWeightTons.toFixed(2),
+          totalAmount: totalOrderAmount.toFixed(2),
+          notes: orderNotes,
+          status: 'قيد الانتظار',
+          date: new Date().toISOString().slice(0, 10),
+          createdAt: new Date().toISOString()
+        };
+
+        const newRef = push(ref(db, 'orders'));
+        set(newRef, newOrder).then(() => {
+          showToast('تم رفع الطلب للإدارة بنجاح!');
+          setCartItems([]);
+          setSelectedClientId('');
+          setOrderNotes('');
+          setActiveTab('myOrders');
+        });
+      };
+
+      // تصفية العملاء للمندوب
+      const filteredClients = useMemo(() => {
+        return clients.filter(c => c.name.includes(clientSearch) || c.phone.includes(clientSearch));
+      }, [clients, clientSearch]);
+
+      // تصفية المنتجات
+      const filteredProducts = useMemo(() => {
+        return products.filter(p => p.name.includes(productSearch));
+      }, [products, productSearch]);
+
+      // طلبات المندوب الحالي فقط
+      const repOrders = useMemo(() => {
+        if (!currentRep) return [];
+        return myOrders.filter(o => o.repId === currentRep.id);
+      }, [myOrders, currentRep]);
+
+      // شاشة تسجيل دخول المندوب
+      if (!currentRep) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4 bg-dark-950">
+            <form onSubmit={handleRepLogin} className="glass-card p-8 rounded-3xl w-full max-w-md gold-glow space-y-6">
+              <div className="text-center">
+                <img src={LOGO_URL} alt="Logo" className="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-gold shadow-lg p-1 bg-dark-900" />
+                <h1 className="text-2xl font-black text-white">بوابة <span className="gold-text">مناديب الأعلاف</span></h1>
+                <p className="text-xs text-gray-400 mt-1">تسجيل دخول المندوب لرفع طلبات التوريد</p>
+              </div>
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-gray-300 block mb-1">رقم هاتف المندوب</label>
+                  <input type="text" required value={phoneInput} onChange={e => setPhoneInput(e.target.value)} placeholder="أدخل رقم هاتفك المسجل" className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm focus:border-gold outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-300 block mb-1">كلمة المرور / الباسورد</label>
+                  <input type="password" required value={passwordInput} onChange={e => setPasswordInput(e.target.value)} placeholder="أدخل كلمة المرور" className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm focus:border-gold outline-none" />
+                </div>
+                <button type="submit" className="w-full gold-gradient text-dark-950 font-black py-3 rounded-xl hover:brightness-110 transition-all text-sm shadow-lg">
+                  تسجيل الدخول كـ مندوب
+                </button>
+              </div>
+            </form>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen flex flex-col bg-dark-900 text-white">
+          {/* Toast Notification */}
+          {toast && (
+            <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-950 text-red-300 border-red-800' : 'bg-dark-800 text-gold border-gold/40'}`}>
+              <i data-lucide={toast.type === 'error' ? 'alert-triangle' : 'check-circle'} className="w-5 h-5"></i>
+              {toast.message}
+            </div>
+          )}
+
+          {/* Header */}
+          <header className="glass-card sticky top-0 z-40 px-6 py-4 flex items-center justify-between border-b border-dark-700">
+            <div className="flex items-center gap-3">
+              <img src={LOGO_URL} alt="Logo" className="w-10 h-10 rounded-full border border-gold p-0.5 bg-dark-900" />
+              <div>
+                <h1 className="font-bold text-base">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
+                <p className="text-[10px] text-gray-400">حساب المندوب: <strong className="text-gold">{currentRep.name}</strong> ({currentRep.region || 'عام'})</p>
+              </div>
+            </div>
+
+            <nav className="hidden md:flex items-center gap-2 bg-dark-800/80 p-1.5 rounded-2xl border border-dark-700">
+              {[
+                { id: 'newOrder', label: 'إنشاء طلب جديد', icon: 'plus-circle' },
+                { id: 'myOrders', label: 'طلباتي ومتابعة الحالة', icon: 'shopping-cart' },
+                { id: 'history', label: 'سجل المبيعات المكتملة', icon: 'check-check' }
+              ].map(tab => (
+                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === tab.id ? 'gold-gradient text-dark-950 shadow-md' : 'text-gray-400 hover:text-white'}`}>
+                  <i data-lucide={tab.icon} className="w-4 h-4"></i>
+                  {tab.label}
+                </button>
+              ))}
+            </nav>
+
+            <button onClick={() => setCurrentRep(null)} className="bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-2 rounded-xl text-xs flex items-center gap-1.5">
+              <i data-lucide="log-out" className="w-4 h-4"></i> خروج
+            </button>
+          </header>
+
+          {/* Main Container */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
+
+            {/* TAB 1: NEW ORDER FORM (إنشاء طلب جديد) */}
+            {activeTab === 'newOrder' && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left Side: Select Client & Products */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Step 1: Select Client */}
+                  <div className="glass-card p-6 rounded-3xl space-y-4">
+                    <h3 className="text-base font-bold text-gold flex items-center gap-2">
+                      <i data-lucide="user-check" className="w-5 h-5"></i>
+                      ١. تحديد العميل المطلوب رفع الطلب له
+                    </h3>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder="بحث باسم العميل أو الهاتف..." value={clientSearch} onChange={e => setClientSearch(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold" />
+                    </div>
+                    <select value={selectedClientId} onChange={e => setSelectedClientId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                      <option value="">-- اختر العميل من القائمة المنسدلة --</option>
+                      {filteredClients.map(c => (
+                        <option key={c.id} value={c.id}>{c.name} - {c.phone} ({c.address})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Step 2: Select Products & Units */}
+                  <div className="glass-card p-6 rounded-3xl space-y-4">
+                    <h3 className="text-base font-bold text-gold flex items-center gap-2">
+                      <i data-lucide="package" className="w-5 h-5"></i>
+                      ٢. إضافة أصناف الأعلاف للطلب
+                    </h3>
+                    <div className="flex gap-2">
+                      <input type="text" placeholder="بحث بالصنف..." value={productSearch} onChange={e => setProductSearch(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold" />
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="md:col-span-1">
+                        <label className="text-xs text-gray-400 block mb-1">اختر العلف</label>
+                        <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                          <option value="">-- الصنف --</option>
+                          {filteredProducts.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">وحدة الكمية</label>
+                        <select value={unitType} onChange={e => setUnitType(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                          <option value="ton">بالطن</option>
+                          <option value="bag">بالشيكارة</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">الكمية المطلوبة</label>
+                        <input type="number" step="0.1" min="0.1" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
+                      </div>
+                    </div>
+
+                    <button type="button" onClick={handleAddToCart} className="w-full bg-dark-800 border border-gold/40 hover:border-gold text-gold font-bold p-3 rounded-xl text-xs flex items-center justify-center gap-2">
+                      <i data-lucide="plus" className="w-4 h-4"></i> إضافة الصنف للطلب
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right Side: Order Cart Summary */}
+                <div className="glass-card p-6 rounded-3xl space-y-6 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-bold text-white border-b border-dark-700 pb-3 flex justify-between items-center">
+                      <span>سلة الطلب والمجموع</span>
+                      <span className="text-xs text-gold font-normal">{cartItems.length} أصناف</span>
+                    </h3>
+
+                    {/* Cart Items List */}
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                      {cartItems.length === 0 ? (
+                        <p className="text-xs text-gray-500 text-center py-6">لم يتم إضافة أي منتج للسلة حتى الآن</p>
+                      ) : (
+                        cartItems.map(item => (
+                          <div key={item.id} className="bg-dark-800 p-3 rounded-xl flex justify-between items-center text-xs border border-dark-700">
+                            <div>
+                              <h5 className="font-bold text-white">{item.productName}</h5>
+                              <p className="text-[10px] text-gray-400 mt-0.5">
+                                {item.quantity} {item.unitLabel} | <span className="text-gold">{item.price.toLocaleString()} ج.م</span>
+                              </p>
+                            </div>
+               
