@@ -173,7 +173,6 @@
       const [trips, setTrips] = useState([]);
       const [logs, setLogs] = useState([]);
 
-      // Ref لمتابعة عدد الطلبات السابقة لمنع إعادة تعريف الإندكس وتفريغ الشاشة
       const prevOrdersCountRef = useRef(0);
 
       // UI States
@@ -208,7 +207,7 @@
         setTimeout(() => setToast(null), 3000);
       };
 
-      // 🔔 دالة تشغيل صوت التنبيه المحسّنة والمضمونة
+      // 🔔 دالة تشغيل صوت التنبيه الآمنة
       const playNotificationSound = () => {
         try {
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -219,13 +218,12 @@
             audioCtx.resume();
           }
 
-          const duration = 5; // مدة التنبيه 5 ثوانٍ
+          const duration = 5;
           const startTime = audioCtx.currentTime;
 
           for (let i = 0; i < duration; i++) {
             const time = startTime + i;
             
-            // النغمة الأولى
             const osc1 = audioCtx.createOscillator();
             const gain1 = audioCtx.createGain();
             osc1.type = 'sine';
@@ -237,7 +235,6 @@
             osc1.start(time);
             osc1.stop(time + 0.15);
 
-            // النغمة الثانية
             const osc2 = audioCtx.createOscillator();
             const gain2 = audioCtx.createGain();
             osc2.type = 'sine';
@@ -250,11 +247,11 @@
             osc2.stop(time + 0.35);
           }
         } catch (e) {
-          console.error("Audio Playback Error:", e);
+          console.error("Audio Error:", e);
         }
       };
 
-      // Realtime Database Sync الإبتدائي والآمن
+      // Realtime Database Sync الإبتدائي والآمن جداً
       useEffect(() => {
         const interval = setInterval(() => {
           if (window.rtdbMethods) {
@@ -262,74 +259,85 @@
             const { ref, onValue, db } = window.rtdbMethods;
 
             onValue(ref(db, 'salesReps'), snapshot => {
-              const data = snapshot.val();
-              setSalesReps(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+              try {
+                const data = snapshot.val();
+                setSalesReps(data ? Object.keys(data).map(k => ({ id: k, ...(data[k] || {}) })) : []);
+              } catch (e) { console.error(e); }
             });
 
+            // المزامنة الحية للطلبات بدون تجميد أو إظلام الواجهة
             onValue(ref(db, 'orders'), snapshot => {
-              const data = snapshot.val();
-              const fetchedOrders = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
-              setOrders(fetchedOrders);
-              prevOrdersCountRef.current = fetchedOrders.length;
+              try {
+                const data = snapshot.val();
+                if (data) {
+                  const fetchedOrders = Object.keys(data).map(k => {
+                    const item = data[k] || {};
+                    return {
+                      id: k,
+                      clientName: item.clientName || 'عميل غير محدد',
+                      repName: item.repName || 'مندوب',
+                      driverName: item.driverName || 'غير محدد',
+                      quantity: item.quantity || 0,
+                      totalAmount: item.totalAmount || 0,
+                      status: item.status || 'قيد الانتظار',
+                      date: item.date || new Date().toISOString().slice(0, 10),
+                      notes: item.notes || '',
+                      ...item
+                    };
+                  }).reverse();
+
+                  if (prevOrdersCountRef.current > 0 && fetchedOrders.length > prevOrdersCountRef.current) {
+                    playNotificationSound();
+                    showToast('🔔 تم وصول طلب جديد من المندوب!', 'success');
+                  }
+
+                  setOrders(fetchedOrders);
+                  prevOrdersCountRef.current = fetchedOrders.length;
+                } else {
+                  setOrders([]);
+                }
+              } catch (err) {
+                console.error("Error reading orders:", err);
+              }
             });
 
             onValue(ref(db, 'drivers'), snapshot => {
-              const data = snapshot.val();
-              setDrivers(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+              try {
+                const data = snapshot.val();
+                setDrivers(data ? Object.keys(data).map(k => ({ id: k, ...(data[k] || {}) })) : []);
+              } catch (e) { console.error(e); }
             });
 
             onValue(ref(db, 'clients'), snapshot => {
-              const data = snapshot.val();
-              setClients(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+              try {
+                const data = snapshot.val();
+                setClients(data ? Object.keys(data).map(k => ({ id: k, ...(data[k] || {}) })) : []);
+              } catch (e) { console.error(e); }
             });
 
             onValue(ref(db, 'products'), snapshot => {
-              const data = snapshot.val();
-              setProducts(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+              try {
+                const data = snapshot.val();
+                setProducts(data ? Object.keys(data).map(k => ({ id: k, ...(data[k] || {}) })) : []);
+              } catch (e) { console.error(e); }
             });
 
             onValue(ref(db, 'trips'), snapshot => {
-              const data = snapshot.val();
-              setTrips(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : []);
+              try {
+                const data = snapshot.val();
+                setTrips(data ? Object.keys(data).map(k => ({ id: k, ...(data[k] || {}) })).reverse() : []);
+              } catch (e) { console.error(e); }
             });
 
             onValue(ref(db, 'logs'), snapshot => {
-              const data = snapshot.val();
-              setLogs(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : []);
+              try {
+                const data = snapshot.val();
+                setLogs(data ? Object.keys(data).map(k => ({ id: k, ...(data[k] || {}) })).reverse() : []);
+              } catch (e) { console.error(e); }
             });
           }
         }, 100);
       }, []);
-
-      // 🔄 التحديث الأوتوماتيكي للطلبات مع فحص الآمان ومنع تفريغ الواجهة
-      useEffect(() => {
-        if (!isAuthenticated) return;
-
-        const ordersInterval = setInterval(() => {
-          if (window.rtdbMethods) {
-            const { ref, get, db } = window.rtdbMethods;
-            get(ref(db, 'orders')).then(snapshot => {
-              if (snapshot.exists()) {
-                const data = snapshot.val();
-                if (data) {
-                  const updatedList = Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse();
-                  
-                  // 🔔 تشغيل الصوت والإشعار عند وجود طلبات جديدة
-                  if (prevOrdersCountRef.current > 0 && updatedList.length > prevOrdersCountRef.current) {
-                    playNotificationSound();
-                    showToast('🔔 وصل طلب جديد من المندوب!', 'success');
-                  }
-
-                  setOrders(updatedList);
-                  prevOrdersCountRef.current = updatedList.length;
-                }
-              }
-            }).catch(err => console.error("Error syncing orders:", err));
-          }
-        }, 5000);
-
-        return () => clearInterval(ordersInterval);
-      }, [isAuthenticated]);
 
       useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
@@ -477,7 +485,7 @@
         if (!selectedDriver) return;
         const { ref, push, set, update, db } = window.rtdbMethods;
 
-        const client = clients.find(c => c.id === tripData.clientId);
+        const client = clients.find(c => c && c.id === tripData.clientId);
         const today = new Date().toISOString().slice(0, 10);
         const timeNow = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
 
@@ -513,13 +521,13 @@
         setTripData({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: '2.5', truckNumber: '', notes: '' });
       };
 
-      // Delete Handler (حذف عنصر)
+      // Delete Handler
       const confirmDelete = () => {
         if (!deleteTarget) return;
         const { ref, remove, update, db } = window.rtdbMethods;
 
         if (deleteTarget.path === 'trips' && deleteTarget.trip) {
-          const driver = drivers.find(d => d.id === deleteTarget.trip.driverId);
+          const driver = drivers.find(d => d && d.id === deleteTarget.trip.driverId);
           if (driver) {
             const updatedTotal = Math.max(0, (driver.totalTripsCount || 0) - (parseInt(deleteTarget.trip.tripsCount) || 1));
             update(ref(db, `drivers/${driver.id}`), { totalTripsCount: updatedTotal });
@@ -535,18 +543,19 @@
         setDeleteTarget(null);
       };
 
-      // 🖨️ تحديث حالة الطلب والتحويل المباشر للطباعة عند القبول
+      // updateOrderStatus
       const updateOrderStatus = (order, newStatus) => {
+        if (!order || !order.id) return;
         const { ref, update, push, set, db } = window.rtdbMethods;
 
         update(ref(db, `orders/${order.id}`), { status: newStatus })
           .then(() => {
             showToast(`تم تغيير حالة الطلب إلى: ${newStatus}`);
-            addLog('UPDATE_ORDER', `تعديل حالة طلب العميل ${order.clientName} إلى ${newStatus}`);
+            addLog('UPDATE_ORDER', `تعديل حالة طلب العميل ${order.clientName || ''} إلى ${newStatus}`);
 
             if (newStatus === 'مقبول') {
               if (order.driverId) {
-                const driver = drivers.find(d => d.id === order.driverId);
+                const driver = drivers.find(d => d && d.id === order.driverId);
                 const today = order.date || new Date().toISOString().slice(0, 10);
                 const tripsToAdd = parseInt(order.tripsCount) || 1;
 
@@ -555,8 +564,8 @@
                   orderId: order.id,
                   driverId: order.driverId,
                   driverName: order.driverName || (driver ? driver.name : 'سائق'),
-                  clientId: order.clientId,
-                  clientName: order.clientName,
+                  clientId: order.clientId || '',
+                  clientName: order.clientName || 'عميل',
                   clientAddress: order.clientAddress || '',
                   date: today,
                   time: new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
@@ -588,14 +597,16 @@
           });
       };
 
-      // تصفية الطلبات بآمان
+      // تصفية الطلبات بآمان وحماية كاملة ضد الحقول الفارغة
       const filteredOrders = useMemo(() => {
         if (!Array.isArray(orders)) return [];
         return orders.filter(o => {
           if (!o) return false;
-          const matchSearch = (o.clientName && o.clientName.includes(searchQuery)) || 
-                              (o.repName && o.repName.includes(searchQuery)) ||
-                              (o.driverName && o.driverName.includes(searchQuery));
+          const cName = o.clientName ? String(o.clientName) : '';
+          const rName = o.repName ? String(o.repName) : '';
+          const dName = o.driverName ? String(o.driverName) : '';
+          
+          const matchSearch = cName.includes(searchQuery) || rName.includes(searchQuery) || dName.includes(searchQuery);
           
           if (orderStatusFilter === 'الكل') return matchSearch;
           return matchSearch && (o.status || 'قيد الانتظار') === orderStatusFilter;
@@ -612,8 +623,8 @@
         return trips.filter(t => {
           if (!t) return false;
           const matchDriver = reportFilter.driverId ? t.driverId === reportFilter.driverId : true;
-          const matchFrom = reportFilter.fromDate ? t.date >= reportFilter.fromDate : true;
-          const matchTo = reportFilter.toDate ? t.date <= reportFilter.toDate : true;
+          const matchFrom = reportFilter.fromDate ? (t.date && t.date >= reportFilter.fromDate) : true;
+          const matchTo = reportFilter.toDate ? (t.date && t.date <= reportFilter.toDate) : true;
           return matchDriver && matchFrom && matchTo;
         });
       }, [trips, reportFilter]);
@@ -648,7 +659,6 @@
 
       return (
         <div className="min-h-screen flex flex-col bg-dark-900 text-white" onClick={() => {
-          // فتح كتم الصوت فور أول ضغطة للمستخدم لضمان السماح بأصوات التنبيه المستقبلية
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
           if (AudioContextClass) {
             const ctx = new AudioContextClass();
@@ -712,11 +722,11 @@
                   </div>
                   <div className="glass-card p-5 rounded-2xl">
                     <span className="text-gray-400 text-xs block mb-1">إجمالي النقلات المنجزة</span>
-                    <p className="text-3xl font-black gold-text">{Array.isArray(trips) ? trips.reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0) : 0}</p>
+                    <p className="text-3xl font-black gold-text">{Array.isArray(trips) ? trips.reduce((a, b) => a + (parseFloat(b?.tripsCount) || 0), 0) : 0}</p>
                   </div>
                   <div className="glass-card p-5 rounded-2xl">
                     <span className="text-gray-400 text-xs block mb-1">إجمالي كميات الأعلاف (طن)</span>
-                    <p className="text-3xl font-black text-white">{Array.isArray(orders) ? orders.reduce((a, b) => a + (parseFloat(b.quantity) || 0), 0).toFixed(2) : '0.00'}</p>
+                    <p className="text-3xl font-black text-white">{Array.isArray(orders) ? orders.reduce((a, b) => a + (parseFloat(b?.quantity) || 0), 0).toFixed(2) : '0.00'}</p>
                   </div>
                 </div>
 
@@ -743,7 +753,7 @@
                     <div className="flex items-center gap-3 w-full md:w-auto">
                       <span className="text-[10px] text-gold font-bold flex items-center gap-1 bg-dark-800 px-3 py-2 rounded-xl border border-gold/20">
                         <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                        تحديث تلقائي كل 5 ثوانٍ
+                        مزامنة حية وبدون إعادة تحميل
                       </span>
                       <input
                         type="text"
@@ -755,7 +765,7 @@
                     </div>
                   </div>
 
-                  {/* 🎴 عرض كروت الطلبات الكبيرة */}
+                  {/* 🎴 عرض كروت الطلبات الكبيرة الحصينة ضد الانهيار */}
                   {filteredOrders.length === 0 ? (
                     <div className="glass-card p-12 text-center rounded-2xl border border-dark-700">
                       <i data-lucide="package-open" className="w-12 h-12 text-gray-600 mx-auto mb-3"></i>
@@ -806,7 +816,7 @@
                           </div>
 
                           <div className="flex justify-between items-center text-[11px] text-gray-400 px-1">
-                            <span className="font-mono text-gray-500">#{order.id ? order.id.slice(-6).toUpperCase() : ''}</span>
+                            <span className="font-mono text-gray-500">#{order.id ? String(order.id).slice(-6).toUpperCase() : ''}</span>
                             <span className="truncate max-w-[200px]">{order.notes ? `ملاحظة: ${order.notes}` : 'لا يوجد ملاحظات إضافية'}</span>
                           </div>
 
@@ -837,7 +847,7 @@
                             )}
 
                             <button
-                              onClick={() => { setDeleteTarget({ path: 'orders', id: order.id, name: `طلب العميل ${order.clientName}` }); setActiveModal('deleteConfirm'); }}
+                              onClick={() => { setDeleteTarget({ path: 'orders', id: order.id, name: `طلب العميل ${order.clientName || ''}` }); setActiveModal('deleteConfirm'); }}
                               className="p-2.5 bg-dark-800 hover:bg-red-950 text-red-400 rounded-xl text-xs border border-dark-700 transition-all"
                               title="حذف الطلب نهائياً"
                             >
@@ -882,9 +892,9 @@
                       {products.map(product => (
                         <tr key={product.id} className="hover:bg-dark-800/40">
                           <td className="p-4 font-bold text-white">{product.name}</td>
-                          <td className="p-4 font-black text-gold">{Number(product.pricePerTon).toLocaleString()} ج.م</td>
+                          <td className="p-4 font-black text-gold">{Number(product.pricePerTon || 0).toLocaleString()} ج.م</td>
                           <td className="p-4 text-gray-300">{product.bagWeightKg} كجم</td>
-                          <td className="p-4 font-bold text-green-400">{Number(product.pricePerBag).toLocaleString()} ج.م</td>
+                          <td className="p-4 font-bold text-green-400">{Number(product.pricePerBag || 0).toLocaleString()} ج.م</td>
                           <td className="p-4 text-gray-400">{product.updatedAt ? new Date(product.updatedAt).toLocaleDateString('ar-EG') : 'الآن'}</td>
                           <td className="p-4 text-center flex justify-center gap-2">
                             <button onClick={() => { setSelectedProduct(product); setProductData({ name: product.name, pricePerTon: product.pricePerTon, bagWeightKg: product.bagWeightKg, notes: product.notes || '' }); setActiveModal('productForm'); }} className="p-2 bg-dark-700 hover:text-gold rounded-lg"><i data-lucide="edit" className="w-4 h-4"></i></button>
@@ -1096,7 +1106,7 @@
                   {logs.map(log => (
                     <div key={log.id} className="bg-dark-800 p-3 rounded-xl flex justify-between items-center text-xs border border-dark-700">
                       <span className="font-bold text-gold">{log.description}</span>
-                      <span className="text-gray-400">{new Date(log.timestamp).toLocaleString('ar-EG')}</span>
+                      <span className="text-gray-400">{log.timestamp ? new Date(log.timestamp).toLocaleString('ar-EG') : ''}</span>
                     </div>
                   ))}
                 </div>
@@ -1110,7 +1120,6 @@
             <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-white text-black p-6 rounded-3xl w-full max-w-4xl max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl">
                 
-                {/* Header Controls */}
                 <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
                   <h3 className="text-lg font-bold text-black flex items-center gap-2">
                     <i data-lucide="file-text" className="w-5 h-5 text-gold"></i>
@@ -1124,9 +1133,7 @@
                   </div>
                 </div>
 
-                {/* Printable Order Invoice Sheet */}
                 <div id="print-area" className="p-4 space-y-4">
-                  {/* الهيدر واللوجو */}
                   <div className="flex justify-between items-center border-b-2 border-black pb-4">
                     <div className="text-right">
                       <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
@@ -1136,11 +1143,10 @@
                     <img src={LOGO_URL} alt="Logo" className="w-20 h-20 rounded-full border border-black object-contain" />
                   </div>
 
-                  {/* معلومات العميل والمندوب */}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-black text-xs">
                     <div>
                       <span className="text-gray-500 block">اسم العميل:</span>
-                      <strong className="text-sm font-black text-black">{selectedOrderDetails.clientName}</strong>
+                      <strong className="text-sm font-black text-black">{selectedOrderDetails.clientName || 'غير محدد'}</strong>
                     </div>
                     <div>
                       <span className="text-gray-500 block">العنوان والمكان:</span>
@@ -1156,7 +1162,7 @@
                     </div>
                     <div>
                       <span className="text-gray-500 block">رقم طلب الفاتورة:</span>
-                      <strong className="text-black font-mono">#{selectedOrderDetails.id ? selectedOrderDetails.id.slice(-6).toUpperCase() : ''}</strong>
+                      <strong className="text-black font-mono">#{selectedOrderDetails.id ? String(selectedOrderDetails.id).slice(-6).toUpperCase() : ''}</strong>
                     </div>
                     <div>
                       <span className="text-gray-500 block">الحالة:</span>
@@ -1166,7 +1172,6 @@
                     </div>
                   </div>
 
-                  {/* جدول الأصناف */}
                   <div className="space-y-2">
                     <h4 className="font-bold text-xs text-black">جدول المنتجات والأصناف المطلوبة للتحميل:</h4>
                     <table className="w-full text-right text-xs border-collapse">
@@ -1182,22 +1187,22 @@
                         </tr>
                       </thead>
                       <tbody>
-                        {selectedOrderDetails.items && selectedOrderDetails.items.length > 0 ? (
+                        {Array.isArray(selectedOrderDetails.items) && selectedOrderDetails.items.length > 0 ? (
                           selectedOrderDetails.items.map((item, idx) => (
                             <tr key={idx} className="border-b border-black">
                               <td className="p-2 border border-black text-center font-bold">{idx + 1}</td>
-                              <td className="p-2 border border-black font-bold">{item.productName}</td>
-                              <td className="p-2 border border-black font-black">{item.quantity}</td>
-                              <td className="p-2 border border-black">{item.unitLabel}</td>
-                              <td className="p-2 border border-black">{(item.price / item.quantity).toLocaleString()} ج.م</td>
-                              <td className="p-2 border border-black font-bold">{item.price.toLocaleString()} ج.م</td>
-                              <td className="p-2 border border-black">{item.weightTons ? item.weightTons.toFixed(2) : '-'} طن</td>
+                              <td className="p-2 border border-black font-bold">{item?.productName || 'علف'}</td>
+                              <td className="p-2 border border-black font-black">{item?.quantity || 0}</td>
+                              <td className="p-2 border border-black">{item?.unitLabel || 'طن'}</td>
+                              <td className="p-2 border border-black">{item?.quantity ? ((item?.price || 0) / item.quantity).toLocaleString() : '0'} ج.م</td>
+                              <td className="p-2 border border-black font-bold">{Number(item?.price || 0).toLocaleString()} ج.م</td>
+                              <td className="p-2 border border-black">{item?.weightTons ? Number(item.weightTons).toFixed(2) : '-'} طن</td>
                             </tr>
                           ))
                         ) : (
                           <tr className="border-b border-black">
                             <td colSpan="7" className="p-3 text-center border border-black font-bold">
-                              {selectedOrderDetails.cargoType} - كمية: {selectedOrderDetails.quantity} طن
+                              {selectedOrderDetails.cargoType || 'علف'} - كمية: {selectedOrderDetails.quantity || 0} طن
                             </td>
                           </tr>
                         )}
@@ -1205,19 +1210,17 @@
                     </table>
                   </div>
 
-                  {/* المجاميع والملاحظات */}
                   <div className="flex flex-col md:flex-row justify-between items-center bg-gray-100 p-4 rounded-xl border border-black text-xs space-y-2 md:space-y-0">
                     <div>
                       <span className="text-gray-600 block">ملاحظات التسليم والمصنع:</span>
                       <p className="font-bold text-black">{selectedOrderDetails.notes || 'لا يوجد ملاحظات إضافية'}</p>
                     </div>
                     <div className="text-left space-y-1">
-                      <div>إجمالي وزن الشحنة: <strong className="text-black font-black text-sm">{selectedOrderDetails.quantity} طن</strong></div>
+                      <div>إجمالي وزن الشحنة: <strong className="text-black font-black text-sm">{selectedOrderDetails.quantity || 0} طن</strong></div>
                       <div>إجمالي الفاتورة المطلوب سداده: <strong className="text-black font-black text-base">{Number(selectedOrderDetails.totalAmount || 0).toLocaleString()} جنيه</strong></div>
                     </div>
                   </div>
 
-                  {/* التوقيعات */}
                   <div className="grid grid-cols-3 gap-4 text-center text-xs pt-8 font-bold border-t border-gray-300">
                     <div>توقيع أمين المخزن: .........</div>
                     <div>توقيع السائق المستلم: .........</div>
@@ -1225,7 +1228,6 @@
                   </div>
                 </div>
 
-                {/* Footer Action Buttons */}
                 <div className="flex justify-between items-center pt-4 border-t border-gray-200 no-print">
                   <div className="flex gap-2">
                     {selectedOrderDetails.status !== 'مقبول' && (
@@ -1252,7 +1254,7 @@
             </div>
           )}
 
-          {/* باقي الـ Modals المخصصة للنماذج والحذف */}
+          {/* बाकी الـ Modals المخصصة للنماذج والحذف */}
           {activeModal === 'productForm' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <form onSubmit={handleSaveProduct} className="glass-card p-6 rounded-3xl w-full max-w-lg space-y-4">
@@ -1409,7 +1411,7 @@
                       </tr>
                     </thead>
                     <tbody>
-                      {trips.filter(t => t.driverId === selectedDriver.id && (reportFilter.fromDate ? t.date >= reportFilter.fromDate : true) && (reportFilter.toDate ? t.date <= reportFilter.toDate : true)).map(t => (
+                      {trips.filter(t => t && t.driverId === selectedDriver.id && (reportFilter.fromDate ? t.date >= reportFilter.fromDate : true) && (reportFilter.toDate ? t.date <= reportFilter.toDate : true)).map(t => (
                         <tr key={t.id} className="border-b text-black">
                           <td className="p-2 border border-black font-medium">{t.date}</td>
                           <td className="p-2 border border-black font-medium">{t.clientName}</td>
@@ -1422,8 +1424,8 @@
                   </table>
 
                   <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border border-black">
-                    <span>إجمالي عدد النقلات: {trips.filter(t => t.driverId === selectedDriver.id).reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0)}</span>
-                    <span>إجمالي الوزن: {trips.filter(t => t.driverId === selectedDriver.id).reduce((a, b) => a + (parseFloat(b.weightTons) || 0), 0).toFixed(2)} طن</span>
+                    <span>إجمالي عدد النقلات: {trips.filter(t => t && t.driverId === selectedDriver.id).reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0)}</span>
+                    <span>إجمالي الوزن: {trips.filter(t => t && t.driverId === selectedDriver.id).reduce((a, b) => a + (parseFloat(b.weightTons) || 0), 0).toFixed(2)} طن</span>
                   </div>
                 </div>
 
