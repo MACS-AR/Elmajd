@@ -150,9 +150,38 @@
 
   <!-- React Logic -->
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef } = React;
+    const { useState, useEffect, useMemo, useRef, Component } = React;
 
     const LOGO_URL = "https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png"; 
+
+    // 🛡️ Error Boundary لحماية الواجهة من الإظلام عند وجود أخطاء بيانات
+    class ErrorBoundary extends Component {
+      constructor(props) {
+        super(props);
+        this.state = { hasError: false };
+      }
+      static getDerivedStateFromError(error) {
+        return { hasError: true };
+      }
+      componentDidCatch(error, errorInfo) {
+        console.error("React Error Caught:", error, errorInfo);
+      }
+      render() {
+        if (this.state.hasError) {
+          return (
+            <div className="p-8 text-center bg-dark-900 text-white min-h-screen flex flex-col items-center justify-center space-y-4">
+              <i data-lucide="alert-triangle" className="w-12 h-12 text-gold"></i>
+              <h2 className="text-xl font-bold">تم استلام طلب بتنسيق خاص</h2>
+              <p className="text-xs text-gray-400">جاري إعادة تنظيم البيانات للحفاظ على استقرار اللوحة...</p>
+              <button onClick={() => window.location.reload()} className="gold-gradient text-dark-950 font-bold px-6 py-2.5 rounded-xl text-xs">
+                إعادة تنشيط اللوحة
+              </button>
+            </div>
+          );
+        }
+        return this.props.children;
+      }
+    }
 
     function App() {
       // Auth State
@@ -207,7 +236,7 @@
         setTimeout(() => setToast(null), 3000);
       };
 
-      // 🔔 دالة تشغيل صوت التنبيه الآمنة
+      // 🔔 دالة تشغيل صوت التنبيه المحسّنة والمؤمنة
       const playNotificationSound = () => {
         try {
           const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -247,11 +276,11 @@
             osc2.stop(time + 0.35);
           }
         } catch (e) {
-          console.error("Audio Error:", e);
+          console.error("Audio Playback Error:", e);
         }
       };
 
-      // Realtime Database Sync الإبتدائي والآمن جداً
+      // Realtime Database Sync - تنظيف وتطهير شامل للبيانات لمنع تكسير الصفحة
       useEffect(() => {
         const interval = setInterval(() => {
           if (window.rtdbMethods) {
@@ -265,30 +294,56 @@
               } catch (e) { console.error(e); }
             });
 
-            // المزامنة الحية للطلبات بدون تجميد أو إظلام الواجهة
+            // 🛠️ جلب الطلبات وتنظيف الحقول تماماً لعدم كسر الواجهة
             onValue(ref(db, 'orders'), snapshot => {
               try {
                 const data = snapshot.val();
-                if (data) {
+                if (data && typeof data === 'object') {
                   const fetchedOrders = Object.keys(data).map(k => {
-                    const item = data[k] || {};
+                    const raw = data[k] || {};
+                    // معالجة آمنة للكمية
+                    let safeQty = 0;
+                    if (typeof raw.quantity === 'number') safeQty = raw.quantity;
+                    else if (typeof raw.quantity === 'string') safeQty = parseFloat(raw.quantity) || 0;
+
+                    // معالجة آمنة للمبلغ الإجمالي
+                    let safeAmount = 0;
+                    if (typeof raw.totalAmount === 'number') safeAmount = raw.totalAmount;
+                    else if (typeof raw.totalAmount === 'string') safeAmount = parseFloat(raw.totalAmount) || 0;
+
+                    // معالجة عناصر الفاتورة
+                    let safeItems = [];
+                    if (Array.isArray(raw.items)) {
+                      safeItems = raw.items.map(it => ({
+                        productName: it?.productName || 'علف',
+                        quantity: parseFloat(it?.quantity) || 0,
+                        unitLabel: it?.unitLabel || 'طن',
+                        price: parseFloat(it?.price) || 0,
+                        weightTons: parseFloat(it?.weightTons) || 0
+                      }));
+                    }
+
                     return {
-                      id: k,
-                      clientName: item.clientName || 'عميل غير محدد',
-                      repName: item.repName || 'مندوب',
-                      driverName: item.driverName || 'غير محدد',
-                      quantity: item.quantity || 0,
-                      totalAmount: item.totalAmount || 0,
-                      status: item.status || 'قيد الانتظار',
-                      date: item.date || new Date().toISOString().slice(0, 10),
-                      notes: item.notes || '',
-                      ...item
+                      id: String(k),
+                      clientName: raw.clientName ? String(raw.clientName) : 'عميل غير محدد',
+                      repName: raw.repName ? String(raw.repName) : 'مندوب',
+                      driverName: raw.driverName ? String(raw.driverName) : 'غير محدد',
+                      quantity: safeQty,
+                      totalAmount: safeAmount,
+                      status: raw.status ? String(raw.status) : 'قيد الانتظار',
+                      date: raw.date ? String(raw.date) : new Date().toISOString().slice(0, 10),
+                      notes: raw.notes ? String(raw.notes) : '',
+                      items: safeItems,
+                      cargoType: raw.cargoType ? String(raw.cargoType) : 'علف',
+                      driverTruck: raw.driverTruck ? String(raw.driverTruck) : '',
+                      driverId: raw.driverId ? String(raw.driverId) : '',
+                      clientId: raw.clientId ? String(raw.clientId) : ''
                     };
                   }).reverse();
 
                   if (prevOrdersCountRef.current > 0 && fetchedOrders.length > prevOrdersCountRef.current) {
                     playNotificationSound();
-                    showToast('🔔 تم وصول طلب جديد من المندوب!', 'success');
+                    showToast('🔔 وصل طلب جديد من المندوب!', 'success');
                   }
 
                   setOrders(fetchedOrders);
@@ -297,7 +352,7 @@
                   setOrders([]);
                 }
               } catch (err) {
-                console.error("Error reading orders:", err);
+                console.error("Error processing orders sync:", err);
               }
             });
 
@@ -773,9 +828,9 @@
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {filteredOrders.map(order => (
+                      {filteredOrders.map((order, idx) => (
                         <div
-                          key={order.id}
+                          key={order.id || idx}
                           onClick={() => { setSelectedOrderDetails(order); setActiveModal('orderDetailsModal'); }}
                           className="glass-card p-6 rounded-3xl border border-dark-700 hover:border-gold/60 transition-all duration-300 cursor-pointer group flex flex-col justify-between space-y-5 relative overflow-hidden shadow-xl hover:shadow-gold/10"
                         >
@@ -1254,7 +1309,7 @@
             </div>
           )}
 
-          {/* बाकी الـ Modals المخصصة للنماذج والحذف */}
+          {/* باقي Modals النماذج بالحماية الكامله */}
           {activeModal === 'productForm' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <form onSubmit={handleSaveProduct} className="glass-card p-6 rounded-3xl w-full max-w-lg space-y-4">
@@ -1511,7 +1566,11 @@
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(<App />);
+    root.render(
+      <ErrorBoundary>
+        <App />
+      </ErrorBoundary>
+    );
   </script>
 </body>
 </html>
