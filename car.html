@@ -69,12 +69,14 @@
       box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
     }
 
-    @media print {
+        @media print {
       @page {
         size: A4 portrait;
-        margin: 6mm;
+        margin: 5mm; /* تقليل الهوامش لمنع الخروج لورقة ثانية */
       }
-      body {
+      html, body {
+        height: max-content !important;
+        overflow: hidden !important;
         background: #ffffff !important;
         color: #000000 !important;
       }
@@ -93,6 +95,8 @@
         padding: 0 !important;
         background: #ffffff !important;
         color: #000000 !important;
+        page-break-after: avoid !important;
+        page-break-inside: avoid !important;
       }
       .no-print {
         display: none !important;
@@ -101,11 +105,12 @@
         width: 100% !important;
         border-collapse: collapse !important;
         margin-top: 8px !important;
+        page-break-inside: avoid !important; /* يمنع تكرار الجدول في ورقة ثانية */
       }
       th, td {
         border: 1.5px solid #000000 !important;
         color: #000000 !important;
-        padding: 6px 8px !important;
+        padding: 5px 8px !important;
         font-size: 11px !important;
         text-align: right !important;
       }
@@ -1112,7 +1117,7 @@
                   <div className="grid grid-cols-3 gap-4 text-center text-xs pt-8 font-bold border-t border-gray-300">
                     <div>توقيع أمين المخزن: .........</div>
                     <div>توقيع السائق المستلم: .........</div>
-                    <div>اعتماد مدير المبيعات: .........</div>
+                    <div>اعتماد مدير الحسابات: .........</div>
                   </div>
                 </div>
 
@@ -1329,7 +1334,7 @@
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-white text-black p-6 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
                 <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
-                  <h3 className="text-lg font-bold text-black">التقرير الشامل المصمم للطباعة</h3>
+                  <h3 className="text-lg font-bold text-black">التقرير الشامل للطباعة</h3>
                   <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
                     <i data-lucide="printer" className="w-4 h-4"></i> طباعة التقرير
                   </button>
