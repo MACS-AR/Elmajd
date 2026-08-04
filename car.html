@@ -69,28 +69,59 @@
       box-shadow: 0 0 25px rgba(212, 175, 55, 0.18);
     }
 
-    /* إعدادات الطباعة للقياسين A4 و A5 */
+    /* إصلاح شامل للطباعة الجداول والألوان لضمان الوضوح التام */
     @media print {
-      body * { visibility: hidden; }
-      #print-area, #print-area * { visibility: visible; }
+      @page {
+        size: A4 portrait;
+        margin: 10mm;
+      }
+      body {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+      }
+      body * {
+        visibility: hidden;
+      }
+      #print-area, #print-area * {
+        visibility: visible;
+      }
       #print-area {
         position: absolute;
         left: 0;
         top: 0;
-        width: 100%;
+        width: 100% !important;
+        max-width: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
         background: #ffffff !important;
         color: #000000 !important;
-        padding: 15px;
       }
-      .no-print { display: none !important; }
-      @page {
-        margin: 10mm;
+      .no-print {
+        display: none !important;
       }
-      .print-a4 {
-        width: 210mm;
+      table {
+        width: 100% !important;
+        border-collapse: collapse !important;
+        page-break-inside: auto;
+      }
+      tr {
+        page-break-inside: avoid;
+        page-break-after: auto;
+      }
+      th, td {
+        border: 1px solid #000000 !important;
+        color: #000000 !important;
+        padding: 6px 8px !important;
+        font-size: 11px !important;
+        text-align: right !important;
+      }
+      th {
+        background-color: #f0f0f0 !important;
+        font-weight: bold !important;
       }
       .print-a5 {
-        width: 148mm;
+        max-width: 148mm !important;
+        margin: 0 auto !important;
       }
     }
   </style>
@@ -144,12 +175,13 @@
       // UI States
       const [searchQuery, setSearchQuery] = useState('');
       const [toast, setToast] = useState(null);
-      const [printSize, setPrintSize] = useState('A4'); // A4 or A5
+      const [printSize, setPrintSize] = useState('A4');
 
       // Modal Controls
-      const [activeModal, setActiveModal] = useState(null); // 'driverForm', 'clientForm', 'tripForm', 'driverReportModal', 'fullReportModal', 'deleteConfirm'
+      const [activeModal, setActiveModal] = useState(null); // 'driverForm', 'clientForm', 'tripForm', 'editTripForm', 'driverReportModal', 'fullReportModal', 'deleteConfirm'
       const [selectedDriver, setSelectedDriver] = useState(null);
       const [selectedClient, setSelectedClient] = useState(null);
+      const [selectedTrip, setSelectedTrip] = useState(null);
       const [deleteTarget, setDeleteTarget] = useState(null);
 
       // Report Date Range Filters
@@ -160,7 +192,7 @@
       });
 
       // Form Data States
-      const [driverData, setDriverData] = useState({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', plateNumber: '', notes: '', status: 'active' });
+      const [driverData, setDriverData] = useState({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' });
       const [clientData, setClientData] = useState({ name: '', address: '', phone: '', city: '', region: '', notes: '' });
       const [tripData, setTripData] = useState({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: '2.5', truckNumber: '', notes: '' });
 
@@ -188,7 +220,7 @@
 
             onValue(ref(db, 'trips'), snapshot => {
               const data = snapshot.val();
-              setTrips(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+              setTrips(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : []);
             });
 
             onValue(ref(db, 'logs'), snapshot => {
@@ -247,7 +279,7 @@
         }
         setActiveModal(null);
         setSelectedDriver(null);
-        setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', plateNumber: '', notes: '', status: 'active' });
+        setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' });
       };
 
       // Save Client
@@ -318,10 +350,57 @@
         setTripData({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: '2.5', truckNumber: '', notes: '' });
       };
 
+      // Update Existing Trip (تعديل النقلة وعدد النقلات)
+      const handleUpdateTrip = (e) => {
+        e.preventDefault();
+        if (!selectedTrip) return;
+        const { ref, update, db } = window.rtdbMethods;
+
+        const client = clients.find(c => c.id === tripData.clientId);
+        const oldTripsCount = parseInt(selectedTrip.tripsCount) || 0;
+        const newTripsCount = parseInt(tripData.tripsCount) || 1;
+        const parsedWeight = parseFloat(tripData.weightTons) || 0;
+
+        update(ref(db, `trips/${selectedTrip.id}`), {
+          clientId: tripData.clientId,
+          clientName: client ? client.name : selectedTrip.clientName,
+          clientAddress: client ? client.address : selectedTrip.clientAddress,
+          tripsCount: newTripsCount,
+          cargoType: tripData.cargoType,
+          weightTons: parsedWeight,
+          notes: tripData.notes || ''
+        }).then(() => {
+          // التعديل الفعلي لعداد نقلات السائق
+          const driver = drivers.find(d => d.id === selectedTrip.driverId);
+          if (driver) {
+            const diff = newTripsCount - oldTripsCount;
+            const updatedTotal = Math.max(0, (driver.totalTripsCount || 0) + diff);
+            update(ref(db, `drivers/${driver.id}`), {
+              totalTripsCount: updatedTotal
+            });
+          }
+          showToast('تم تعديل بيانات النقلة بنجاح');
+          addLog('UPDATE_TRIP', `تعديل نقلة للسائق ${selectedTrip.driverName}`);
+        });
+
+        setActiveModal(null);
+        setSelectedTrip(null);
+      };
+
       // Delete Handler
       const confirmDelete = () => {
         if (!deleteTarget) return;
-        const { ref, remove, db } = window.rtdbMethods;
+        const { ref, remove, update, db } = window.rtdbMethods;
+
+        if (deleteTarget.path === 'trips' && deleteTarget.trip) {
+          // تقليل عدد نقلات السائق عند حذف النقلة
+          const driver = drivers.find(d => d.id === deleteTarget.trip.driverId);
+          if (driver) {
+            const updatedTotal = Math.max(0, (driver.totalTripsCount || 0) - (parseInt(deleteTarget.trip.tripsCount) || 1));
+            update(ref(db, `drivers/${driver.id}`), { totalTripsCount: updatedTotal });
+          }
+        }
+
         remove(ref(db, `${deleteTarget.path}/${deleteTarget.id}`))
           .then(() => {
             showToast('تم الحذف بنجاح');
@@ -404,13 +483,14 @@
               <div className="w-10 h-10 gold-gradient rounded-xl flex items-center justify-center text-dark-950 font-black text-lg">م</div>
               <div>
                 <h1 className="font-bold text-base">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
-                <p className="text-[10px] text-gray-400">لوحة تحكم إدارة النقلات</p>
+                <p className="text-[10px] text-gray-400">لوحة تحكم إدارة النقلات والتوريدات</p>
               </div>
             </div>
 
             <nav className="hidden md:flex items-center gap-2 bg-dark-800/80 p-1.5 rounded-2xl border border-dark-700">
               {[
                 { id: 'dashboard', label: 'الرئيسية (البطاقات)', icon: 'layout-dashboard' },
+                { id: 'trips', label: 'إدارة النقلات', icon: 'package-check' },
                 { id: 'drivers', label: 'إدارة السائقين', icon: 'truck' },
                 { id: 'clients', label: 'إدارة العملاء', icon: 'users' },
                 { id: 'reports', label: 'التقارير والطباعة', icon: 'bar-chart-3' },
@@ -472,7 +552,7 @@
                           </div>
                           <div>
                             <h4 className="font-bold text-lg text-white">{driver.name}</h4>
-                            <p className="text-xs text-gray-400">سيارة: <span className="text-gold font-semibold">{driver.truckNumber}</span> ({driver.plateNumber})</p>
+                            <p className="text-xs text-gray-400">السيارة / اللوحة: <span className="text-gold font-semibold">{driver.truckNumber}</span></p>
                           </div>
                         </div>
 
@@ -502,12 +582,57 @@
               </div>
             )}
 
+            {/* TAB: TRIPS MANAGEMENT (جديد - إدارة وتعديل النقلات) */}
+            {activeTab === 'trips' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold">إدارة وتعديل النقلات المسجلة</h2>
+                </div>
+
+                <div className="glass-card rounded-2xl overflow-hidden border border-dark-700">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-dark-800 text-gold font-bold">
+                      <tr>
+                        <th className="p-4">التاريخ والوقت</th>
+                        <th className="p-4">اسم السائق</th>
+                        <th className="p-4">اسم العميل</th>
+                        <th className="p-4">عدد النقلات</th>
+                        <th className="p-4">الوزن (طناً)</th>
+                        <th className="p-4">الحمولة</th>
+                        <th className="p-4 text-center">الإجراءات والعمليات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-700">
+                      {trips.map(t => (
+                        <tr key={t.id} className="hover:bg-dark-800/40">
+                          <td className="p-4">{t.date} {t.time}</td>
+                          <td className="p-4 font-bold">{t.driverName}</td>
+                          <td className="p-4">{t.clientName}</td>
+                          <td className="p-4 font-black text-gold">{t.tripsCount}</td>
+                          <td className="p-4">{t.weightTons}</td>
+                          <td className="p-4">{t.cargoType}</td>
+                          <td className="p-4 text-center flex justify-center gap-2">
+                            <button onClick={() => { setSelectedTrip(t); setTripData({ clientId: t.clientId, tripsCount: t.tripsCount, cargoType: t.cargoType, weightTons: t.weightTons, notes: t.notes || '' }); setActiveModal('editTripForm'); }} className="p-2 bg-dark-700 hover:text-gold rounded-lg flex items-center gap-1">
+                              <i data-lucide="edit" className="w-4 h-4"></i> تعديل
+                            </button>
+                            <button onClick={() => { setDeleteTarget({ path: 'trips', id: t.id, name: `نقلة السائق ${t.driverName}`, trip: t }); setActiveModal('deleteConfirm'); }} className="p-2 bg-dark-700 text-red-400 rounded-lg">
+                              <i data-lucide="trash-2" className="w-4 h-4"></i>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* TAB: DRIVERS MANAGEMENT */}
             {activeTab === 'drivers' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-bold">إدارة السائقين</h2>
-                  <button onClick={() => { setSelectedDriver(null); setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', plateNumber: '', notes: '', status: 'active' }); setActiveModal('driverForm'); }} className="gold-gradient text-dark-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                  <button onClick={() => { setSelectedDriver(null); setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' }); setActiveModal('driverForm'); }} className="gold-gradient text-dark-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
                     <i data-lucide="plus" className="w-4 h-4"></i> إضافة سائق جديد
                   </button>
                 </div>
@@ -518,9 +643,8 @@
                       <tr>
                         <th className="p-4">اسم السائق</th>
                         <th className="p-4">رقم الهاتف</th>
-                        <th className="p-4">رقم السيارة</th>
-                        <th className="p-4">اللوحة</th>
-                        <th className="p-4">النقلات</th>
+                        <th className="p-4">رقم السيارة / اللوحة</th>
+                        <th className="p-4">النقلات الإجمالية</th>
                         <th className="p-4 text-center">الإجراءات</th>
                       </tr>
                     </thead>
@@ -529,8 +653,7 @@
                         <tr key={d.id} className="hover:bg-dark-800/40">
                           <td className="p-4 font-bold">{d.name}</td>
                           <td className="p-4 text-gray-300">{d.phone}</td>
-                          <td className="p-4 text-gold">{d.truckNumber}</td>
-                          <td className="p-4">{d.plateNumber}</td>
+                          <td className="p-4 text-gold font-bold">{d.truckNumber}</td>
                           <td className="p-4 font-bold">{d.totalTripsCount || 0}</td>
                           <td className="p-4 text-center flex justify-center gap-2">
                             <button onClick={() => { setSelectedDriver(d); setDriverData(d); setActiveModal('driverForm'); }} className="p-2 bg-dark-700 hover:text-gold rounded-lg"><i data-lucide="edit" className="w-4 h-4"></i></button>
@@ -586,7 +709,7 @@
             {activeTab === 'reports' && (
               <div className="space-y-6">
                 <div className="glass-card p-6 rounded-3xl space-y-4">
-                  <h3 className="text-base font-bold text-gold">إعداد التقرير الشامل أو المخصص</h3>
+                  <h3 className="text-base font-bold text-gold">إعداد التقرير الشامل أو المخصص للطباعة</h3>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div>
                       <label className="text-xs text-gray-400 block mb-1">تحديد السائق</label>
@@ -646,7 +769,7 @@
             {/* TAB: LOGS */}
             {activeTab === 'logs' && (
               <div className="space-y-6">
-                <h2 className="text-xl font-bold">سجلات الأحداث</h2>
+                <h2 className="text-xl font-bold">سجلات الأحداث والعمليات</h2>
                 <div className="glass-card rounded-2xl p-4 space-y-2">
                   {logs.map(log => (
                     <div key={log.id} className="bg-dark-800 p-3 rounded-xl flex justify-between items-center text-xs border border-dark-700">
@@ -669,13 +792,12 @@
                   <input type="text" placeholder="اسم السائق" required value={driverData.name} onChange={e => setDriverData({ ...driverData, name: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                   <input type="text" placeholder="رقم الهاتف" required value={driverData.phone} onChange={e => setDriverData({ ...driverData, phone: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="رقم السيارة" required value={driverData.truckNumber} onChange={e => setDriverData({ ...driverData, truckNumber: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
-                  <input type="text" placeholder="رقم اللوحة" required value={driverData.plateNumber} onChange={e => setDriverData({ ...driverData, plateNumber: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
+                <div>
+                  <input type="text" placeholder="رقم السيارة / رقم اللوحة" required value={driverData.truckNumber} onChange={e => setDriverData({ ...driverData, truckNumber: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
-                  <button type="submit" className="px-5 py-2 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ</button>
+                  <button type="submit" className="px-5 py-2 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ السائق</button>
                 </div>
               </form>
             </div>
@@ -693,7 +815,7 @@
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                   <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
-                  <button type="submit" className="px-5 py-2 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ</button>
+                  <button type="submit" className="px-5 py-2 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ العميل</button>
                 </div>
               </form>
             </div>
@@ -717,7 +839,7 @@
                     <input type="number" min="1" required value={tripData.tripsCount} onChange={e => setTripData({ ...tripData, tripsCount: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                   </div>
                   <div>
-                    <label className="text-xs text-gray-400 block mb-1">الوزن (طناً - يدعم الكسر)</label>
+                    <label className="text-xs text-gray-400 block mb-1">الوزن (طناً)</label>
                     <input type="number" step="0.01" min="0.1" required value={tripData.weightTons} onChange={e => setTripData({ ...tripData, weightTons: e.target.value })} placeholder="مثال: 2.5" className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                   </div>
                 </div>
@@ -733,6 +855,39 @@
             </div>
           )}
 
+          {/* MODAL: EDIT TRIP (جديد - تعديل النقلة) */}
+          {activeModal === 'editTripForm' && selectedTrip && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <form onSubmit={handleUpdateTrip} className="glass-card p-6 rounded-3xl w-full max-w-md space-y-4">
+                <h3 className="text-lg font-bold text-gold">تعديل بيانات نقلة: {selectedTrip.driverName}</h3>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">العميل</label>
+                  <select required value={tripData.clientId} onChange={e => setTripData({ ...tripData, clientId: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                    {clients.map(c => <option key={c.id} value={c.id}>{c.name} - {c.address}</option>)}
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">تعديل عدد النقلات</label>
+                    <input type="number" min="1" required value={tripData.tripsCount} onChange={e => setTripData({ ...tripData, tripsCount: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">الوزن (طناً)</label>
+                    <input type="number" step="0.01" min="0.1" required value={tripData.weightTons} onChange={e => setTripData({ ...tripData, weightTons: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">نوع الحمولة</label>
+                  <input type="text" required value={tripData.cargoType} onChange={e => setTripData({ ...tripData, cargoType: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
+                  <button type="submit" className="px-5 py-2 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ التعديلات</button>
+                </div>
+              </form>
+            </div>
+          )}
+
           {/* MODAL: DRIVER SINGLE REPORT */}
           {activeModal === 'driverReportModal' && selectedDriver && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -740,21 +895,17 @@
                 <div className="flex justify-between items-center border-b border-dark-700 pb-4 no-print">
                   <h3 className="text-lg font-bold text-gold">كشف حساب السائق: {selectedDriver.name}</h3>
                   <div className="flex items-center gap-3">
-                    <select value={printSize} onChange={e => setPrintSize(e.target.value)} className="bg-dark-800 border border-dark-700 rounded-xl px-3 py-1.5 text-xs text-white">
-                      <option value="A4">حجم A4</option>
-                      <option value="A5">حجم A5</option>
-                    </select>
                     <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5">
-                      <i data-lucide="printer" className="w-4 h-4"></i> طباعة T-PDF ({printSize})
+                      <i data-lucide="printer" className="w-4 h-4"></i> طباعة / PDF 
                     </button>
                   </div>
                 </div>
 
-                <div id="print-area" className={printSize === 'A5' ? 'print-a5' : 'print-a4'}>
+                <div id="print-area">
                   <div className="text-center border-b border-gray-400 pb-3 mb-4">
-                    <h1 className="text-2xl font-black">مصنع المجد للأعلاف</h1>
-                    <p className="text-sm">كشف نقلات سائق</p>
-                    <div className="flex justify-between text-xs mt-3">
+                    <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
+                    <p className="text-sm text-black">كشف نقلات سائق</p>
+                    <div className="flex justify-between text-xs mt-3 text-black">
                       <span>السائق: <strong>{selectedDriver.name}</strong></span>
                       <span>السيارة: <strong>{selectedDriver.truckNumber}</strong></span>
                       <span>تاريخ الإصدار: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></span>
@@ -763,7 +914,7 @@
 
                   <table className="w-full text-right text-xs border-collapse">
                     <thead>
-                      <tr className="bg-dark-800 text-gold border-b">
+                      <tr className="bg-gray-100 text-black border-b">
                         <th className="p-2 border">التاريخ</th>
                         <th className="p-2 border">العميل</th>
                         <th className="p-2 border">النقلات</th>
@@ -773,7 +924,7 @@
                     </thead>
                     <tbody>
                       {trips.filter(t => t.driverId === selectedDriver.id && (reportFilter.fromDate ? t.date >= reportFilter.fromDate : true) && (reportFilter.toDate ? t.date <= reportFilter.toDate : true)).map(t => (
-                        <tr key={t.id} className="border-b">
+                        <tr key={t.id} className="border-b text-black">
                           <td className="p-2 border">{t.date}</td>
                           <td className="p-2 border">{t.clientName}</td>
                           <td className="p-2 border font-bold">{t.tripsCount}</td>
@@ -784,7 +935,7 @@
                     </tbody>
                   </table>
 
-                  <div className="flex justify-between items-center bg-dark-800 p-3 rounded-xl text-xs font-bold mt-4">
+                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border">
                     <span>إجمالي عدد النقلات: {trips.filter(t => t.driverId === selectedDriver.id).reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0)}</span>
                     <span>إجمالي الوزن: {trips.filter(t => t.driverId === selectedDriver.id).reduce((a, b) => a + (parseFloat(b.weightTons) || 0), 0).toFixed(2)} طن</span>
                   </div>
@@ -802,28 +953,24 @@
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="glass-card p-6 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto space-y-6">
                 <div className="flex justify-between items-center border-b border-dark-700 pb-4 no-print">
-                  <h3 className="text-lg font-bold text-gold">التقرير الشامل المصمم للطباعة</h3>
+                  <h3 className="text-lg font-bold text-gold">التقرير الشامل للطباعة</h3>
                   <div className="flex items-center gap-3">
-                    <select value={printSize} onChange={e => setPrintSize(e.target.value)} className="bg-dark-800 border border-dark-700 rounded-xl px-3 py-1.5 text-xs text-white">
-                      <option value="A4">قياس A4</option>
-                      <option value="A5">قياس A5</option>
-                    </select>
                     <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5">
-                      <i data-lucide="printer" className="w-4 h-4"></i> طباعة / PDF ({printSize})
+                      <i data-lucide="printer" className="w-4 h-4"></i> طباعة A4 / PDF
                     </button>
                   </div>
                 </div>
 
-                <div id="print-area" className={printSize === 'A5' ? 'print-a5' : 'print-a4'}>
+                <div id="print-area">
                   <div className="text-center border-b border-gray-400 pb-3 mb-4">
-                    <h1 className="text-2xl font-black">مصنع المجد للأعلاف</h1>
-                    <p className="text-sm">تقرير حركة النقل والتوريدات الشامل</p>
-                    <p className="text-xs text-gray-500 mt-1">الفترة من: {reportFilter.fromDate || 'البداية'} إلى: {reportFilter.toDate || 'اليوم'}</p>
+                    <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
+                    <p className="text-sm text-black">تقرير حركة النقل والتوريدات الشامل</p>
+                    <p className="text-xs text-black mt-1">الفترة من: {reportFilter.fromDate || 'البداية'} إلى: {reportFilter.toDate || 'اليوم'}</p>
                   </div>
 
                   <table className="w-full text-right text-xs border-collapse">
                     <thead>
-                      <tr className="bg-dark-800 text-gold border-b">
+                      <tr className="bg-gray-100 text-black border-b">
                         <th className="p-2 border">التاريخ</th>
                         <th className="p-2 border">السائق</th>
                         <th className="p-2 border">العميل</th>
@@ -834,7 +981,7 @@
                     </thead>
                     <tbody>
                       {filteredReportTrips.map(t => (
-                        <tr key={t.id} className="border-b">
+                        <tr key={t.id} className="border-b text-black">
                           <td className="p-2 border">{t.date}</td>
                           <td className="p-2 border font-bold">{t.driverName}</td>
                           <td className="p-2 border">{t.clientName}</td>
@@ -846,7 +993,7 @@
                     </tbody>
                   </table>
 
-                  <div className="flex justify-between items-center bg-dark-800 p-3 rounded-xl text-xs font-bold mt-4">
+                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border">
                     <span>مجموع النقلات: {filteredReportTrips.reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0)}</span>
                     <span>إجمالي الوزن: {filteredReportTrips.reduce((a, b) => a + (parseFloat(b.weightTons) || 0), 0).toFixed(2)} طن</span>
                   </div>
