@@ -69,11 +69,11 @@
       box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
     }
 
-    /* إصلاح شامل للطباعة الجداول والألوان لضمان عدم الخروج صغيراً في منتصف الصفحة */
+    /* إصلاح جذر الشاشة والطباعة لأي قياس ورقي */
     @media print {
       @page {
-        size: A4 portrait;
-        margin: 12mm;
+        size: auto;
+        margin: 8mm;
       }
       body {
         background: #ffffff !important;
@@ -101,17 +101,17 @@
       table {
         width: 100% !important;
         border-collapse: collapse !important;
-        margin-top: 15px !important;
+        margin-top: 10px !important;
       }
       th, td {
-        border: 1px solid #000000 !important;
+        border: 1.5px solid #000000 !important;
         color: #000000 !important;
-        padding: 8px 10px !important;
-        font-size: 13px !important;
+        padding: 8px !important;
+        font-size: 12px !important;
         text-align: right !important;
       }
       th {
-        background-color: #f2f2f2 !important;
+        background-color: #e5e7eb !important;
         font-weight: bold !important;
       }
     }
@@ -148,7 +148,6 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // رابط اللوجو الدائري الفاخر من جيت هاب
     const LOGO_URL = "https://raw.githubusercontent.com/github/explore/main/topics/react/react.png"; 
 
     function App() {
@@ -161,11 +160,12 @@
       const [activeTab, setActiveTab] = useState('dashboard');
 
       // Database Collections
-      const [salesReps, setSalesReps] = useState([]); // المناديب
-      const [orders, setOrders] = useState([]); // طلبات المناديب
-      const [drivers, setDrivers] = useState([]); // السائقين
-      const [clients, setClients] = useState([]); // العملاء
-      const [trips, setTrips] = useState([]); // النقلات
+      const [salesReps, setSalesReps] = useState([]);
+      const [orders, setOrders] = useState([]);
+      const [drivers, setDrivers] = useState([]);
+      const [clients, setClients] = useState([]);
+      const [products, setProducts] = useState([]); // المنتجات
+      const [trips, setTrips] = useState([]);
       const [logs, setLogs] = useState([]);
 
       // UI States
@@ -177,7 +177,7 @@
       const [selectedDriver, setSelectedDriver] = useState(null);
       const [selectedClient, setSelectedClient] = useState(null);
       const [selectedSalesRep, setSelectedSalesRep] = useState(null);
-      const [selectedTrip, setSelectedTrip] = useState(null);
+      const [selectedProduct, setSelectedProduct] = useState(null);
       const [deleteTarget, setDeleteTarget] = useState(null);
 
       // Report Date Range Filters
@@ -191,6 +191,7 @@
       const [salesRepData, setSalesRepData] = useState({ name: '', phone: '', password: '', region: '', status: 'active' });
       const [driverData, setDriverData] = useState({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' });
       const [clientData, setClientData] = useState({ name: '', address: '', phone: '', city: '', region: '', notes: '' });
+      const [productData, setProductData] = useState({ name: '', pricePerTon: '', bagWeightKg: '25', notes: '' });
       const [tripData, setTripData] = useState({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: '2.5', truckNumber: '', notes: '' });
 
       const showToast = (message, type = 'success') => {
@@ -223,6 +224,11 @@
             onValue(ref(db, 'clients'), snapshot => {
               const data = snapshot.val();
               setClients(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+            });
+
+            onValue(ref(db, 'products'), snapshot => {
+              const data = snapshot.val();
+              setProducts(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
             });
 
             onValue(ref(db, 'trips'), snapshot => {
@@ -260,7 +266,46 @@
         }
       };
 
-      // Save Sales Rep (إضافة / تعديل مندوب)
+      // Save Product (حفظ المنتج وحساب سعر الشيكارة)
+      const handleSaveProduct = (e) => {
+        e.preventDefault();
+        const { ref, push, set, update, db } = window.rtdbMethods;
+
+        const tonPrice = parseFloat(productData.pricePerTon) || 0;
+        const bagKg = parseFloat(productData.bagWeightKg) || 25;
+        const bagPrice = ((tonPrice * bagKg) / 1000).toFixed(2);
+
+        const payload = {
+          name: productData.name,
+          pricePerTon: tonPrice,
+          bagWeightKg: bagKg,
+          pricePerBag: parseFloat(bagPrice),
+          notes: productData.notes || '',
+          updatedAt: new Date().toISOString()
+        };
+
+        if (selectedProduct) {
+          update(ref(db, `products/${selectedProduct.id}`), payload)
+            .then(() => {
+              showToast('تم تعديل بيانات المنتج وحساب سعر الشيكارة');
+              addLog('UPDATE_PRODUCT', `تعديل المنتج: ${productData.name}`);
+            });
+        } else {
+          const newRef = push(ref(db, 'products'));
+          set(newRef, {
+            ...payload,
+            createdAt: new Date().toISOString()
+          }).then(() => {
+            showToast('تم إضافة المنتج بنجاح');
+            addLog('ADD_PRODUCT', `إضافة منتج جديد: ${productData.name}`);
+          });
+        }
+        setActiveModal(null);
+        setSelectedProduct(null);
+        setProductData({ name: '', pricePerTon: '', bagWeightKg: '25', notes: '' });
+      };
+
+      // Save Sales Rep
       const handleSaveSalesRep = (e) => {
         e.preventDefault();
         const { ref, push, set, update, db } = window.rtdbMethods;
@@ -277,7 +322,7 @@
             ...salesRepData,
             createdAt: new Date().toISOString()
           }).then(() => {
-            showToast('تمت إضافة المندوب الجديد بنجاح');
+            showToast('تمت إضافة المندوب بنجاح');
             addLog('ADD_SALES_REP', `إضافة مندوب جديد: ${salesRepData.name}`);
           });
         }
@@ -403,7 +448,7 @@
         setDeleteTarget(null);
       };
 
-      // Update Order Status (قبول / إلغاء طلب المندوب)
+      // Update Order Status
       const updateOrderStatus = (orderId, newStatus) => {
         const { ref, update, db } = window.rtdbMethods;
         update(ref(db, `orders/${orderId}`), { status: newStatus })
@@ -467,13 +512,14 @@
               <img src={LOGO_URL} alt="Logo" className="w-10 h-10 rounded-full border border-gold p-0.5 bg-dark-900" />
               <div>
                 <h1 className="font-bold text-base">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
-                <p className="text-[10px] text-gray-400">لوحة تحكم المناديب والنقلات الملكية</p>
+                <p className="text-[10px] text-gray-400">نظام المبيعات والمنتجات والنقل الشامل</p>
               </div>
             </div>
 
             <nav className="hidden md:flex items-center gap-2 bg-dark-800/80 p-1.5 rounded-2xl border border-dark-700">
               {[
-                { id: 'dashboard', label: 'طلبات المناديب (الرئيسية)', icon: 'shopping-bag' },
+                { id: 'dashboard', label: 'طلبات المناديب', icon: 'shopping-bag' },
+                { id: 'products', label: 'إدارة المنتجات', icon: 'package' },
                 { id: 'salesReps', label: 'إدارة المناديب', icon: 'user-check' },
                 { id: 'driverCards', label: 'السائقين والنقلات', icon: 'truck' },
                 { id: 'clients', label: 'إدارة العملاء', icon: 'users' },
@@ -494,18 +540,17 @@
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
 
-            {/* TAB: DASHBOARD (طلبـات المـناديب المرفوعـة) */}
+            {/* TAB: DASHBOARD */}
             {activeTab === 'dashboard' && (
               <div className="space-y-8">
-                {/* Statistics Overview */}
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="glass-card p-5 rounded-2xl">
                     <span className="text-gray-400 text-xs block mb-1">إجمالي طلبات المناديب</span>
                     <p className="text-3xl font-black text-white">{orders.length}</p>
                   </div>
                   <div className="glass-card p-5 rounded-2xl">
-                    <span className="text-gray-400 text-xs block mb-1">عدد المناديب النشطين</span>
-                    <p className="text-3xl font-black text-white">{salesReps.length}</p>
+                    <span className="text-gray-400 text-xs block mb-1">عدد أصناف الأعلاف</span>
+                    <p className="text-3xl font-black text-white">{products.length}</p>
                   </div>
                   <div className="glass-card p-5 rounded-2xl">
                     <span className="text-gray-400 text-xs block mb-1">إجمالي النقلات المنجزة</span>
@@ -517,7 +562,6 @@
                   </div>
                 </div>
 
-                {/* Orders List from Sales Reps */}
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <h2 className="text-lg font-bold text-white flex items-center gap-2">
@@ -535,7 +579,7 @@
                           <th className="p-4">اسم المندوب</th>
                           <th className="p-4">اسم العميل</th>
                           <th className="p-4">المنطقة</th>
-                          <th className="p-4">الكمية المطلوب (طن)</th>
+                          <th className="p-4">الكمية (طن)</th>
                           <th className="p-4">الحالة</th>
                           <th className="p-4 text-center">تحديث الحالة</th>
                         </tr>
@@ -566,7 +610,52 @@
               </div>
             )}
 
-            {/* TAB: SALES REPS (إدارة المـناديب) */}
+            {/* TAB: PRODUCTS (إدارة المنتجات والأعلاف) */}
+            {activeTab === 'products' && (
+              <div className="space-y-6">
+                <div className="flex justify-between items-center">
+                  <h2 className="text-xl font-bold flex items-center gap-2">
+                    <i data-lucide="package" className="w-5 h-5 text-gold"></i>
+                    قائمة أسعار ومواصفات منتجات الأعلاف
+                  </h2>
+                  <button onClick={() => { setSelectedProduct(null); setProductData({ name: '', pricePerTon: '', bagWeightKg: '25', notes: '' }); setActiveModal('productForm'); }} className="gold-gradient text-dark-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                    <i data-lucide="plus" className="w-4 h-4"></i> إضافة منتج علف جديد
+                  </button>
+                </div>
+
+                <div className="glass-card rounded-2xl overflow-hidden border border-dark-700">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-dark-800 text-gold font-bold">
+                      <tr>
+                        <th className="p-4">اسم المنتج / العلف</th>
+                        <th className="p-4">سعر الطن (جنيه)</th>
+                        <th className="p-4">وزن الشيكارة (كجم)</th>
+                        <th className="p-4">سعر الشيكارة التلقائي (جنيه)</th>
+                        <th className="p-4">تاريخ التحديث</th>
+                        <th className="p-4 text-center">الإجراءات</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-700">
+                      {products.map(product => (
+                        <tr key={product.id} className="hover:bg-dark-800/40">
+                          <td className="p-4 font-bold text-white">{product.name}</td>
+                          <td className="p-4 font-black text-gold">{Number(product.pricePerTon).toLocaleString()} ج.م</td>
+                          <td className="p-4 text-gray-300">{product.bagWeightKg} كجم</td>
+                          <td className="p-4 font-bold text-green-400">{Number(product.pricePerBag).toLocaleString()} ج.م</td>
+                          <td className="p-4 text-gray-400">{product.updatedAt ? new Date(product.updatedAt).toLocaleDateString('ar-EG') : 'الآن'}</td>
+                          <td className="p-4 text-center flex justify-center gap-2">
+                            <button onClick={() => { setSelectedProduct(product); setProductData({ name: product.name, pricePerTon: product.pricePerTon, bagWeightKg: product.bagWeightKg, notes: product.notes || '' }); setActiveModal('productForm'); }} className="p-2 bg-dark-700 hover:text-gold rounded-lg"><i data-lucide="edit" className="w-4 h-4"></i></button>
+                            <button onClick={() => { setDeleteTarget({ path: 'products', id: product.id, name: product.name }); setActiveModal('deleteConfirm'); }} className="p-2 bg-dark-700 text-red-400 rounded-lg"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TAB: SALES REPS */}
             {activeTab === 'salesReps' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -609,13 +698,13 @@
               </div>
             )}
 
-            {/* TAB: DRIVER CARDS & TRIPS (السائقين والنقلات) */}
+            {/* TAB: DRIVER CARDS & TRIPS */}
             {activeTab === 'driverCards' && (
               <div className="space-y-8">
                 <div className="flex justify-between items-center">
                   <h2 className="text-xl font-bold flex items-center gap-2">
                     <i data-lucide="truck" className="w-5 h-5 text-gold"></i>
-                    بطاقات وتفاصيل السائقين
+                    بطاقات السائقين
                   </h2>
                   <button onClick={() => { setSelectedDriver(null); setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' }); setActiveModal('driverForm'); }} className="gold-gradient text-dark-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
                     <i data-lucide="plus" className="w-4 h-4"></i> إضافة سائق جديد
@@ -721,7 +810,7 @@
                     </div>
                     <div className="flex items-end gap-2">
                       <button onClick={() => setActiveModal('fullReportModal')} className="w-full gold-gradient text-dark-950 font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-1">
-                        <i data-lucide="printer" className="w-4 h-4"></i> معاينة والطباعة A4
+                        <i data-lucide="printer" className="w-4 h-4"></i> معاينة والطباعة
                       </button>
                     </div>
                   </div>
@@ -773,7 +862,45 @@
 
           </main>
 
-          {/* MODAL: SALES REP FORM (إضافة مندوب) */}
+          {/* MODAL: PRODUCT FORM (إضافة / تعديل منتج علف) */}
+          {activeModal === 'productForm' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <form onSubmit={handleSaveProduct} className="glass-card p-6 rounded-3xl w-full max-w-lg space-y-4">
+                <h3 className="text-lg font-bold text-gold">{selectedProduct ? 'تعديل بيانات المنتج' : 'إضافة منتج علف جديد'}</h3>
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">اسم العلف / الصنف</label>
+                  <input type="text" placeholder="مثال: علف بادي 23%" required value={productData.name} onChange={e => setProductData({ ...productData, name: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">سعر الطن (جنيه)</label>
+                    <input type="number" step="1" min="1" placeholder="مثال: 22000" required value={productData.pricePerTon} onChange={e => setProductData({ ...productData, pricePerTon: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 block mb-1">وزن الشيكارة (كجم)</label>
+                    <input type="number" step="0.5" min="1" required value={productData.bagWeightKg} onChange={e => setProductData({ ...productData, bagWeightKg: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
+                  </div>
+                </div>
+
+                {/* المعاينة التلقائية لسعر الشيكارة المحسوب */}
+                {productData.pricePerTon && (
+                  <div className="bg-dark-950 p-3 rounded-xl border border-gold/30 text-xs flex justify-between items-center">
+                    <span className="text-gray-300">سعر الشيكارة المحسوب تلقائياً:</span>
+                    <span className="font-bold text-gold text-sm">
+                      {(((parseFloat(productData.pricePerTon) || 0) * (parseFloat(productData.bagWeightKg) || 25)) / 1000).toFixed(2)} جنيه
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
+                  <button type="submit" className="px-5 py-2 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ المنتج</button>
+                </div>
+              </form>
+            </div>
+          )}
+
+          {/* MODAL: SALES REP FORM */}
           {activeModal === 'salesRepForm' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <form onSubmit={handleSaveSalesRep} className="glass-card p-6 rounded-3xl w-full max-w-lg space-y-4">
@@ -781,7 +908,7 @@
                 <input type="text" placeholder="اسم المندوب الثلاثي" required value={salesRepData.name} onChange={e => setSalesRepData({ ...salesRepData, name: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                 <div className="grid grid-cols-2 gap-3">
                   <input type="text" placeholder="رقم الهاتف" required value={salesRepData.phone} onChange={e => setSalesRepData({ ...salesRepData, phone: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
-                  <input type="text" placeholder="الباسورد الخاص به لدخول لوحته" required value={salesRepData.password} onChange={e => setSalesRepData({ ...salesRepData, password: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
+                  <input type="text" placeholder="كلمة المرور" required value={salesRepData.password} onChange={e => setSalesRepData({ ...salesRepData, password: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                 </div>
                 <input type="text" placeholder="المنطقة المخصصة له" value={salesRepData.region} onChange={e => setSalesRepData({ ...salesRepData, region: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                 <div className="flex justify-end gap-2 pt-2">
@@ -853,7 +980,7 @@
                   </div>
                 </div>
                 <div>
-                  <label className="text-xs text-gray-400 block mb-1">نوع الحمولة</label>
+                  <label className="text-xs text-gray-400 block mb-1">نوع الحمولة / صنف العلف</label>
                   <input type="text" required value={tripData.cargoType} onChange={e => setTripData({ ...tripData, cargoType: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none" />
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
@@ -864,60 +991,60 @@
             </div>
           )}
 
-          {/* MODAL: DRIVER SINGLE REPORT (PRINTING FIXED) */}
+          {/* MODAL: DRIVER SINGLE REPORT (إصلاح اللون الأبيض الكامل للشاشة والطباعة) */}
           {activeModal === 'driverReportModal' && selectedDriver && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-              <div className="glass-card p-6 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-6">
-                <div className="flex justify-between items-center border-b border-dark-700 pb-4 no-print">
-                  <h3 className="text-lg font-bold text-gold">كشف حساب السائق: {selectedDriver.name}</h3>
-                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5">
-                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة A4 كاملة
+              <div className="bg-white text-black p-6 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
+                  <h3 className="text-lg font-bold text-black">كشف حساب السائق: {selectedDriver.name}</h3>
+                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة التقرير
                   </button>
                 </div>
 
                 <div id="print-area">
-                  <div className="text-center border-b border-gray-400 pb-3 mb-4">
-                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2" />
+                  <div className="text-center border-b-2 border-black pb-3 mb-4">
+                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 border border-black" />
                     <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
-                    <p className="text-sm text-black">كشف نقلات سائق تفصيلي</p>
-                    <div className="flex justify-between text-xs mt-3 text-black">
+                    <p className="text-sm font-bold text-black">كشف نقلات سائق تفصيلي</p>
+                    <div className="flex justify-between text-xs mt-3 text-black font-semibold">
                       <span>السائق: <strong>{selectedDriver.name}</strong></span>
                       <span>السيارة: <strong>{selectedDriver.truckNumber}</strong></span>
-                      <span>تاريخ الإصدار: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></span>
+                      <span>التاريخ: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></span>
                     </div>
                   </div>
 
                   <table className="w-full text-right text-xs border-collapse">
                     <thead>
-                      <tr className="bg-gray-100 text-black border-b">
-                        <th className="p-2 border">التاريخ</th>
-                        <th className="p-2 border">العميل</th>
-                        <th className="p-2 border">النقلات</th>
-                        <th className="p-2 border">الحمولة</th>
-                        <th className="p-2 border">الوزن (طن)</th>
+                      <tr className="bg-gray-200 text-black border-b">
+                        <th className="p-2 border border-black font-bold">التاريخ</th>
+                        <th className="p-2 border border-black font-bold">العميل</th>
+                        <th className="p-2 border border-black font-bold">النقلات</th>
+                        <th className="p-2 border border-black font-bold">الحمولة</th>
+                        <th className="p-2 border border-black font-bold">الوزن (طن)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {trips.filter(t => t.driverId === selectedDriver.id && (reportFilter.fromDate ? t.date >= reportFilter.fromDate : true) && (reportFilter.toDate ? t.date <= reportFilter.toDate : true)).map(t => (
                         <tr key={t.id} className="border-b text-black">
-                          <td className="p-2 border">{t.date}</td>
-                          <td className="p-2 border">{t.clientName}</td>
-                          <td className="p-2 border font-bold">{t.tripsCount}</td>
-                          <td className="p-2 border">{t.cargoType}</td>
-                          <td className="p-2 border">{t.weightTons}</td>
+                          <td className="p-2 border border-black font-medium">{t.date}</td>
+                          <td className="p-2 border border-black font-medium">{t.clientName}</td>
+                          <td className="p-2 border border-black font-bold">{t.tripsCount}</td>
+                          <td className="p-2 border border-black font-medium">{t.cargoType}</td>
+                          <td className="p-2 border border-black font-medium">{t.weightTons}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border">
+                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border border-black">
                     <span>إجمالي عدد النقلات: {trips.filter(t => t.driverId === selectedDriver.id).reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0)}</span>
                     <span>إجمالي الوزن: {trips.filter(t => t.driverId === selectedDriver.id).reduce((a, b) => a + (parseFloat(b.weightTons) || 0), 0).toFixed(2)} طن</span>
                   </div>
                 </div>
 
                 <div className="flex justify-end pt-2 no-print">
-                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-dark-800 text-gray-300 text-xs">إغلاق</button>
+                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-gray-800 text-white text-xs font-bold">إغلاق</button>
                 </div>
               </div>
             </div>
@@ -926,55 +1053,55 @@
           {/* MODAL: FULL REPORT */}
           {activeModal === 'fullReportModal' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-              <div className="glass-card p-6 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto space-y-6">
-                <div className="flex justify-between items-center border-b border-dark-700 pb-4 no-print">
-                  <h3 className="text-lg font-bold text-gold">التقرير الشامل للطباعة</h3>
-                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5">
-                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة A4
+              <div className="bg-white text-black p-6 rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
+                  <h3 className="text-lg font-bold text-black">التقرير الشامل المصمم للطباعة</h3>
+                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة التقرير
                   </button>
                 </div>
 
                 <div id="print-area">
-                  <div className="text-center border-b border-gray-400 pb-3 mb-4">
-                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2" />
+                  <div className="text-center border-b-2 border-black pb-3 mb-4">
+                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 border border-black" />
                     <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
-                    <p className="text-sm text-black">تقرير حركة النقل والتوريدات الشامل</p>
-                    <p className="text-xs text-black mt-1">الفترة من: {reportFilter.fromDate || 'البداية'} إلى: {reportFilter.toDate || 'اليوم'}</p>
+                    <p className="text-sm font-bold text-black">تقرير حركة النقل والتوريدات الشامل</p>
+                    <p className="text-xs text-black mt-1 font-semibold">الفترة من: {reportFilter.fromDate || 'البداية'} إلى: {reportFilter.toDate || 'اليوم'}</p>
                   </div>
 
                   <table className="w-full text-right text-xs border-collapse">
                     <thead>
-                      <tr className="bg-gray-100 text-black border-b">
-                        <th className="p-2 border">التاريخ</th>
-                        <th className="p-2 border">السائق</th>
-                        <th className="p-2 border">العميل</th>
-                        <th className="p-2 border">النقلات</th>
-                        <th className="p-2 border">الحمولة</th>
-                        <th className="p-2 border">الوزن (طن)</th>
+                      <tr className="bg-gray-200 text-black border-b">
+                        <th className="p-2 border border-black font-bold">التاريخ</th>
+                        <th className="p-2 border border-black font-bold">السائق</th>
+                        <th className="p-2 border border-black font-bold">العميل</th>
+                        <th className="p-2 border border-black font-bold">النقلات</th>
+                        <th className="p-2 border border-black font-bold">الحمولة</th>
+                        <th className="p-2 border border-black font-bold">الوزن (طن)</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredReportTrips.map(t => (
                         <tr key={t.id} className="border-b text-black">
-                          <td className="p-2 border">{t.date}</td>
-                          <td className="p-2 border font-bold">{t.driverName}</td>
-                          <td className="p-2 border">{t.clientName}</td>
-                          <td className="p-2 border">{t.tripsCount}</td>
-                          <td className="p-2 border">{t.cargoType}</td>
-                          <td className="p-2 border">{t.weightTons}</td>
+                          <td className="p-2 border border-black font-medium">{t.date}</td>
+                          <td className="p-2 border border-black font-bold">{t.driverName}</td>
+                          <td className="p-2 border border-black font-medium">{t.clientName}</td>
+                          <td className="p-2 border border-black font-bold">{t.tripsCount}</td>
+                          <td className="p-2 border border-black font-medium">{t.cargoType}</td>
+                          <td className="p-2 border border-black font-medium">{t.weightTons}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border">
+                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border border-black">
                     <span>مجموع النقلات: {filteredReportTrips.reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0)}</span>
                     <span>إجمالي الوزن: {filteredReportTrips.reduce((a, b) => a + (parseFloat(b.weightTons) || 0), 0).toFixed(2)} طن</span>
                   </div>
                 </div>
 
                 <div className="flex justify-end pt-2 no-print">
-                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-dark-800 text-gray-300 text-xs">إغلاق</button>
+                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-gray-800 text-white text-xs font-bold">إغلاق</button>
                 </div>
               </div>
             </div>
