@@ -69,10 +69,10 @@
       box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
     }
 
-        @media print {
+    @media print {
       @page {
         size: A4 portrait;
-        margin: 5mm; /* تقليل الهوامش لمنع الخروج لورقة ثانية */
+        margin: 5mm;
       }
       html, body {
         height: max-content !important;
@@ -105,7 +105,7 @@
         width: 100% !important;
         border-collapse: collapse !important;
         margin-top: 8px !important;
-        page-break-inside: avoid !important; /* يمنع تكرار الجدول في ورقة ثانية */
+        page-break-inside: avoid !important;
       }
       th, td {
         border: 1.5px solid #000000 !important;
@@ -150,7 +150,7 @@
 
   <!-- React Logic -->
   <script type="text/babel">
-    const { useState, useEffect, useMemo } = React;
+    const { useState, useEffect, useMemo, useRef } = React;
 
     const LOGO_URL = "https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png"; 
 
@@ -167,12 +167,14 @@
       // Database Collections
       const [salesReps, setSalesReps] = useState([]);
       const [orders, setOrders] = useState([]);
-      const [prevOrdersCount, setPrevOrdersCount] = useState(0);
       const [drivers, setDrivers] = useState([]);
       const [clients, setClients] = useState([]);
       const [products, setProducts] = useState([]);
       const [trips, setTrips] = useState([]);
       const [logs, setLogs] = useState([]);
+
+      // Ref لمتابعة عدد الطلبات السابقة لمنع إعادة تعريف الإندكس وتفريغ الشاشة
+      const prevOrdersCountRef = useRef(0);
 
       // UI States
       const [searchQuery, setSearchQuery] = useState('');
@@ -206,11 +208,18 @@
         setTimeout(() => setToast(null), 3000);
       };
 
-      // 🔔 دالة تشغيل صوت تنبيه نغمة رسالة/هاتف لمدة 5 ثوانٍ عند استلام طلب جديد
+      // 🔔 دالة تشغيل صوت التنبيه المحسّنة والمضمونة
       const playNotificationSound = () => {
         try {
-          const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-          const duration = 5; // مدة الصوت 5 ثوانٍ
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (!AudioContextClass) return;
+          const audioCtx = new AudioContextClass();
+          
+          if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+          }
+
+          const duration = 5; // مدة التنبيه 5 ثوانٍ
           const startTime = audioCtx.currentTime;
 
           for (let i = 0; i < duration; i++) {
@@ -220,7 +229,7 @@
             const osc1 = audioCtx.createOscillator();
             const gain1 = audioCtx.createGain();
             osc1.type = 'sine';
-            osc1.frequency.setValueAtTime(587.33, time); // Note D5
+            osc1.frequency.setValueAtTime(587.33, time);
             gain1.gain.setValueAtTime(0.3, time);
             gain1.gain.exponentialRampToValueAtTime(0.0001, time + 0.15);
             osc1.connect(gain1);
@@ -232,7 +241,7 @@
             const osc2 = audioCtx.createOscillator();
             const gain2 = audioCtx.createGain();
             osc2.type = 'sine';
-            osc2.frequency.setValueAtTime(880, time + 0.15); // Note A5
+            osc2.frequency.setValueAtTime(880, time + 0.15);
             gain2.gain.setValueAtTime(0.4, time + 0.15);
             gain2.gain.exponentialRampToValueAtTime(0.0001, time + 0.35);
             osc2.connect(gain2);
@@ -241,11 +250,11 @@
             osc2.stop(time + 0.35);
           }
         } catch (e) {
-          console.error("Audio Notification Error:", e);
+          console.error("Audio Playback Error:", e);
         }
       };
 
-      // Realtime Database Sync الإبتدائي
+      // Realtime Database Sync الإبتدائي والآمن
       useEffect(() => {
         const interval = setInterval(() => {
           if (window.rtdbMethods) {
@@ -261,7 +270,7 @@
               const data = snapshot.val();
               const fetchedOrders = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
               setOrders(fetchedOrders);
-              setPrevOrdersCount(fetchedOrders.length);
+              prevOrdersCountRef.current = fetchedOrders.length;
             });
 
             onValue(ref(db, 'drivers'), snapshot => {
@@ -292,31 +301,35 @@
         }, 100);
       }, []);
 
-      // 🔄 تحديث أوتوماتيكي لجدول الطلبات فقط كل 5 ثوانٍ مع صوت تنبيه 5 ثوانٍ للطلبات الجديدة
+      // 🔄 التحديث الأوتوماتيكي للطلبات مع فحص الآمان ومنع تفريغ الواجهة
       useEffect(() => {
+        if (!isAuthenticated) return;
+
         const ordersInterval = setInterval(() => {
-          if (window.rtdbMethods && isAuthenticated) {
+          if (window.rtdbMethods) {
             const { ref, get, db } = window.rtdbMethods;
             get(ref(db, 'orders')).then(snapshot => {
               if (snapshot.exists()) {
                 const data = snapshot.val();
-                const updatedList = Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse();
-                
-                // 🔔 فحص إذا كان هناك طلب جديد
-                if (prevOrdersCount > 0 && updatedList.length > prevOrdersCount) {
-                  playNotificationSound();
-                  showToast('🔔 تم استلام طلب جديد من المندوب!', 'success');
-                }
+                if (data) {
+                  const updatedList = Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse();
+                  
+                  // 🔔 تشغيل الصوت والإشعار عند وجود طلبات جديدة
+                  if (prevOrdersCountRef.current > 0 && updatedList.length > prevOrdersCountRef.current) {
+                    playNotificationSound();
+                    showToast('🔔 وصل طلب جديد من المندوب!', 'success');
+                  }
 
-                setOrders(updatedList);
-                setPrevOrdersCount(updatedList.length);
+                  setOrders(updatedList);
+                  prevOrdersCountRef.current = updatedList.length;
+                }
               }
-            }).catch(err => console.error("Error updating orders:", err));
+            }).catch(err => console.error("Error syncing orders:", err));
           }
         }, 5000);
 
         return () => clearInterval(ordersInterval);
-      }, [isAuthenticated, prevOrdersCount]);
+      }, [isAuthenticated]);
 
       useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
@@ -500,7 +513,7 @@
         setTripData({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: '2.5', truckNumber: '', notes: '' });
       };
 
-      // Delete Handler (يشمل إمكانية حذف طلب المندوب نهائياً)
+      // Delete Handler (حذف عنصر)
       const confirmDelete = () => {
         if (!deleteTarget) return;
         const { ref, remove, update, db } = window.rtdbMethods;
@@ -532,7 +545,6 @@
             addLog('UPDATE_ORDER', `تعديل حالة طلب العميل ${order.clientName} إلى ${newStatus}`);
 
             if (newStatus === 'مقبول') {
-              // ربط تلقائي بالنقلات والسائق
               if (order.driverId) {
                 const driver = drivers.find(d => d.id === order.driverId);
                 const today = order.date || new Date().toISOString().slice(0, 10);
@@ -565,7 +577,6 @@
                 }
               }
 
-              // 🖨️ تحويل تلقائي للطباعة بعد القبول
               setSelectedOrderDetails(order);
               setActiveModal('orderDetailsModal');
               setTimeout(() => {
@@ -577,9 +588,11 @@
           });
       };
 
-      // تصفية الطلبات
+      // تصفية الطلبات بآمان
       const filteredOrders = useMemo(() => {
+        if (!Array.isArray(orders)) return [];
         return orders.filter(o => {
+          if (!o) return false;
           const matchSearch = (o.clientName && o.clientName.includes(searchQuery)) || 
                               (o.repName && o.repName.includes(searchQuery)) ||
                               (o.driverName && o.driverName.includes(searchQuery));
@@ -589,13 +602,15 @@
         });
       }, [orders, searchQuery, orderStatusFilter]);
 
-      const pendingOrdersCount = useMemo(() => orders.filter(o => (o.status || 'قيد الانتظار') === 'قيد الانتظار').length, [orders]);
-      const approvedOrdersCount = useMemo(() => orders.filter(o => o.status === 'مقبول').length, [orders]);
-      const rejectedOrdersCount = useMemo(() => orders.filter(o => o.status === 'ملغي').length, [orders]);
+      const pendingOrdersCount = useMemo(() => Array.isArray(orders) ? orders.filter(o => o && (o.status || 'قيد الانتظار') === 'قيد الانتظار').length : 0, [orders]);
+      const approvedOrdersCount = useMemo(() => Array.isArray(orders) ? orders.filter(o => o && o.status === 'مقبول').length : 0, [orders]);
+      const rejectedOrdersCount = useMemo(() => Array.isArray(orders) ? orders.filter(o => o && o.status === 'ملغي').length : 0, [orders]);
 
       // Filtered Trips for Reports
       const filteredReportTrips = useMemo(() => {
+        if (!Array.isArray(trips)) return [];
         return trips.filter(t => {
+          if (!t) return false;
           const matchDriver = reportFilter.driverId ? t.driverId === reportFilter.driverId : true;
           const matchFrom = reportFilter.fromDate ? t.date >= reportFilter.fromDate : true;
           const matchTo = reportFilter.toDate ? t.date <= reportFilter.toDate : true;
@@ -632,7 +647,14 @@
       }
 
       return (
-        <div className="min-h-screen flex flex-col bg-dark-900 text-white">
+        <div className="min-h-screen flex flex-col bg-dark-900 text-white" onClick={() => {
+          // فتح كتم الصوت فور أول ضغطة للمستخدم لضمان السماح بأصوات التنبيه المستقبلية
+          const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+          if (AudioContextClass) {
+            const ctx = new AudioContextClass();
+            if (ctx.state === 'suspended') ctx.resume();
+          }
+        }}>
           {/* Toast */}
           {toast && (
             <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-950 text-red-300 border-red-800' : 'bg-dark-800 text-gold border-gold/40'}`}>
@@ -675,7 +697,7 @@
 
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
 
-            {/* TAB: DASHBOARD (طلبات المناديب - تصميم الكروت الكبيرة 2 جنب بعض) */}
+            {/* TAB: DASHBOARD (كروت الطلبات الكبيرة) */}
             {activeTab === 'dashboard' && (
               <div className="space-y-8">
                 {/* الإحصائيات الفورية */}
@@ -690,16 +712,16 @@
                   </div>
                   <div className="glass-card p-5 rounded-2xl">
                     <span className="text-gray-400 text-xs block mb-1">إجمالي النقلات المنجزة</span>
-                    <p className="text-3xl font-black gold-text">{trips.reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0)}</p>
+                    <p className="text-3xl font-black gold-text">{Array.isArray(trips) ? trips.reduce((a, b) => a + (parseFloat(b.tripsCount) || 0), 0) : 0}</p>
                   </div>
                   <div className="glass-card p-5 rounded-2xl">
                     <span className="text-gray-400 text-xs block mb-1">إجمالي كميات الأعلاف (طن)</span>
-                    <p className="text-3xl font-black text-white">{orders.reduce((a, b) => a + (parseFloat(b.quantity) || 0), 0).toFixed(2)}</p>
+                    <p className="text-3xl font-black text-white">{Array.isArray(orders) ? orders.reduce((a, b) => a + (parseFloat(b.quantity) || 0), 0).toFixed(2) : '0.00'}</p>
                   </div>
                 </div>
 
                 <div className="space-y-4">
-                  {/* شريط التحكم والتصفية وتوضيح التحديث التلقائي */}
+                  {/* شريط التحكم والتصفية */}
                   <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                     <div className="flex items-center gap-2 bg-dark-800 p-1.5 rounded-2xl border border-dark-700">
                       {[
@@ -733,7 +755,7 @@
                     </div>
                   </div>
 
-                  {/* 🎴 عرض الطلبات كـ كروت كبيرة (2 جنب بعض في الصفحة) */}
+                  {/* 🎴 عرض كروت الطلبات الكبيرة */}
                   {filteredOrders.length === 0 ? (
                     <div className="glass-card p-12 text-center rounded-2xl border border-dark-700">
                       <i data-lucide="package-open" className="w-12 h-12 text-gray-600 mx-auto mb-3"></i>
@@ -747,7 +769,6 @@
                           onClick={() => { setSelectedOrderDetails(order); setActiveModal('orderDetailsModal'); }}
                           className="glass-card p-6 rounded-3xl border border-dark-700 hover:border-gold/60 transition-all duration-300 cursor-pointer group flex flex-col justify-between space-y-5 relative overflow-hidden shadow-xl hover:shadow-gold/10"
                         >
-                          {/* الهيدر العلوي للكرت */}
                           <div className="flex justify-between items-start">
                             <div>
                               <span className="text-[10px] text-gray-400 font-mono block mb-1">
@@ -755,7 +776,7 @@
                               </span>
                               <h3 className="text-lg font-black text-white group-hover:text-gold transition-colors flex items-center gap-2">
                                 <i data-lucide="user" className="w-5 h-5 text-gold"></i>
-                                {order.clientName}
+                                {order.clientName || 'عميل'}
                               </h3>
                             </div>
                             <span className={`px-3 py-1 rounded-full text-xs font-bold border ${order.status === 'مقبول' ? 'bg-green-500/10 text-green-400 border-green-500/30' : order.status === 'ملغي' ? 'bg-red-500/10 text-red-400 border-red-500/30' : 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'}`}>
@@ -763,7 +784,6 @@
                             </span>
                           </div>
 
-                          {/* شبكة تفاصيل الكرت */}
                           <div className="grid grid-cols-2 gap-3 bg-dark-950/70 p-4 rounded-2xl border border-dark-700 text-xs">
                             <div>
                               <span className="text-gray-400 block mb-0.5">المندوب المسؤول:</span>
@@ -775,7 +795,7 @@
                             </div>
                             <div>
                               <span className="text-gray-400 block mb-0.5">إجمالي الكمية:</span>
-                              <strong className="text-white font-black text-base block">{order.quantity} طن</strong>
+                              <strong className="text-white font-black text-base block">{order.quantity || 0} طن</strong>
                             </div>
                             <div>
                               <span className="text-gray-400 block mb-0.5">المبلغ الإجمالي:</span>
@@ -785,13 +805,11 @@
                             </div>
                           </div>
 
-                          {/* الملاحظات ورقم الفاتورة */}
                           <div className="flex justify-between items-center text-[11px] text-gray-400 px-1">
-                            <span className="font-mono text-gray-500">#{order.id.slice(-6).toUpperCase()}</span>
+                            <span className="font-mono text-gray-500">#{order.id ? order.id.slice(-6).toUpperCase() : ''}</span>
                             <span className="truncate max-w-[200px]">{order.notes ? `ملاحظة: ${order.notes}` : 'لا يوجد ملاحظات إضافية'}</span>
                           </div>
 
-                          {/* أزرار التحكم السريعة والحذف في أسفل الكرت */}
                           <div className="flex items-center justify-between pt-3 border-t border-dark-700/80 gap-2" onClick={e => e.stopPropagation()}>
                             <button
                               onClick={() => { setSelectedOrderDetails(order); setActiveModal('orderDetailsModal'); }}
@@ -1087,7 +1105,7 @@
 
           </main>
 
-          {/* 📄 MODAL: FULL ORDER INVOICE DETAILS (الفاتورة الراقية المطبوعة - بدون تليفون المندوب) */}
+          {/* 📄 MODAL: FULL ORDER INVOICE DETAILS */}
           {activeModal === 'orderDetailsModal' && selectedOrderDetails && (
             <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-white text-black p-6 rounded-3xl w-full max-w-4xl max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl">
@@ -1118,7 +1136,7 @@
                     <img src={LOGO_URL} alt="Logo" className="w-20 h-20 rounded-full border border-black object-contain" />
                   </div>
 
-                  {/* معلومات العميل والمندوب (بدون تليفون المندوب) */}
+                  {/* معلومات العميل والمندوب */}
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-3 bg-gray-50 p-4 rounded-xl border border-black text-xs">
                     <div>
                       <span className="text-gray-500 block">اسم العميل:</span>
@@ -1130,7 +1148,6 @@
                     </div>
                     <div>
                       <span className="text-gray-500 block">المندوب المسؤول:</span>
-                      {/* ⚠️ اسم المندوب فقط بدون رقم الهاتف */}
                       <strong className="text-black text-sm">{selectedOrderDetails.repName || 'مندوب المبيعات'}</strong>
                     </div>
                     <div>
@@ -1139,7 +1156,7 @@
                     </div>
                     <div>
                       <span className="text-gray-500 block">رقم طلب الفاتورة:</span>
-                      <strong className="text-black font-mono">#{selectedOrderDetails.id.slice(-6).toUpperCase()}</strong>
+                      <strong className="text-black font-mono">#{selectedOrderDetails.id ? selectedOrderDetails.id.slice(-6).toUpperCase() : ''}</strong>
                     </div>
                     <div>
                       <span className="text-gray-500 block">الحالة:</span>
