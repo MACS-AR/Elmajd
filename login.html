@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>مصنع المجد للأعلاف - صفحة المعرض والمبيعات المباشرة</title>
 
-  <!-- Tailwind CSS Config Definition Before CDN Load -->
+  <!-- Tailwind CSS Configuration Before Script -->
   <script>
     window.tailwind = {
       theme: {
@@ -202,10 +202,10 @@
       const [clientName, setClientName] = useState('');
       const [cartItems, setCartItems] = useState([]);
       const [searchQuery, setSearchQuery] = useState('');
-      const [isSearchActive, setIsSearchActive] = useState(false); // حالة التحكم في إظهار قائمة البحث
+      const [isSearchActive, setIsSearchActive] = useState(false); // التحكم بإظهار وإخفاء البحث
       const [notes, setNotes] = useState('');
-      const [discount, setDiscount] = useState(0); // ميزة الخصم
-      const [paymentMethod, setPaymentMethod] = useState('كاش'); // ميزة طريقة الدفع
+      const [discount, setDiscount] = useState(0); // الخصم النظير
+      const [paymentMethod, setPaymentMethod] = useState('كاش'); // طريقة الدفع
 
       // Active Modal
       const [activeModal, setActiveModal] = useState(null);
@@ -264,7 +264,7 @@
         return () => window.removeEventListener('firebaseReady', initFirebase);
       }, []);
 
-      // Safe Lucide Icon Initialization
+      // Safe Lucide Icons Refresh
       useEffect(() => {
         if (window.lucide && typeof window.lucide.createIcons === 'function') {
           window.lucide.createIcons();
@@ -299,7 +299,7 @@
         return cartItems.reduce((sum, item) => sum + (parseInt(item.quantityBags) || 0), 0);
       }, [cartItems]);
 
-      // Add Product to Invoice Cart & Close Search Drawer Immediately
+      // Add Product to Invoice Cart & Close Search Section Automatically
       const handleAddToCart = (product) => {
         const existingIndex = cartItems.findIndex(item => item.productId === product.id);
         const stockQty = showroomStock[product.id] ? parseInt(showroomStock[product.id].bagsCount) || 0 : 0;
@@ -333,10 +333,10 @@
           }]);
         }
 
-        // إخفاء نتائج البحث وإفراغ حقل البحث لاستغلال المساحة
+        // إخفاء نتائج البحث فور اختيار المنتج لتوفير مساحة الشاشة
         setSearchQuery('');
         setIsSearchActive(false);
-        showToast(`تمت إضافة (${product.name}) للفاتورة`);
+        showToast(`تمت إضافة (${product.name}) للفاتورة بنجاح`);
       };
 
       // Update Item Quantity in Cart
@@ -366,7 +366,7 @@
         setClientName('');
         setNotes('');
         setDiscount(0);
-        showToast('تم تفريغ الفاتورة بنجاح');
+        showToast('تم تفريغ الفاتورة بالكامل');
       };
 
       // Save Invoice and Deduct Stock
@@ -468,15 +468,15 @@
       }, [showroomSales, reportMonth]);
 
       const navTabs = [
-        { id: 'pos', label: 'الفاتورة والبيع', icon: 'shopping-cart' },
-        { id: 'stock', label: 'التحكم بالمخزون', icon: 'boxes' },
+        { id: 'pos', label: 'إنشاء فاتورة', icon: 'shopping-cart' },
+        { id: 'stock', label: 'المخزون', icon: 'boxes' },
         { id: 'sales', label: 'سجل المبيعات', icon: 'receipt' },
         { id: 'reports', label: 'التقارير الشهريّة', icon: 'bar-chart-2' }
       ];
 
       return (
         <div className="min-h-screen flex flex-col bg-dark-900 text-white">
-          {/* Toast Notification */}
+          {/* Toast Alert */}
           {toast && (
             <div className={`fixed top-4 left-1/2 -translate-x-1/2 md:left-6 md:translate-x-0 z-50 px-5 py-3 rounded-xl shadow-2xl text-xs md:text-sm font-bold flex items-center gap-2 border transition-all ${toast.type === 'error' ? 'bg-red-950 text-red-300 border-red-800' : 'bg-dark-800 text-gold border-gold/40'}`}>
               <i data-lucide={toast.type === 'error' ? 'alert-triangle' : 'check-circle'} className="w-5 h-5"></i>
@@ -536,7 +536,7 @@
             {activeTab === 'pos' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
                 
-                {/* Left/Top Column: POS Form & Cart Items */}
+                {/* POS Invoice Form */}
                 <div className="lg:col-span-6 space-y-4">
                   <form onSubmit={handleCreateInvoice} className="glass-card p-4 md:p-6 rounded-3xl border border-dark-700 space-y-4 gold-glow">
                     <div className="flex items-center justify-between border-b border-dark-700 pb-3">
@@ -611,7 +611,7 @@
                       )}
                     </div>
 
-                    {/* الخصم وطريقة الدفع */}
+                    {/* طريقة الدفع والخصم */}
                     <div className="grid grid-cols-2 gap-3 pt-1">
                       <div>
                         <label className="text-[11px] text-gray-400 block mb-1">طريقة الدفع</label>
@@ -676,7 +676,7 @@
                   </form>
                 </div>
 
-                {/* Right/Bottom Column: Search Drawer (Collapsible) */}
+                {/* Collapsible Search & Products Drawer */}
                 <div className={`lg:col-span-6 space-y-4 ${!isSearchActive ? 'hidden lg:block' : 'block'}`}>
                   <div className="glass-card p-3 md:p-4 rounded-2xl flex items-center gap-3 border border-dark-700 shadow-md">
                     <i data-lucide="search" className="w-5 h-5 text-gold shrink-0"></i>
