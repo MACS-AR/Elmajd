@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>لوحة إدارة مصنع المجد للأعلاف</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config={theme:{extend:{colors:{
+gold:{light:"#F5E0A3",DEFAULT:"#D4AF37",dark:"#AA820A"},
+dark:{950:"#050608",900:"#090A0F",800:"#12141D",700:"#1D202F"}
+}}}};
+</script>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#090A0F;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif}
+.gold-gradient{background:linear-gradient(135deg,#F5E0A3,#D4AF37 50%,#AA820A)}
+.gold-text{background:linear-gradient(135deg,#F5E0A3,#D4AF37 50%,#AA820A);-webkit-background-clip:text;background-clip:text;color:transparent}
+.glass{background:rgba(18,20,29,.9);backdrop-filter:blur(14px);border:1px solid rgba(212,175,55,.18)}
+input,select,textarea{color-scheme:dark}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:#3a3d4a;border-radius:10px}
+@media print{.no-print{display:none!important}body{background:white!important;color:black!important}.print-area{display:block!important;color:black!important}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+import {getAuth,onAuthStateChanged,signInWithEmailAndPassword,signOut} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-auth.js";
+import {getDatabase,ref,onValue,get,set,push,update,remove,runTransaction} from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+
+const firebaseConfig={
+ apiKey:"AIzaSyBgRkceRq7FRbhCevLlULYNy-A5Tl_cr0w",
+ authDomain:"sr-test-c9e06.firebaseapp.com",
+ databaseURL:"https://sr-test-c9e06-default-rtdb.firebaseio.com",
+ projectId:"sr-test-c9e06",
+ storageBucket:"sr-test-c9e06.firebasestorage.app",
+ messagingSenderId:"658396508062",
+ appId:"1:658396508062:web:c56cd84f93daa2e176308f",
+ measurementId:"G-3ZZV344NDK"
+};
+const app=initializeApp(firebaseConfig),auth=getAuth(app),db=getDatabase(app);
+window.firebaseAPI={auth,db,ref,onValue,get,set,push,update,remove,runTransaction,
+ signInWithEmailAndPassword,signOut,onAuthStateChanged};
+</script>
+<script type="text/babel">
+const {useState,useEffect,useMemo}=React;
+
+const A=()=>window.firebaseAPI;
+const money=n=>Number(n||0).toLocaleString("ar-EG",{maximumFractionDigits:2})+" ج.م";
+const num=n=>Number(n||0);
+const dateKey=()=>new Date().toISOString().slice(0,10);
+const uid=()=>Math.random().toString(36).slice(2)+Date.now().toString(36);
+
+function Icon({n}){
+ const d={
+  home:"M3 10.5 12 3l9 7.5M5 9v11h14V9M9 20v-6h6v6",
+  box:"M3 7l9-4 9 4-9 4-9-4Zm0 0v10l9 4 9-4V7M12 11v10",
+  users:"M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  cart:"M3 3h2l2.4 11h11L21 7H6M9 19a1.8 1.8 0 1 0 0 3 1.8 1.8 0 0 0 0-3Zm9 0a1.8 1.8 0 1 0 0 3 1.8 1.8 0 0 0 0-3Z",
+  money:"M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7H14a3.5 3.5 0 0 1 0 7H6",
+  return:"M9 14 4 9l5-5M4 9h10a6 6 0 0 1 6 6v1",
+  chart:"M4 20V10m6 10V4m6 16v-7m4 7H2",
+  settings:"M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Zm8-3.5 2-1.2-2-3.5-2.2.7a8 8 0 0 0-1.8-1L15.7 4h-4l-.3 3a8 8 0 0 0-1.8 1L7.4 7.3l-2 3.5 2 1.2v2.1l-2 1.2 2 3.5 2.2-.7a8 8 0 0 0 1.8 1l.3 3h4l.3-3a8 8 0 0 0 1.8-1l2.2.7 2-3.5-2-1.2Z",
+  search:"M21 21l-4.3-4.3M10.5 18a7.5 7.5 0 1 1 0-15 7.5 7.5 0 0 1 0 15Z",
+  plus:"M12 5v14M5 12h14",
+  edit:"m4 20 4.5-1L20 7.5a2.1 2.1 0 0 0-3-3L5.5 16 4 20Z",
+  trash:"M4 7h16M10 11v6m4-6v6M9 7V4h6v3m3 0-1 14H7L6 7",
+  close:"M6 6l12 12M18 6 6 18",
+  print:"M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v7H6z",
+  logout:"M10 17l5-5-5-5m5 5H3m10-9h5a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-5"
+ };
+ return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d[n]||d.home}/></svg>
+}
+
+function Toast({t}){
+ if(!t)return null;
+ return <div className={"fixed bottom-5 left-5 z-[100] px-5 py-3 rounded-xl shadow-2xl border "+(t.type==="error"?"bg-red-950 border-red-700 text-red-200":"bg-dark-800 border-gold/40 text-gold")}>{t.msg}</div>
+}
+
+function Login({onLogin}){
+ const [email,setEmail]=useState(""); const [pass,setPass]=useState(""); const [busy,setBusy]=useState(false); const [err,setErr]=useState("");
+ async function submit(e){e.preventDefault();setBusy(true);setErr("");try{await A().signInWithEmailAndPassword(A().auth,email.trim(),pass)}catch(x){setErr("بيانات الدخول غير صحيحة أو الحساب غير مفعل في Firebase.");}finally{setBusy(false)}}
+ return <div className="min-h-screen flex items-center justify-center p-5 bg-dark-950">
+  <form onSubmit={submit} className="glass rounded-3xl p-7 w-full max-w-md shadow-2xl">
+   <div className="text-center mb-7"><div className="w-20 h-20 mx-auto rounded-full border-2 border-gold p-2 mb-4"><img src="https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png" className="w-full h-full object-contain"/></div><h1 className="text-2xl font-black gold-text">إدارة مصنع المجد للأعلاف</h1><p className="text-xs text-gray-400 mt-2">تسجيل دخول لوحة الإدارة</p></div>
+   {err&&<div className="bg-red-950 border border-red-800 text-red-300 p-3 rounded-xl text-xs mb-4">{err}</div>}
+   <label className="text-xs text-gray-400">البريد الإلكتروني</label>
+   <input required type="email" value={email} onChange={e=>setEmail(e.target.value)} className="w-full mt-1 mb-4 p-3 rounded-xl bg-dark-800 border border-dark-700 outline-none focus:border-gold" placeholder="admin@example.com"/>
+   <label className="text-xs text-gray-400">كلمة المرور</label>
+   <input required type="password" value={pass} onChange={e=>setPass(e.target.value)} className="w-full mt-1 mb-5 p-3 rounded-xl bg-dark-800 border border-dark-700 outline-none focus:border-gold"/>
+   <button disabled={busy} className="w-full gold-gradient text-dark-950 font-black py-3 rounded-xl">{busy?"جارٍ الدخول...":"دخول لوحة الإدارة"}</button>
+  </form>
+ </div>
+}
+
+function Modal({title,children,onClose,wide=false}){
+ return <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+  <div className={"glass rounded-3xl p-5 w-full "+(wide?"max-w-5xl":"max-w-xl")+" max-h-[92vh] overflow-y-auto"}>
+   <div className="flex justify-between items-center border-b border-dark-700 pb-3 mb-5"><h2 className="font-black text-gold">{title}</h2><button onClick={onClose} className="p-2 text-gray-400 hover:text-white"><Icon n="close"/></button></div>{children}
+  </div>
+ </div>
+}
+
+function Admin(){
+ const [tab,setTab]=useState("home"),[toast,setToast]=useState(null),[user,setUser]=useState(null);
+ const [products,setProducts]=useState([]),[customers,setCustomers]=useState([]),[sales,setSales]=useState([]),[payments,setPayments]=useState([]),[returns,setReturns]=useState([]);
+ const [mainStock,setMainStock]=useState({}),[showStock,setShowStock]=useState({}),[transfers,setTransfers]=useState([]);
+ const [modal,setModal]=useState(null),[editing,setEditing]=useState(null),[search,setSearch]=useState("");
+ const [reportMonth,setReportMonth]=useState(new Date().toISOString().slice(0,7));
+ const [currentUser,setCurrentUser]=useState(null);
+
+ const notify=(msg,type="success")=>{setToast({msg,type});setTimeout(()=>setToast(null),3200)};
+ useEffect(()=>A().onAuthStateChanged(A().auth,u=>setUser(u)),[]);
+ useEffect(()=>{
+  if(!user)return;
+  const paths=[
+   ["products",setProducts],["customers",setCustomers],["sales",setSales],["payments",setPayments],
+   ["saleReturns",setReturns],["mainStock",setMainStock],["showroomStock",setShowStock],["transfers",setTransfers]
+  ];
+  const unsubs=paths.map(([p,setter])=>A().onValue(A().ref(A().db,p),s=>{
+   const v=s.val()||{};
+   setter(Object.entries(v).map(([id,x])=>({id,...(x||{})})).reverse());
+  }));
+  const u=A().onValue(A().ref(A().db,"users/"+user.uid),s=>setCurrentUser(s.val()||{}));
+  return()=>{unsubs.forEach(x=>x&&x());u&&u()};
+ },[user]);
+
+ const lowMain=useMemo(()=>products.filter(p=>num(mainStock[p.id]?.bagsCount)<=num(p.minStock||5)),[products,mainStock]);
+ const lowShow=useMemo(()=>products.filter(p=>num(showStock[p.id]?.bagsCount)<=num(p.minShowroomStock||5)),[products,showStock]);
+ const monthSales=useMemo(()=>sales.filter(x=>(x.date||"").slice(0,7)===reportMonth),[sales,reportMonth]);
+ const monthTotal=monthSales.reduce((s,x)=>s+num(x.totalAmount),0);
+ const monthPaid=monthSales.reduce((s,x)=>s+num(x.paidAmount),0);
+ const monthDue=monthTotal-monthPaid;
+ const monthBags=monthSales.reduce((s,x)=>s+num(x.totalBags),0);
+
+ async function audit(action,description,extra={}){
+  try{await A().push(A().ref(A().db,"auditLogs"),{action,description,userId:user.uid,userEmail:user.email,timestamp:new Date().toISOString(),...extra})}catch(e){console.error(e)}
+ }
+ async function save(path,data,id){
+  if(id)await A().update(A().ref(A().db,path+"/"+id),data);else await A().set(A().ref(A().db,path+"/"+uid()),{...data,createdAt:new Date().toISOString()});
+ }
+ async function del(path,id){if(confirm("هل أنت متأكد من الحذف؟")){await A().remove(A().ref(A().db,path+"/"+id));await audit("DELETE",`حذف سجل من ${path}`,{recordId:id});notify("تم الحذف")}}
+
+ function openForm(type,item=null){setEditing(item);setModal(type)}
+ const nav=[
+  ["home","الرئيسية","home"],["sales","المبيعات والفواتير","cart"],["customers","العملاء","users"],
+  ["products","المنتجات","box"],["stock","المخزون","box"],["payments","التحصيل","money"],
+  ["returns","المرتجعات","return"],["reports","التقارير","chart"],["settings","الإعدادات","settings"]
+ ];
+ if(!user)return <Login/>;
+ const role=currentUser?.role||"admin";
+ const canEdit=["admin","manager"].includes(role);
+ const canDelete=role==="admin";
+
+ return <div className="min-h-screen">
+  <Toast t={toast}/>
+  <header className="sticky top-0 z-40 glass px-4 py-3 flex items-center justify-between">
+   <div className="flex items-center gap-3"><img src="https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png" className="w-10 h-10 rounded-full border border-gold object-contain"/><div><b>مصنع <span className="gold-text">المجد للأعلاف</span></b><div className="text-[10px] text-gray-400">لوحة الإدارة • {role}</div></div></div>
+   <button onClick={()=>A().signOut(A().auth)} className="p-2 rounded-xl bg-dark-800 text-red-300" title="خروج"><Icon n="logout"/></button>
+  </header>
+  <div className="flex">
+   <aside className="hidden md:block w-64 min-h-[calc(100vh-66px)] bg-dark-950 border-l border-dark-800 p-3 sticky top-[66px]">
+    {nav.map(([id,label,ic])=><button key={id} onClick={()=>setTab(id)} className={"w-full flex items-center gap-3 p-3 rounded-xl mb-1 text-sm font-bold "+(tab===id?"gold-gradient text-dark-950":"text-gray-400 hover:bg-dark-800 hover:text-white")}><Icon n={ic}/>{label}</button>)}
+   </aside>
+   <main className="flex-1 p-3 md:p-6 max-w-[1600px] mx-auto w-full">
+    {tab==="home"&&<Home monthTotal={monthTotal} monthPaid={monthPaid} monthDue={monthDue} monthBags={monthBags} sales={sales} customers={customers} products={products} lowMain={lowMain} lowShow={lowShow} onTab={setTab}/>}
+    {tab==="products"&&<Products data={products} search={search} setSearch={setSearch} canEdit={canEdit} canDelete={canDelete} open={openForm} del={del} />}
+    {tab==="customers"&&<Customers data={customers} search={search} setSearch={setSearch} canEdit={canEdit} canDelete={canDelete} open={openForm} del={del}/>}
+    {tab==="sales"&&<Sales data={sales} customers={customers} products={products} mainStock={mainStock} showStock={showStock} canEdit={canEdit} notify={notify} audit={audit}/>}
+    {tab==="stock"&&<Stock products={products} mainStock={mainStock} showStock={showStock} transfers={transfers} canEdit={canEdit} open={openForm} notify={notify} audit={audit}/>}
+    {tab==="payments"&&<Payments customers={customers} payments={payments} sales={sales} canEdit={canEdit} notify={notify} audit={audit}/>}
+    {tab==="returns"&&<Returns data={returns} sales={sales} products={products} canEdit={canEdit} notify={notify}/>}
+    {tab==="reports"&&<Reports sales={sales} customers={customers} products={products} month={reportMonth} setMonth={setReportMonth}/>}
+    {tab==="settings"&&<Settings user={user} currentUser={currentUser} notify={notify}/>}
+   </main>
+  </div>
+  <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-950 border-t border-dark-700 grid grid-cols-5 p-1">{nav.slice(0,5).map(([id,label,ic])=><button key={id} onClick={()=>setTab(id)} className={"p-2 text-[9px] flex flex-col items-center gap-1 "+(tab===id?"text-gold":"text-gray-400")}><Icon n={ic}/>{label}</button>)}</nav>
+  {modal==="product"&&<ProductForm item={editing} close={()=>setModal(null)} save={async d=>{await save("products",d,editing?.id);await audit(editing?"UPDATE":"CREATE","حفظ منتج");setModal(null);notify("تم حفظ المنتج")}}/>}
+  {modal==="customer"&&<CustomerForm item={editing} close={()=>setModal(null)} save={async d=>{await save("customers",d,editing?.id);await audit(editing?"UPDATE":"CREATE","حفظ عميل");setModal(null);notify("تم حفظ العميل")}}/>}
+ </div>
+}
+
+function Home({monthTotal,monthPaid,monthDue,monthBags,sales,customers,products,lowMain,lowShow,onTab}){
+ const cards=[["مبيعات الشهر",money(monthTotal),"cart"],["المحصل",money(monthPaid),"money"],["المتبقي",money(monthDue),"money"],["الشكاير المباعة",monthBags+" شكارة","box"]];
+ return <div className="space-y-5">
+  <div><h1 className="text-2xl font-black">لوحة التحكم</h1><p className="text-xs text-gray-400 mt-1">نظرة شاملة على حركة مصنع المجد للأعلاف</p></div>
+  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">{cards.map(c=><div className="glass rounded-2xl p-4" key={c[0]}><div className="text-xs text-gray-400">{c[0]}</div><div className="text-xl font-black text-gold mt-2">{c[1]}</div></div>)}</div>
+  <div className="grid lg:grid-cols-3 gap-4">
+   <div className="glass rounded-2xl p-5"><h3 className="font-black text-gold mb-4">ملخص النظام</h3><div className="space-y-3 text-sm"><div className="flex justify-between"><span>الفواتير</span><b>{sales.length}</b></div><div className="flex justify-between"><span>العملاء</span><b>{customers.length}</b></div><div className="flex justify-between"><span>المنتجات</span><b>{products.length}</b></div></div></div>
+   <div className="glass rounded-2xl p-5"><h3 className="font-black text-red-400 mb-3">نواقص المخزن</h3>{lowMain.length+lowShow.length===0?<p className="text-xs text-green-400">لا توجد أصناف حرجة.</p>:<div className="space-y-2">{[...new Set([...lowMain,...lowShow].map(x=>x.name))].slice(0,8).map(x=><div className="bg-red-950/40 rounded-xl p-2 text-xs">{x}</div>)}</div>}</div>
+   <div className="glass rounded-2xl p-5"><h3 className="font-black text-gold mb-3">اختصارات</h3><div className="grid grid-cols-2 gap-2"><button onClick={()=>onTab("sales")} className="p-3 rounded-xl bg-dark-800 text-xs">فاتورة جديدة</button><button onClick={()=>onTab("customers")} className="p-3 rounded-xl bg-dark-800 text-xs">إضافة عميل</button><button onClick={()=>onTab("products")} className="p-3 rounded-xl bg-dark-800 text-xs">إضافة منتج</button><button onClick={()=>onTab("reports")} className="p-3 rounded-xl bg-dark-800 text-xs">التقارير</button></div></div>
+  </div>
+ </div>
+}
+
+function SearchBar({value,setValue,placeholder="بحث..."}){return <div className="flex gap-2 bg-dark-800 border border-dark-700 rounded-xl p-2 items-center"><Icon n="search"/><input value={value} onChange={e=>setValue(e.target.value)} placeholder={placeholder} className="bg-transparent outline-none w-full text-sm"/></div>}
+
+function Products({data,search,setSearch,canEdit,canDelete,open,del}){
+ const list=data.filter(x=>(x.name||"").toLowerCase().includes(search.toLowerCase())||(x.sku||"").toLowerCase().includes(search.toLowerCase())||(x.barcode||"").includes(search));
+ return <Section title="إدارة المنتجات" add={canEdit?()=>open("product"):null}><SearchBar value={search} setValue={setSearch} placeholder="اسم المنتج / SKU / الباركود"/><Table headers={["المنتج","SKU","الباركود","سعر الطن","سعر الشيكارة","وزن الشيكارة","الحد الأدنى"]} rows={list.map(x=>[x.name,x.sku||"-",x.barcode||"-",money(x.pricePerTon),money(x.pricePerBag),x.bagWeightKg+" كجم",x.minStock||5])} actions={canEdit?list.map(x=><><button onClick={()=>open("product",x)} className="text-gold p-2"><Icon n="edit"/></button>{canDelete&&<button onClick={()=>del("products",x.id)} className="text-red-400 p-2"><Icon n="trash"/></button>}</>):null}/></Section>
+}
+function Customers({data,search,setSearch,canEdit,canDelete,open,del}){
+ const list=data.filter(x=>(x.name||"").includes(search)||(x.phone||"").includes(search));
+ return <Section title="إدارة العملاء" add={canEdit?()=>open("customer"):null}><SearchBar value={search} setValue={setSearch} placeholder="اسم العميل أو الهاتف"/><Table headers={["العميل","الهاتف","العنوان","الحد الائتماني","الرصيد الافتتاحي"]} rows={list.map(x=>[x.name,x.phone||"-",x.address||"-",money(x.creditLimit),money(x.openingBalance)])} actions={canEdit?list.map(x=><><button onClick={()=>open("customer",x)} className="text-gold p-2"><Icon n="edit"/></button>{canDelete&&<button onClick={()=>del("customers",x.id)} className="text-red-400 p-2"><Icon n="trash"/></button>}</>):null}/></Section>
+}
+
+function Sales({data,customers,products,mainStock,showStock,canEdit,notify,audit}){
+ const [items,setItems]=useState([]),[customerId,setCustomerId]=useState(""),[method,setMethod]=useState("cash"),[paid,setPaid]=useState(""),[q,setQ]=useState(""),[notes,setNotes]=useState("");
+ const results=products.filter(p=>(p.name||"").includes(q)).slice(0,8);
+ const total=items.reduce((s,x)=>s+x.qty*x.price,0), remaining=Math.max(0,total-num(paid));
+ function add(p){
+  const stock=num(showStock[p.id]?.bagsCount);
+  const old=items.find(x=>x.productId===p.id),qty=(old?.qty||0)+1;
+  if(qty>stock)return notify("الكمية تتجاوز مخزون المعرض","error");
+  if(old)setItems(items.map(x=>x.productId===p.id?{...x,qty}:x));else setItems([...items,{productId:p.id,name:p.name,qty:1,price:num(p.pricePerBag)||((num(p.pricePerTon)*num(p.bagWeightKg||25))/1000),weight:num(p.bagWeightKg||25)}]);
+ }
+ async function create(){
+  if(!customerId||!items.length)return notify("اختر العميل وأضف منتجًا","error");
+  const customer=customers.find(x=>x.id===customerId);
+  const credit=(num(customer?.openingBalance)+data.filter(s=>s.customerId===customerId).reduce((s,x)=>s+num(x.remainingAmount),0));
+  if(method==="credit" && credit+remaining>num(customer?.creditLimit))return notify("تجاوز الحد الائتماني للعميل","error");
+  const id=uid(),invoice="MJ-"+new Date().getFullYear()+"-"+String(Date.now()).slice(-6);
+  const sale={invoiceNumber:invoice,customerId,customerName:customer.name,date:dateKey(),time:new Date().toLocaleTimeString("ar-EG"),paymentMethod:method,items:items.map(x=>({...x,total:x.qty*x.price})),totalBags:items.reduce((s,x)=>s+x.qty,0),totalAmount:total,paidAmount:method==="cash"?total:num(paid),remainingAmount:method==="cash"?0:remaining,notes,createdAt:new Date().toISOString()};
+  const updates={};updates["sales/"+id]=sale;
+  items.forEach(x=>{updates["showroomStock/"+x.productId+"/bagsCount"]=num(showStock[x.productId]?.bagsCount)-x.qty;updates["showroomStock/"+x.productId+"/updatedAt"]=new Date().toISOString()});
+  await update(A().ref(A().db),updates);await audit("SALE","إنشاء فاتورة بيع",{invoiceNumber:invoice,totalAmount:total,paymentMethod:method});setItems([]);setCustomerId("");setPaid("");setNotes("");notify("تم حفظ الفاتورة وخصم المخزون");
+ }
+ return <Section title="المبيعات والفواتير"><div className="grid lg:grid-cols-2 gap-4">
+  <div className="glass rounded-2xl p-4 space-y-3"><h3 className="font-bold text-gold">فاتورة جديدة</h3><select value={customerId} onChange={e=>setCustomerId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3"><option value="">اختر العميل</option>{customers.map(c=><option value={c.id}>{c.name} — {c.phone||""}</option>)}</select>
+  <input value={q} onChange={e=>setQ(e.target.value)} placeholder="ابحث عن منتج..." className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3"/>
+  {q&&results.map(p=><button onClick={()=>add(p)} className="w-full text-right bg-dark-800 hover:border-gold border border-dark-700 rounded-xl p-3 flex justify-between"><span>{p.name}</span><span className="text-gold">{money(p.pricePerBag)}</span></button>)}
+  <div className="space-y-2">{items.map((x,i)=><div className="bg-dark-950 rounded-xl p-3 flex justify-between items-center"><span>{x.name}<small className="block text-gray-500">{money(x.price)}</small></span><div className="flex items-center gap-2"><input type="number" min="1" value={x.qty} onChange={e=>{let q=Math.max(1,num(e.target.value));let stock=num(showStock[x.productId]?.bagsCount);if(q<=stock)setItems(items.map((z,j)=>j===i?{...z,qty:q}:z))}} className="w-16 bg-dark-800 p-2 rounded-lg text-center"/><button onClick={()=>setItems(items.filter((_,j)=>j!==i))} className="text-red-400"><Icon n="trash"/></button></div></div>)}</div></div>
+  <div className="glass rounded-2xl p-4 space-y-4"><h3 className="font-bold text-gold">الدفع</h3><div className="grid grid-cols-2 gap-2"><button onClick={()=>setMethod("cash")} className={"p-3 rounded-xl font-bold "+(method==="cash"?"gold-gradient text-dark-950":"bg-dark-800")}>نقدي</button><button onClick={()=>setMethod("credit")} className={"p-3 rounded-xl font-bold "+(method==="credit"?"gold-gradient text-dark-950":"bg-dark-800")}>آجل</button></div>{method==="credit"&&<input type="number" min="0" value={paid} onChange={e=>setPaid(e.target.value)} placeholder="المبلغ المدفوع الآن" className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3"/>}<textarea value={notes} onChange={e=>setNotes(e.target.value)} placeholder="ملاحظات" className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3"/>
+  <div className="bg-dark-950 rounded-xl p-4 space-y-2"><div className="flex justify-between"><span>الإجمالي</span><b className="text-gold">{money(total)}</b></div><div className="flex justify-between"><span>المدفوع</span><b>{money(method==="cash"?total:paid)}</b></div><div className="flex justify-between"><span>المتبقي</span><b className="text-red-400">{money(remaining)}</b></div></div>
+  <button disabled={!items.length} onClick={create} className="w-full gold-gradient text-dark-950 font-black p-3 rounded-xl">حفظ الفاتورة</button></div>
+ </div></Section>
+}
+
+function Stock({products,mainStock,showStock,transfers,canEdit,open,notify,audit}){
+ const [pid,setPid]=useState(""),[qty,setQty]=useState(""),[from,setFrom]=useState("main"),[to,setTo]=useState("show");
+ async function transfer(){
+  if(!pid||num(qty)<=0||from===to)return notify("أكمل بيانات التحويل","error");
+  const source=from==="main"?mainStock:showStock,target=to==="main"?mainStock:showStock;
+  const have=num(source[pid]?.bagsCount);if(have<num(qty))return notify("الرصيد غير كافٍ","error");
+  const updates={};updates[(from==="main"?"mainStock":"showroomStock")+"/"+pid+"/bagsCount"]=have-num(qty);updates[(to==="main"?"mainStock":"showroomStock")+"/"+pid+"/bagsCount"]=num(target[pid]?.bagsCount)+num(qty);
+  const id=uid();updates["transfers/"+id]={productId:pid,quantity:num(qty),from,to,date:new Date().toISOString()};
+  updates["stockMovements/"+uid()]={type:"TRANSFER",productId:pid,quantity:num(qty),from,to,date:new Date().toISOString()};
+  await update(A().ref(A().db),updates);await audit("TRANSFER","تحويل مخزون",{productId:pid,quantity:num(qty),from,to});setQty("");notify("تم التحويل بنجاح");
+ }
+ return <Section title="المخزون والتحويلات"><div className="grid lg:grid-cols-3 gap-4"><div className="glass rounded-2xl p-4 space-y-3 lg:col-span-1"><h3 className="font-bold text-gold">تحويل مخزون</h3><select value={pid} onChange={e=>setPid(e.target.value)} className="w-full bg-dark-800 p-3 rounded-xl"><option value="">المنتج</option>{products.map(p=><option value={p.id}>{p.name}</option>)}</select><select value={from} onChange={e=>setFrom(e.target.value)} className="w-full bg-dark-800 p-3 rounded-xl"><option value="main">المخزن الرئيسي</option><option value="show">المعرض</option></select><select value={to} onChange={e=>setTo(e.target.value)} className="w-full bg-dark-800 p-3 rounded-xl"><option value="show">المعرض</option><option value="main">المخزن الرئيسي</option></select><input type="number" min="1" value={qty} onChange={e=>setQty(e.target.value)} placeholder="عدد الشكاير" className="w-full bg-dark-800 p-3 rounded-xl"/><button disabled={!canEdit} onClick={transfer} className="w-full gold-gradient text-dark-950 font-bold p-3 rounded-xl">تنفيذ التحويل</button></div><div className="lg:col-span-2 grid sm:grid-cols-2 gap-3">{products.map(p=><div className="glass rounded-2xl p-4"><b>{p.name}</b><div className="flex justify-between mt-3"><span className="text-xs text-gray-400">الرئيسي</span><b>{num(mainStock[p.id]?.bagsCount)} ش</b></div><div className="flex justify-between mt-1"><span className="text-xs text-gray-400">المعرض</span><b className="text-gold">{num(showStock[p.id]?.bagsCount)} ش</b></div></div>)}</div></div></Section>
+}
+
+function Payments({customers,payments,sales,canEdit,notify,audit}){
+ const [cid,setCid]=useState(""),[amount,setAmount]=useState(""),[note,setNote]=useState("");
+ const balances=cid=>sales.filter(s=>s.customerId===cid).reduce((a,s)=>a+num(s.remainingAmount),0)-payments.filter(p=>p.customerId===cid).reduce((a,p)=>a+num(p.amount),0);
+ async function add(){if(!cid||num(amount)<=0)return notify("اختر العميل والمبلغ","error");const id=uid();await A().set(A().ref(A().db,"payments/"+id),{customerId:cid,customerName:customers.find(c=>c.id===cid)?.name,amount:num(amount),date:dateKey(),note,createdAt:new Date().toISOString()});await audit("PAYMENT","تسجيل تحصيل",{customerId:cid,amount:num(amount)});setAmount("");setNote("");notify("تم تسجيل التحصيل")}
+ return <Section title="التحصيل والمدفوعات"><div className="glass rounded-2xl p-4 max-w-xl space-y-3"><select value={cid} onChange={e=>setCid(e.target.value)} className="w-full bg-dark-800 p-3 rounded-xl"><option value="">اختر العميل</option>{customers.map(c=><option value={c.id}>{c.name}</option>)}</select>{cid&&<div className="bg-dark-950 p-3 rounded-xl text-sm">الرصيد الحالي: <b className="text-red-400">{money(Math.max(0,balances(cid)))}</b></div>}<input type="number" min="0" value={amount} onChange={e=>setAmount(e.target.value)} placeholder="قيمة التحصيل" className="w-full bg-dark-800 p-3 rounded-xl"/><input value={note} onChange={e=>setNote(e.target.value)} placeholder="ملاحظة" className="w-full bg-dark-800 p-3 rounded-xl"/><button disabled={!canEdit} onClick={add} className="w-full gold-gradient text-dark-950 font-bold p-3 rounded-xl">تسجيل التحصيل</button></div><div className="mt-4"><Table headers={["التاريخ","العميل","المبلغ","ملاحظة"]} rows={payments.map(p=>[p.date,p.customerName,money(p.amount),p.note||"-"])}/></div></Section>
+}
+
+function Returns({data,sales,products,canEdit,notify}){
+ const [saleId,setSaleId]=useState(""),[pid,setPid]=useState(""),[qty,setQty]=useState("");
+ async function add(){const s=sales.find(x=>x.id===saleId);if(!s||!pid||num(qty)<=0)return notify("أكمل بيانات المرتجع","error");const item=s.items.find(x=>x.productId===pid);if(!item||num(qty)>num(item.qty))return notify("كمية المرتجع غير صحيحة","error");const id=uid(),r={saleId,invoiceNumber:s.invoiceNumber,customerId:s.customerId,customerName:s.customerName,productId:pid,quantity:num(qty),amount:num(item.price)*num(qty),date:dateKey(),createdAt:new Date().toISOString()};const updates={};updates["saleReturns/"+id]=r;updates["showroomStock/"+pid+"/bagsCount"] = num((await A().get(A().ref(A().db,"showroomStock/"+pid))).val()?.bagsCount)+num(qty);await A().update(A().ref(A().db),updates);setQty("");notify("تم تسجيل المرتجع وإضافة الكمية للمعرض")}
+ return <Section title="مرتجعات المبيعات"><div className="glass rounded-2xl p-4 max-w-xl space-y-3"><select value={saleId} onChange={e=>setSaleId(e.target.value)} className="w-full bg-dark-800 p-3 rounded-xl"><option value="">اختر الفاتورة</option>{sales.map(s=><option value={s.id}>{s.invoiceNumber} — {s.customerName}</option>)}</select><select value={pid} onChange={e=>setPid(e.target.value)} className="w-full bg-dark-800 p-3 rounded-xl"><option value="">المنتج</option>{(sales.find(s=>s.id===saleId)?.items||[]).map(x=><option value={x.productId}>{x.name}</option>)}</select><input type="number" min="1" value={qty} onChange={e=>setQty(e.target.value)} placeholder="كمية المرتجع" className="w-full bg-dark-800 p-3 rounded-xl"/><button disabled={!canEdit} onClick={add} className="w-full gold-gradient text-dark-950 font-bold p-3 rounded-xl">تسجيل المرتجع</button></div></Section>
+}
+
+function Reports({sales,customers,products,month,setMonth}){
+ const list=sales.filter(s=>(s.date||"").slice(0,7)===month),total=list.reduce((s,x)=>s+num(x.totalAmount),0),paid=list.reduce((s,x)=>s+num(x.paidAmount),0);
+ return <Section title="التقارير"><div className="flex gap-3 mb-4"><input type="month" value={month} onChange={e=>setMonth(e.target.value)} className="bg-dark-800 border border-dark-700 p-3 rounded-xl"/></div><div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">{[["المبيعات",money(total)],["المحصل",money(paid)],["الآجل",money(total-paid)],["الفواتير",list.length]].map(x=><div className="glass rounded-2xl p-5"><span className="text-xs text-gray-400">{x[0]}</span><b className="block text-2xl text-gold mt-2">{x[1]}</b></div>)}</div><div className="glass rounded-2xl p-4 mt-4"><Table headers={["الفاتورة","التاريخ","العميل","الدفع","الإجمالي","المتبقي"]} rows={list.map(s=>[s.invoiceNumber,s.date,s.customerName,s.paymentMethod==="cash"?"نقدي":"آجل",money(s.totalAmount),money(s.remainingAmount)])}/></div></Section>
+}
+
+function Settings({user,currentUser,notify}){return <Section title="الإعدادات"><div className="glass rounded-2xl p-5 max-w-2xl space-y-4"><div><span className="text-xs text-gray-400">الحساب الحالي</span><b className="block mt-1">{user.email}</b></div><div><span className="text-xs text-gray-400">الصلاحية</span><b className="block text-gold mt-1">{currentUser?.role||"admin"}</b></div><div className="bg-yellow-950/30 border border-yellow-700/40 rounded-xl p-4 text-xs text-yellow-200">يجب ضبط Firebase Security Rules لمنع المستخدم العادي من تعديل المنتجات أو المخزون أو الفواتير خارج صلاحياته.</div></div></Section>}
+
+function ProductForm({item,close,save}){const [x,setX]=useState(item||{name:"",sku:"",barcode:"",bagWeightKg:25,pricePerTon:"",pricePerBag:"",minStock:5,minShowroomStock:5});const upd=(k,v)=>setX({...x,[k]:v});return <Modal title={item?"تعديل منتج":"إضافة منتج"} onClose={close}><div className="grid sm:grid-cols-2 gap-3">{[["name","اسم المنتج"],["sku","SKU"],["barcode","الباركود"],["bagWeightKg","وزن الشيكارة كجم"],["pricePerTon","سعر الطن"],["pricePerBag","سعر الشيكارة"],["minStock","حد المخزون الرئيسي"],["minShowroomStock","حد مخزون المعرض"]].map(([k,l])=><label className="text-xs text-gray-400">{l}<input value={x[k]??""} onChange={e=>upd(k,e.target.value)} className="w-full mt-1 bg-dark-800 border border-dark-700 p-3 rounded-xl text-white"/></label>)}</div><button onClick={()=>save({...x,updatedAt:new Date().toISOString()})} className="w-full mt-5 gold-gradient text-dark-950 font-bold p-3 rounded-xl">حفظ</button></Modal>}
+function CustomerForm({item,close,save}){const [x,setX]=useState(item||{name:"",phone:"",address:"",creditLimit:0,openingBalance:0});const upd=(k,v)=>setX({...x,[k]:v});return <Modal title={item?"تعديل عميل":"إضافة عميل"} onClose={close}><div className="space-y-3">{[["name","اسم العميل"],["phone","رقم الهاتف"],["address","العنوان"],["creditLimit","الحد الائتماني"],["openingBalance","الرصيد الافتتاحي"]].map(([k,l])=><label className="text-xs text-gray-400 block">{l}<input value={x[k]??""} onChange={e=>upd(k,e.target.value)} className="w-full mt-1 bg-dark-800 border border-dark-700 p-3 rounded-xl text-white"/></label>)}</div><button onClick={()=>save({...x,updatedAt:new Date().toISOString()})} className="w-full mt-5 gold-gradient text-dark-950 font-bold p-3 rounded-xl">حفظ</button></Modal>}
+
+function Section({title,add,children}){return <div className="space-y-4"><div className="flex justify-between items-center"><h1 className="text-xl md:text-2xl font-black">{title}</h1>{add&&<button onClick={add} className="gold-gradient text-dark-950 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2"><Icon n="plus"/>إضافة</button>}</div>{children}</div>}
+function Table({headers,rows,actions}){return <div className="overflow-x-auto glass rounded-2xl"><table className="w-full text-right text-xs min-w-[650px]"><thead className="bg-dark-800 text-gold"><tr>{headers.map(h=><th className="p-3">{h}</th>)}{actions&&<th className="p-3">إجراءات</th>}</tr></thead><tbody>{rows.length?rows.map((r,i)=><tr className="border-t border-dark-700 hover:bg-dark-800/50">{r.map(c=><td className="p-3">{c}</td>)}{actions&&<td className="p-2">{actions[i]}</td>}</tr>):<tr><td colSpan={headers.length+(actions?1:0)} className="p-8 text-center text-gray-500">لا توجد بيانات</td></tr>}</tbody></table></div>}
+
+window.renderApp=()=>ReactDOM.createRoot(document.getElementById("root")).render(<Admin/>);
+</script>
+
+
+<script type="text/babel">window.renderApp&&window.renderApp()</script>
+</body>
+</html>
