@@ -326,7 +326,7 @@
         let matchedUser = null;
         let redirectTarget = '';
 
-        // 1. فحص جدول الموظفين والإدارة والمناديب (salesReps)
+        // 1. فحص جدول الموظفين والإدارة والمناديب والمعرض (salesReps)
         const repsSnapshot = await dbGet(dbRef(db, 'salesReps'));
         if (repsSnapshot.exists()) {
           const repsData = repsSnapshot.val();
@@ -343,9 +343,9 @@
             if (role === 'admin') {
               redirectTarget = `admin.html?phone=${encodeURIComponent(cleanPhone)}`;
               showToast(`أهلاً بك الإداري (${matchedUser.name}).. جاري الفتح`, 'success');
-            } else if (role === 'sales') {
+            } else if (role === 'sales' || role === 'pay' || role === 'store' || role === 'معرض') {
               redirectTarget = `pay.html?phone=${encodeURIComponent(cleanPhone)}`;
-              showToast(`أهلاً بك موظف المعرض (${matchedUser.name}).. جاري الفتح`, 'success');
+              showToast(`أهلاً بك موظف المعرض (${matchedUser.name}).. جاري فتح المعرض`, 'success');
             } else {
               redirectTarget = `rep.html?phone=${encodeURIComponent(cleanPhone)}`;
               showToast(`أهلاً بك المندوب (${matchedUser.name}).. جاري الفتح`, 'success');
@@ -373,7 +373,7 @@
           }
         }
 
-        // 3. فحص جدول العملاء (clients) -> wow.html
+        // 3. فحص جدول العملاء (clients) -> client.html
         if (!matchedUser) {
           const clientsSnapshot = await dbGet(dbRef(db, 'clients'));
 
@@ -388,13 +388,13 @@
               localStorage.setItem('userPhone', cleanPhone);
               localStorage.setItem('clientData', JSON.stringify(matchedClient));
 
-              redirectTarget = `wow.html?phone=${encodeURIComponent(cleanPhone)}`;
+              redirectTarget = `client.html?phone=${encodeURIComponent(cleanPhone)}`;
               showToast(`أهلاً بك العميل العزيز (${matchedClient.name}).. جاري الفتح`, 'success');
             }
           }
         }
 
-        // 4. تنفيذ التوجيه الفعلي
+        // 4. تنفيذ التوجيه التلقائي
         if (redirectTarget) {
           setTimeout(() => {
             window.location.href = redirectTarget;
@@ -404,7 +404,7 @@
           localStorage.setItem('userPhone', cleanPhone);
           
           setTimeout(() => {
-            window.location.href = `wow.html?phone=${encodeURIComponent(cleanPhone)}`;
+            window.location.href = `client.html?phone=${encodeURIComponent(cleanPhone)}`;
           }, 1200);
         }
 
@@ -414,7 +414,7 @@
         
         setTimeout(() => {
           localStorage.setItem('userPhone', cleanPhone);
-          window.location.href = `rep.html?phone=${encodeURIComponent(cleanPhone)}`;
+          window.location.href = `client.html?phone=${encodeURIComponent(cleanPhone)}`;
         }, 1000);
       } finally {
         submitBtn.disabled = false;
