@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>مصنع المجد للأعلاف - تسجيل الدخول الموحد</title>
+  <title>مصنع المجد للأعلاف - بوابة الدخول الموحدة</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -52,38 +52,38 @@
     }
 
     .glass-card {
-      background: rgba(18, 20, 29, 0.85);
+      background: rgba(18, 20, 29, 0.88);
       backdrop-filter: blur(20px);
-      border: 1px solid rgba(212, 175, 55, 0.25);
+      border: 1px solid rgba(212, 175, 55, 0.3);
     }
 
     .gold-glow {
-      box-shadow: 0 0 35px rgba(212, 175, 55, 0.2);
+      box-shadow: 0 0 40px rgba(212, 175, 55, 0.22);
     }
 
-    /* 🐓 أنيميشن الديك الجري فوق خانة الهاتف */
-    @keyframes roosterRun {
-      0% { transform: translateX(110%) scaleX(-1); }
-      48% { transform: translateX(-110%) scaleX(-1); }
-      50% { transform: translateX(-110%) scaleX(1); }
-      98% { transform: translateX(110%) scaleX(1); }
-      100% { transform: translateX(110%) scaleX(-1); }
+    /* 🐓 أنيميشن الديك يجري فوق خانة رقم الهاتف */
+    @keyframes roosterTrack {
+      0% { transform: translateX(120%) scaleX(-1); }
+      48% { transform: translateX(-120%) scaleX(-1); }
+      50% { transform: translateX(-120%) scaleX(1); }
+      98% { transform: translateX(120%) scaleX(1); }
+      100% { transform: translateX(120%) scaleX(-1); }
     }
 
-    @keyframes bounceBob {
+    @keyframes roosterHop {
       0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-6px); }
+      50% { transform: translateY(-7px); }
     }
 
     .rooster-runner {
-      animation: roosterRun 6s infinite ease-in-out;
+      animation: roosterTrack 7s infinite ease-in-out;
     }
 
-    .rooster-bob {
-      animation: bounceBob 0.35s infinite ease-in-out;
+    .rooster-hop {
+      animation: roosterHop 0.3s infinite ease-in-out;
     }
 
-    /* 🐥 خلفية الكتاكيت المتحركة */
+    /* 🐥 أنيميشن الكتاكيت في الخلفية */
     .bg-animation-container {
       position: fixed;
       inset: 0;
@@ -92,44 +92,44 @@
       overflow: hidden;
     }
 
-    @keyframes floatChickLeft {
+    @keyframes chickFloatLeft {
       0% { transform: translateX(100vw) translateY(0) scaleX(1); opacity: 0.15; }
-      50% { transform: translateX(50vw) translateY(-15px) scaleX(1); opacity: 0.3; }
-      100% { transform: translateX(-10vw) translateY(5px) scaleX(1); opacity: 0.05; }
+      50% { transform: translateX(50vw) translateY(-20px) scaleX(1); opacity: 0.35; }
+      100% { transform: translateX(-15vw) translateY(10px) scaleX(1); opacity: 0.05; }
     }
 
-    @keyframes floatChickRight {
-      0% { transform: translateX(-10vw) translateY(0) scaleX(-1); opacity: 0.1; }
-      50% { transform: translateX(40vw) translateY(-20px) scaleX(-1); opacity: 0.25; }
-      100% { transform: translateX(110vw) translateY(10px) scaleX(-1); opacity: 0.05; }
+    @keyframes chickFloatRight {
+      0% { transform: translateX(-15vw) translateY(0) scaleX(-1); opacity: 0.15; }
+      50% { transform: translateX(45vw) translateY(-25px) scaleX(-1); opacity: 0.35; }
+      100% { transform: translateX(115vw) translateY(15px) scaleX(-1); opacity: 0.05; }
     }
 
     .chick-bg-1 {
       position: absolute;
-      top: 15%;
-      animation: floatChickLeft 14s infinite linear;
+      top: 18%;
+      animation: chickFloatLeft 16s infinite linear;
     }
 
     .chick-bg-2 {
       position: absolute;
-      top: 65%;
-      animation: floatChickRight 18s infinite linear;
-      animation-delay: 3s;
+      top: 62%;
+      animation: chickFloatRight 20s infinite linear;
+      animation-delay: 4s;
     }
 
     .chick-bg-3 {
       position: absolute;
       top: 82%;
-      animation: floatChickLeft 22s infinite linear;
-      animation-delay: 7s;
+      animation: chickFloatLeft 24s infinite linear;
+      animation-delay: 9s;
     }
   </style>
 </head>
-<body className="min-h-screen flex items-center justify-center p-4 relative">
+<body class="min-h-screen flex items-center justify-center p-4 relative">
 
-  <!-- 🐥 الخلفية المتحركة: كتاكيت وفراخ تتجول في الخلفية -->
-  <div className="bg-animation-container">
-    <div className="chick-bg-1 text-gold/20 flex gap-4 items-center">
+  <!-- 🐥 خلفية الكتاكيت المتحركة -->
+  <div class="bg-animation-container">
+    <div class="chick-bg-1 text-gold/30 flex gap-4 items-center">
       <svg class="w-12 h-12" viewBox="0 0 64 64" fill="currentColor">
         <path d="M32 12c-6.6 0-12 5.4-12 12 0 3 1.1 5.7 3 7.8L18 36c-2 2-3 4.5-3 7.2 0 5.4 4.3 9.8 9.7 9.8h14.6c5.4 0 9.7-4.4 9.7-9.8 0-2.7-1-5.2-3-7.2l-5-4.2c1.9-2.1 3-4.8 3-7.8 0-6.6-5.4-12-12-12zM42 24c0 1-.8 2-2 2s-2-1-2-2 .8-2 2-2 2 1 2 2z"/>
       </svg>
@@ -138,58 +138,55 @@
       </svg>
     </div>
 
-    <div className="chick-bg-2 text-gold/15 flex gap-6 items-center">
+    <div class="chick-bg-2 text-gold/25 flex gap-6 items-center">
       <svg class="w-14 h-14" viewBox="0 0 64 64" fill="currentColor">
         <path d="M32 12c-6.6 0-12 5.4-12 12 0 3 1.1 5.7 3 7.8L18 36c-2 2-3 4.5-3 7.2 0 5.4 4.3 9.8 9.7 9.8h14.6c5.4 0 9.7-4.4 9.7-9.8 0-2.7-1-5.2-3-7.2l-5-4.2c1.9-2.1 3-4.8 3-7.8 0-6.6-5.4-12-12-12z"/>
       </svg>
     </div>
 
-    <div className="chick-bg-3 text-gold/20 flex gap-3 items-center">
+    <div class="chick-bg-3 text-gold/30 flex gap-3 items-center">
       <svg class="w-10 h-10" viewBox="0 0 64 64" fill="currentColor">
-        <path d="M32 12c-6.6 0-12 5.4-12 12 0 3 1.1 5.7 3 7.8L18 36c-2 2-3 4.5-3 7.2 0 5.4 4.3 9.8 9.7 9.8h14.6c5.4 0 9.7-4.4 9.7-9.8 0-2.7-1-5.2-3-7.2l-5-4.2c1.9-2.1 3-4.8 3-7.8 0-6.6-5.4-12-12-12z"/>
-      </svg>
-      <svg class="w-6 h-6" viewBox="0 0 64 64" fill="currentColor">
         <path d="M32 12c-6.6 0-12 5.4-12 12 0 3 1.1 5.7 3 7.8L18 36c-2 2-3 4.5-3 7.2 0 5.4 4.3 9.8 9.7 9.8h14.6c5.4 0 9.7-4.4 9.7-9.8 0-2.7-1-5.2-3-7.2l-5-4.2c1.9-2.1 3-4.8 3-7.8 0-6.6-5.4-12-12-12z"/>
       </svg>
     </div>
   </div>
 
-  <!-- Container الرئيسي -->
-  <div className="w-full max-w-md relative z-10">
+  <!-- الكارت الرئيسي -->
+  <div class="w-full max-w-md relative z-10">
 
-    <!-- Toast للتنبيهات -->
-    <div id="toast" className="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold border transition-all flex items-center gap-2">
-      <i id="toast-icon" data-lucide="info" className="w-4 h-4"></i>
+    <!-- شريط التنبيهات Toast -->
+    <div id="toast" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold border transition-all flex items-center gap-2">
+      <i id="toast-icon" data-lucide="info" class="w-4 h-4"></i>
       <span id="toast-msg"></span>
     </div>
 
-    <!-- كارت تسجيل الدخول -->
-    <div className="glass-card p-6 md:p-8 rounded-3xl space-y-6 gold-glow relative border border-gold/30">
+    <div class="glass-card p-6 sm:p-8 rounded-3xl space-y-6 gold-glow relative border border-gold/40">
       
-      <div className="text-center space-y-2">
-        <div className="relative inline-block">
+      <!-- اللوجو واسم المصنع -->
+      <div class="text-center space-y-2">
+        <div class="relative inline-block">
           <img 
             src="https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png" 
-            alt="شعار المصنع" 
-            className="w-20 h-20 rounded-full mx-auto border-2 border-gold p-1 bg-dark-900 object-contain shadow-lg" 
+            alt="شعار مصنع المجد" 
+            class="w-20 h-20 rounded-full mx-auto border-2 border-gold p-1 bg-dark-900 object-contain shadow-xl" 
           />
         </div>
-        <h1 className="text-2xl font-black text-white tracking-wide">
-          مصنع <span className="gold-text">المجد للأعلاف</span>
+        <h1 class="text-2xl font-black text-white tracking-wide">
+          مصنع <span class="gold-text">المجد للأعلاف</span>
         </h1>
-        <p className="text-xs text-gray-400">بوابة الدخول الموحدة للعملاء والمناديب والسائقين والإدارة</p>
+        <p class="text-xs text-gray-300 font-semibold">بوابة الدخول الذكية الموحدة للنظام</p>
       </div>
 
-      <!-- 🐓 مضمار الديك المتحرك فوق خانة الهاتف -->
-      <div className="relative w-full h-14 overflow-hidden rounded-2xl bg-dark-950/80 border border-gold/20 flex items-center justify-center">
-        <div className="absolute inset-0 flex items-center justify-between px-4 text-[10px] text-gold/40 font-bold select-none">
+      <!-- 🐓 مضمار الديك يجري فوق خانة الرقم -->
+      <div class="relative w-full h-14 overflow-hidden rounded-2xl bg-dark-950/90 border border-gold/30 flex items-center justify-center shadow-inner">
+        <div class="absolute inset-0 flex items-center justify-between px-4 text-[10px] text-gold/50 font-bold select-none">
           <span>🌾 جودة تميزنا</span>
-          <span>🐔 أعلاف المجد</span>
+          <span>🐔 مصنع المجد للأعلاف</span>
         </div>
 
-        <div className="rooster-runner absolute">
-          <div className="rooster-bob flex items-center gap-1">
-            <svg className="w-10 h-10 text-gold drop-shadow-[0_0_8px_rgba(212,175,55,0.8)]" viewBox="0 0 64 64" fill="currentColor">
+        <div class="rooster-runner absolute">
+          <div class="rooster-hop flex items-center">
+            <svg class="w-10 h-10 text-gold drop-shadow-[0_0_10px_rgba(212,175,55,0.9)]" viewBox="0 0 64 64" fill="currentColor">
               <path d="M28 8c-2 0-3 2-2 4 1 1 3 1 3 0 1 2 3 2 4 0 1 2 3 2 4 0 0-3-2-4-5-2z" fill="#EF4444"/>
               <path d="M36 18c-4 0-8 3-9 7l-5-2c-3 0-5 3-4 6 2 4 6 6 10 6 1 0 2 0 3-1l1 4c-3 2-6 5-6 9 0 5 4 9 9 9h6c4 0 7-3 7-7 0-4-3-8-7-9l-1-4c3-1 5-4 5-8 0-5-4-10-9-10z"/>
               <polygon points="23,22 17,25 23,28" fill="#F59E0B"/>
@@ -199,47 +196,48 @@
         </div>
       </div>
 
-      <!-- نموذج رقم الهاتف -->
-      <form id="loginForm" onsubmit="handleLogin(event)" className="space-y-5">
+      <!-- نموذج أدخل رقم الهاتف -->
+      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-5">
         
-        <div className="space-y-2">
-          <label className="text-xs text-gray-300 font-bold block flex items-center justify-between">
-            <span className="flex items-center gap-1.5">
-              <i data-lucide="phone" className="w-4 h-4 text-gold"></i>
+        <div class="space-y-2">
+          <label class="text-xs text-gray-200 font-bold flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="phone" class="w-4 h-4 text-gold"></i>
               أدخل رقم الهاتف المسجل:
             </span>
-            <span className="text-[10px] text-gold font-normal">مثال: 010xxxxxxxx</span>
+            <span class="text-[10px] text-gold font-normal">01xxxxxxxx</span>
           </label>
 
-          <div className="relative">
+          <div class="relative">
             <input
               type="tel"
               id="phoneInput"
               required
-              placeholder="اكتب رقم الهاتف هنا..."
-              className="w-full bg-dark-800 border-2 border-dark-700 rounded-2xl p-4 text-center font-mono text-base font-bold text-white outline-none focus:border-gold transition-all shadow-inner tracking-wider"
+              placeholder="أدخل رقم التليفون..."
+              class="w-full bg-dark-800 border-2 border-dark-700 rounded-2xl py-4 px-12 text-center font-mono text-base font-bold text-white outline-none focus:border-gold focus:ring-2 focus:ring-gold/30 transition-all shadow-inner tracking-wider"
               dir="ltr"
               autocomplete="tel"
             />
-            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500">
-              <i data-lucide="smartphone" className="w-5 h-5"></i>
+            <div class="absolute right-4 top-1/2 -translate-y-1/2 text-gold">
+              <i data-lucide="smartphone" class="w-5 h-5"></i>
             </div>
           </div>
         </div>
 
+        <!-- زر تسجيل الدخول -->
         <button
           type="submit"
           id="submitBtn"
-          className="w-full gold-gradient text-dark-950 font-black py-4 rounded-2xl text-sm transition-all hover:brightness-110 shadow-xl flex items-center justify-center gap-2 group cursor-pointer"
+          class="w-full gold-gradient text-dark-950 font-black py-4 rounded-2xl text-sm transition-all hover:brightness-110 shadow-xl flex items-center justify-center gap-2 group cursor-pointer"
         >
           <span id="btnText">تسجيل الدخول والتوجيه التلقائي</span>
-          <i id="btnIcon" data-lucide="arrow-left" className="w-5 h-5 group-hover:-translate-x-1 transition-transform"></i>
+          <i id="btnIcon" data-lucide="arrow-left" class="w-5 h-5 group-hover:-translate-x-1 transition-transform"></i>
         </button>
 
       </form>
 
-      <div className="text-center pt-2 border-t border-dark-700/60">
-        <p className="text-[11px] text-gray-500">
+      <div class="text-center pt-2 border-t border-dark-700/60">
+        <p class="text-[11px] text-gray-400">
           مصنع المجد للأعلاف &copy; 2026 - جميع الحقوق محفوظة
         </p>
       </div>
@@ -247,7 +245,7 @@
     </div>
   </div>
 
-  <!-- Firebase Integration -->
+  <!-- Firebase Integration Script -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
     import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
@@ -273,7 +271,7 @@
     if (window.lucide) window.lucide.createIcons();
   </script>
 
-  <!-- كود التوجيه الشامل بعد إضافة السائقين (car.html) -->
+  <!-- كود الفحص المباشر والربط بالمسارات -->
   <script>
     function showToast(message, type = 'info') {
       const toast = document.getElementById('toast');
@@ -408,9 +406,9 @@
         
         setTimeout(() => {
           localStorage.setItem('userPhone', cleanPhone);
-          window.location.href = `rep.html?phone=${encodeURIComponent(cleanPhone)}`;
+          window.location.href = `wow.html?phone=${encodeURIComponent(cleanPhone)}`;
         }, 1500);
-      } finally {
+      } fontFinally {
         submitBtn.disabled = false;
         btnText.innerText = 'تسجيل الدخول والتوجيه التلقائي';
       }
