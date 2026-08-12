@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>مصنع المجد للأعلاف - صفحة المعرض والمبيعات المباشرة</title>
+  <title>بوابة مناديب مبيعات المجد للأعلاف</title>
 
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -14,6 +14,9 @@
 
   <!-- Babel Standalone -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest"></script>
 
   <script>
     tailwind.config = {
@@ -42,7 +45,6 @@
       background-color: #090A0F;
       color: #ffffff;
       font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      overflow-x: hidden;
     }
     .gold-gradient {
       background: linear-gradient(135deg, #F5E0A3 0%, #D4AF37 50%, #AA820A 100%);
@@ -64,32 +66,14 @@
       box-shadow: 0 0 25px rgba(212, 175, 55, 0.25);
     }
 
-    /* 🐔 حركة اهتزاز الدجاجة فوق الرسالة الترحيبية */
-    @keyframes chickenWiggle {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      25% { transform: translateY(-10px) rotate(-8deg); }
-      50% { transform: translateY(0) rotate(8deg); }
-      75% { transform: translateY(-5px) rotate(-4deg); }
-    }
-
-    .chicken-wiggler {
-      animation: chickenWiggle 1.2s ease-in-out infinite;
-    }
-
-    /* 🖨️ تحسينات الطباعة الرسمية فائقة الوضوح (A4 & A5) */
     @media print {
       @page {
-        size: auto;
-        margin: 6mm;
+        size: A4 portrait;
+        margin: 8mm;
       }
-      html, body {
-        height: auto !important;
-        overflow: visible !important;
+      body {
         background: #ffffff !important;
         color: #000000 !important;
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
       }
       body * {
         visibility: hidden;
@@ -102,45 +86,30 @@
         left: 0;
         top: 0;
         width: 100% !important;
-        margin: 0 auto !important;
-        padding: 10px !important;
+        margin: 0 !important;
+        padding: 0 !important;
         background: #ffffff !important;
         color: #000000 !important;
-        font-size: 13px !important;
-        line-height: 1.5 !important;
       }
       .no-print {
         display: none !important;
-      }
-      .print-border {
-        border: 2px solid #000000 !important;
       }
       table {
         width: 100% !important;
         border-collapse: collapse !important;
         margin-top: 10px !important;
-        margin-bottom: 10px !important;
-        page-break-inside: auto;
-      }
-      tr {
-        page-break-inside: avoid;
       }
       th, td {
-        border: 2px solid #000000 !important;
+        border: 1.5px solid #000000 !important;
         color: #000000 !important;
-        padding: 8px 10px !important;
+        padding: 8px !important;
         font-size: 12px !important;
-        font-weight: 700 !important;
         text-align: right !important;
       }
       th {
         background-color: #e5e7eb !important;
-        font-size: 13px !important;
-        font-weight: 900 !important;
+        font-weight: bold !important;
       }
-      h1 { font-size: 22px !important; font-weight: 900 !important; }
-      h2, h3 { font-size: 16px !important; font-weight: 800 !important; }
-      p, span, div, strong { color: #000000 !important; font-weight: 700 !important; }
     }
   </style>
 </head>
@@ -150,7 +119,7 @@
   <!-- Firebase Integration Script -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-    import { getDatabase, ref, set, push, onValue, remove, update, get } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+    import { getDatabase, ref, set, push, onValue, update } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyBgRkceRq7FRbhCevLlULYNy-A5Tl_cr0w",
@@ -167,392 +136,396 @@
     const rtdb = getDatabase(app);
 
     window.rtdbMethods = {
-      ref, set, push, onValue, remove, update, get, db: rtdb
+      ref, set, push, onValue, update, db: rtdb
     };
   </script>
 
   <!-- React Logic -->
   <script type="text/babel">
-    const { useState, useEffect, useMemo, useRef, Component } = React;
+    const { useState, useEffect, useMemo } = React;
 
     const LOGO_URL = "https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png"; 
 
-    // 🎨 آيكونات آمنة متوافقة مع React 100% وتمنع انهيار الشاشة أثناء البحث
-    function Icon({ name, className = "w-4 h-4" }) {
-      const icons = {
-        'search': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>,
-        'shopping-cart': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg>,
-        'boxes': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>,
-        'receipt': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 14l2 2 4-4m6-2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
-        'bar-chart-2': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 20V10m-6 10V4M6 20v-6"/></svg>,
-        'alert-triangle': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>,
-        'check-circle': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
-        'x': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>,
-        'plus': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>,
-        'trash': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>,
-        'printer': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>,
-        'edit-3': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>,
-        'eye': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>,
-        'filter': <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>,
-        'whatsapp': <svg className={className} fill="currentColor" viewBox="0 0 24 24"><path d="M12.012 2c-5.506 0-9.989 4.478-9.99 9.984 0 1.763.459 3.486 1.332 5.003l-1.416 5.168 5.293-1.387c1.462.798 3.11 1.218 4.777 1.218 5.508 0 9.991-4.479 9.991-9.986 0-2.668-1.037-5.177-2.923-7.063a9.923 9.923 0 00-7.064-2.937zm5.82 14.28c-.244.687-1.42 1.312-1.958 1.393-.502.076-1.15.11-1.85-.118-.426-.139-.974-.316-1.683-.623-2.96-1.282-4.887-4.29-5.035-4.488-.148-.198-1.206-1.603-1.206-3.058 0-1.455.761-2.17 1.03-2.464.268-.293.585-.366.78-.366.195 0 .39.002.56.01.18.008.423-.068.663.508.244.585.829 2.023.902 2.17.073.146.122.316.024.512-.098.195-.146.317-.293.488-.146.171-.308.384-.44.512-.146.146-.298.305-.128.597.171.292.76 1.254 1.632 2.03 1.121.998 2.063 1.31 2.355 1.456.292.146.463.122.634-.073.171-.195.731-.853.926-1.146.195-.292.39-.244.658-.146.268.098 1.706.804 2.001.951.293.146.488.22.56.341.073.122.073.707-.171 1.394z"/></svg>
-      };
-      return icons[name] || null;
-    }
+    function RepApp() {
+      // حالة بيانات المندوب المسجل من صفحة index.html
+      const [currentRep, setCurrentRep] = useState(null);
 
-    // Error Boundary
-    class ErrorBoundary extends Component {
-      constructor(props) {
-        super(props);
-        this.state = { hasError: false };
-      }
-      static getDerivedStateFromError(error) {
-        return { hasError: true };
-      }
-      componentDidCatch(error, errorInfo) {
-        console.error("React Error Caught:", error, errorInfo);
-      }
-      render() {
-        if (this.state.hasError) {
-          return (
-            <div className="p-8 text-center bg-dark-900 text-white min-h-screen flex flex-col items-center justify-center space-y-4">
-              <Icon name="alert-triangle" className="w-12 h-12 text-gold mx-auto" />
-              <h2 className="text-xl font-bold">حدث خطأ في واجهة المعرض</h2>
-              <button onClick={() => window.location.reload()} className="gold-gradient text-dark-950 font-bold px-6 py-2.5 rounded-xl text-xs">
-                إعادة تنشيط الصفحة
-              </button>
-            </div>
-          );
-        }
-        return this.props.children;
-      }
-    }
+      // Active Tab (يفتح تلقائياً على إنشاء الفواتير)
+      const [activeTab, setActiveTab] = useState('newOrder'); // newOrder, myOrders, collections, clientStatement, repStatement
 
-    function ShowroomApp() {
-      const [activeTab, setActiveTab] = useState('pos'); // pos, stock, sales, reports
-
-      // Intro Splash State
-      const [showIntro, setShowIntro] = useState(true);
-
-      // Collections from DB
+      // Database Collections
+      const [salesReps, setSalesReps] = useState([]);
+      const [clients, setClients] = useState([]);
+      const [drivers, setDrivers] = useState([]); 
       const [products, setProducts] = useState([]);
-      const [showroomStock, setShowroomStock] = useState({});
-      const [showroomSales, setShowroomSales] = useState([]);
-
-      // POS Form State (تم إضافة clientPhone لإرسال الفواتير عبر الواتساب)
-      const [clientName, setClientName] = useState('');
-      const [clientPhone, setClientPhone] = useState('');
-      const [cartItems, setCartItems] = useState([]);
-      const [searchQuery, setSearchQuery] = useState('');
-      const [notes, setNotes] = useState('');
-
-      // Sales Filter States
-      const [salesSearchClient, setSalesSearchClient] = useState('');
-      const [salesStartDate, setSalesStartDate] = useState('');
-      const [salesEndDate, setSalesEndDate] = useState('');
-
-      // Active Modal & Print Mode
-      const [activeModal, setActiveModal] = useState(null); // printInvoiceModal, printSalesLogModal, editStockModal
-      const [selectedInvoice, setSelectedInvoice] = useState(null);
-      const [editingStockProduct, setEditingStockProduct] = useState(null);
-      const [stockInputValue, setStockInputValue] = useState('');
-      const [selectedPaperSize, setSelectedPaperSize] = useState('A4'); // A4 or A5
+      const [myOrders, setMyOrders] = useState([]);
+      const [collectionsList, setCollectionsList] = useState([]);
 
       // UI States
       const [toast, setToast] = useState(null);
+      const [clientSearch, setClientSearch] = useState('');
+      const [productSearch, setProductSearch] = useState('');
+      const [activeModal, setActiveModal] = useState(null); // printStatementModal, printRepSalesModal, printCollectionReceiptModal
+      const [lastSavedCollection, setLastSavedCollection] = useState(null);
 
-      // Report Month Filter
-      const [reportMonth, setReportMonth] = useState(new Date().toISOString().slice(0, 7));
+      // Form & Cart States للطلب جديد
+      const [selectedClientId, setSelectedClientId] = useState('');
+      const [selectedDriverId, setSelectedDriverId] = useState(''); 
+      const [cartItems, setCartItems] = useState([]);
+      const [selectedProductId, setSelectedProductId] = useState('');
+      const [unitType, setUnitType] = useState('ton');
+      const [quantity, setQuantity] = useState('1');
+      const [orderNotes, setOrderNotes] = useState('');
+
+      // حالة قسم التحصيلات والتوريدات النقدية
+      const [collectionClientId, setCollectionClientId] = useState('');
+      const [collectionSearchText, setCollectionSearchText] = useState('');
+      const [collectionAmount, setCollectionAmount] = useState('');
+      const [collectionDate, setCollectionDate] = useState(new Date().toISOString().slice(0, 10));
+      const [collectionMethod, setCollectionMethod] = useState('نقدي');
+      const [collectionNotes, setCollectionNotes] = useState('');
+
+      // كشف حساب العملاء والمندوبين
+      const [statementFilter, setStatementFilter] = useState({
+        clientId: '',
+        fromDate: new Date().toISOString().slice(0, 8) + '01',
+        toDate: new Date().toISOString().slice(0, 10)
+      });
 
       const showToast = (message, type = 'success') => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
       };
 
-      // دالة إرسال الفاتورة الرسمية عبر الواتساب مباشرة للعميل
-      const sendWhatsAppInvoice = (invoice) => {
-        if (!invoice) return;
-        let phoneNum = invoice.clientPhone || clientPhone;
-        
-        if (!phoneNum || !phoneNum.trim()) {
-          phoneNum = prompt('يرجى إدخال رقم واتساب العميل (مثال: 01012345678):');
-        }
-
-        if (!phoneNum || !phoneNum.trim()) {
-          showToast('لم يتم تقديم رقم هاتف لإرسال الفاتورة', 'error');
-          return;
-        }
-
-        const cleanPhone = phoneNum.replace(/[^0-9]/g, '');
-        const formattedPhone = cleanPhone.startsWith('0') ? '2' + cleanPhone : cleanPhone;
-
-        let itemsFormatted = '';
-        if (Array.isArray(invoice.items)) {
-          itemsFormatted = invoice.items.map(it => `• ${it.productName}: ${it.quantity} ${it.unitLabel} (${Number(it.total).toLocaleString()} ج.م)`).join('\n');
-        }
-
-        const message = `مرحباً بك في مصنع المجد للأعلاف 🌾\n` +
-                        `فاتورة بيع معرض رقم: #${invoice.invoiceNumber || String(invoice.id).slice(-6)}\n` +
-                        `العميل: ${invoice.clientName}\n` +
-                        `التاريخ: ${invoice.date} (${invoice.time})\n` +
-                        `---------------------------\n` +
-                        `تفاصيل الأصناف:\n${itemsFormatted}\n` +
-                        `---------------------------\n` +
-                        `إجمالي عدد الشكاير: ${invoice.totalBags || 0} شكارة\n` +
-                        `المبلغ الإجمالي المطلـوب: ${Number(invoice.totalAmount).toLocaleString()} جنيه مصري\n\n` +
-                        `نشكركم لتعاملكم مع مصنع المجد للأعلاف! 🌾`;
-
-        const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
-        window.open(whatsappUrl, '_blank');
-      };
-
-      // إخفاء الواجهة الترحيبية بعد 3 ثوانٍ
+      // 1. استقبال تسجيل الدخول التلقائي من الرابط أو localStorage
       useEffect(() => {
-        const timer = setTimeout(() => {
-          setShowIntro(false);
-        }, 3000);
-        return () => clearTimeout(timer);
+        const urlParams = new URLSearchParams(window.location.search);
+        const phoneParam = urlParams.get('phone') || localStorage.getItem('userPhone');
+        const savedRepData = localStorage.getItem('repData');
+
+        if (savedRepData) {
+          try {
+            setCurrentRep(JSON.parse(savedRepData));
+          } catch(e) {
+            console.error(e);
+          }
+        } else if (phoneParam) {
+          setCurrentRep({
+            id: 'rep_' + phoneParam,
+            name: `مندوب (${phoneParam})`,
+            phone: phoneParam,
+            region: 'مبيعات عامة'
+          });
+        }
       }, []);
 
-      // Sync Database
+      // 2. مزامنة قاعدة البيانات لحظياً مع Firebase
       useEffect(() => {
         const interval = setInterval(() => {
           if (window.rtdbMethods) {
             clearInterval(interval);
             const { ref, onValue, db } = window.rtdbMethods;
 
+            onValue(ref(db, 'salesReps'), snapshot => {
+              const data = snapshot.val();
+              const list = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : [];
+              setSalesReps(list);
+              
+              // تحديث بيانات المندوب الحالي من القائمة إن وجدت
+              const urlParams = new URLSearchParams(window.location.search);
+              const phoneParam = urlParams.get('phone') || localStorage.getItem('userPhone');
+              if (phoneParam && list.length > 0) {
+                const matched = list.find(r => r.phone && r.phone.trim() === phoneParam.trim());
+                if (matched) setCurrentRep(matched);
+              }
+            });
+
+            onValue(ref(db, 'clients'), snapshot => {
+              const data = snapshot.val();
+              setClients(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+            });
+
+            onValue(ref(db, 'drivers'), snapshot => {
+              const data = snapshot.val();
+              setDrivers(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
+            });
+
             onValue(ref(db, 'products'), snapshot => {
-              try {
-                const data = snapshot.val();
-                setProducts(data ? Object.keys(data).map(k => ({ id: k, ...(data[k] || {}) })) : []);
-              } catch (e) { console.error(e); }
+              const data = snapshot.val();
+              setProducts(data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : []);
             });
 
-            onValue(ref(db, 'showroomStock'), snapshot => {
-              try {
-                const data = snapshot.val();
-                setShowroomStock(data || {});
-              } catch (e) { console.error(e); }
+            onValue(ref(db, 'orders'), snapshot => {
+              const data = snapshot.val();
+              const list = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
+              setMyOrders(list);
             });
 
-            onValue(ref(db, 'showroomSales'), snapshot => {
-              try {
-                const data = snapshot.val();
-                setShowroomSales(data ? Object.keys(data).map(k => ({ id: k, ...(data[k] || {}) })).reverse() : []);
-              } catch (e) { console.error(e); }
+            onValue(ref(db, 'collections'), snapshot => {
+              const data = snapshot.val();
+              const list = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
+              setCollectionsList(list);
             });
           }
         }, 100);
       }, []);
 
-      // Low Stock Warning Items (<= 5 Bags)
-      const lowStockItems = useMemo(() => {
-        return products.filter(p => {
-          const stockObj = showroomStock[p.id];
-          const qty = stockObj ? parseInt(stockObj.bagsCount) || 0 : 0;
-          return qty <= 5;
-        });
-      }, [products, showroomStock]);
+      useEffect(() => {
+        if (window.lucide) window.lucide.createIcons();
+      }, [activeTab, activeModal, currentRep, cartItems, clientSearch, productSearch, collectionClientId, collectionSearchText]);
 
-      // 🔍 تصفية المنتجات عند البحث فقط (تأمين صريح يمنع أي انهيار في الصفحة)
-      const searchedProducts = useMemo(() => {
-        const query = (searchQuery || '').trim().toLowerCase();
-        if (!query) return [];
-        return products.filter(p => {
-          const prodName = String(p && p.name ? p.name : '').toLowerCase();
-          return prodName.includes(query);
-        });
-      }, [products, searchQuery]);
+      // 🔍 بحث مباشر للعملاء والمنتجات
+      const searchedClientsList = useMemo(() => {
+        const q = clientSearch.trim().toLowerCase();
+        if (!q) return [];
+        return clients.filter(c => c.name && c.name.toLowerCase().includes(q));
+      }, [clients, clientSearch]);
 
-      // 📜 فلترة مبيعات السجل (حسب العميل والتاريخ)
-      const filteredSalesLog = useMemo(() => {
-        return showroomSales.filter(sale => {
-          const matchesClient = !salesSearchClient.trim() || (sale.clientName && String(sale.clientName).toLowerCase().includes(salesSearchClient.toLowerCase().trim()));
-          const matchesStart = !salesStartDate || (sale.date && sale.date >= salesStartDate);
-          const matchesEnd = !salesEndDate || (sale.date && sale.date <= salesEndDate);
-          return matchesClient && matchesStart && matchesEnd;
-        });
-      }, [showroomSales, salesSearchClient, salesStartDate, salesEndDate]);
+      const searchedCollectionClientsList = useMemo(() => {
+        const q = collectionSearchText.trim().toLowerCase();
+        if (!q) return [];
+        return clients.filter(c => c.name && c.name.toLowerCase().includes(q));
+      }, [clients, collectionSearchText]);
 
-      // Cart Calculations
-      const cartTotalAmount = useMemo(() => {
-        return cartItems.reduce((sum, item) => sum + (parseFloat(item.totalPrice) || 0), 0);
-      }, [cartItems]);
+      // 💰 حساب مديونية العميل الحالية من الفواتير المقبولة رسمياً من المصنع ناقص التحصيلات
+      const selectedClientAccountInfo = useMemo(() => {
+        if (!collectionClientId) return { totalDebits: 0, totalCredits: 0, currentDebt: 0 };
 
-      const cartTotalBags = useMemo(() => {
-        return cartItems.reduce((sum, item) => sum + (parseInt(item.quantityBags) || 0), 0);
-      }, [cartItems]);
+        // الفواتير المقبولة فقط من المصنع تضاف كمديونيات آجل
+        const approvedOrders = myOrders.filter(o => o.clientId === collectionClientId && o.status === 'مقبول');
+        const totalDebits = approvedOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
 
-      // Add Product to Invoice Cart
-      const handleAddToCart = (product) => {
-        const existingIndex = cartItems.findIndex(item => item.productId === product.id);
-        const stockQty = showroomStock[product.id] ? parseInt(showroomStock[product.id].bagsCount) || 0 : 0;
+        // المبالغ المسددة والمحصلة
+        const clientCollections = collectionsList.filter(c => c.clientId === collectionClientId);
+        const totalCredits = clientCollections.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
 
-        if (stockQty <= 0) {
-          showToast(`نفذ رصيد صنف (${product.name}) في مخزن المعرض!`, 'error');
+        const currentDebt = totalDebits - totalCredits;
+
+        return { totalDebits, totalCredits, currentDebt };
+      }, [collectionClientId, myOrders, collectionsList]);
+
+      // إضافة منتج لسلة الطلب
+      const handleAddToCart = (productParam) => {
+        const product = productParam || products.find(p => p.id === selectedProductId);
+        if (!product) {
+          showToast('يرجى اختيار صنف العلف أولاً', 'error');
           return;
         }
 
-        const pricePerBag = parseFloat(product.pricePerBag) || (((parseFloat(product.pricePerTon) || 0) * (parseFloat(product.bagWeightKg) || 25)) / 1000);
+        const qty = parseFloat(quantity) || 1;
+        let price = 0;
+        let weightTons = 0;
 
-        if (existingIndex > -1) {
-          const updated = [...cartItems];
-          const currentQty = updated[existingIndex].quantityBags;
-          if (currentQty + 1 > stockQty) {
-            showToast(`لا يمكن إضافة أكثر من المتاح بالمخزن (${stockQty} شكارة)`, 'error');
-            return;
-          }
-          updated[existingIndex].quantityBags += 1;
-          updated[existingIndex].totalPrice = updated[existingIndex].quantityBags * pricePerBag;
-          setCartItems(updated);
+        if (unitType === 'ton') {
+          price = (parseFloat(product.pricePerTon) || 0) * qty;
+          weightTons = qty;
         } else {
-          setCartItems([...cartItems, {
-            productId: product.id,
-            productName: product.name,
-            bagWeightKg: product.bagWeightKg || 25,
-            pricePerBag: pricePerBag,
-            quantityBags: 1,
-            unitLabel: 'شيكارة',
-            totalPrice: pricePerBag
-          }]);
+          price = (parseFloat(product.pricePerBag) || 0) * qty;
+          weightTons = (qty * (parseFloat(product.bagWeightKg) || 25)) / 1000;
         }
 
-        showToast(`تم إدراج (${product.name}) بالفاتورة`);
+        const newItem = {
+          id: Date.now().toString(),
+          productId: product.id,
+          productName: product.name,
+          unitType,
+          unitLabel: unitType === 'ton' ? 'طن' : `شيكارة (${product.bagWeightKg || 25} كجم)`,
+          quantity: qty,
+          price,
+          weightTons
+        };
+
+        setCartItems([...cartItems, newItem]);
+        setSelectedProductId('');
+        setQuantity('1');
+        showToast(`تم إدراج (${product.name}) بالسلة بنجاح`);
       };
 
-      const handleUpdateCartQty = (index, newQty) => {
-        const qty = parseInt(newQty) || 1;
-        const item = cartItems[index];
-        const stockQty = showroomStock[item.productId] ? parseInt(showroomStock[item.productId].bagsCount) || 0 : 0;
+      const removeFromCart = (itemId) => {
+        setCartItems(cartItems.filter(item => item.id !== itemId));
+      };
 
-        if (qty > stockQty) {
-          showToast(`الكمية المطلوبة أقصاها الرصيد المتوفر (${stockQty} شكارة)`, 'error');
+      const totalOrderAmount = useMemo(() => cartItems.reduce((a, b) => a + b.price, 0), [cartItems]);
+      const totalOrderWeightTons = useMemo(() => cartItems.reduce((a, b) => a + b.weightTons, 0), [cartItems]);
+
+      // رفع الطلب للمصنع
+      const handleSubmitOrder = (e) => {
+        e.preventDefault();
+        if (!selectedClientId) {
+          showToast('يرجى اختيار العميل أولاً', 'error');
           return;
         }
-
-        const updated = [...cartItems];
-        updated[index].quantityBags = qty;
-        updated[index].totalPrice = qty * item.pricePerBag;
-        setCartItems(updated);
-      };
-
-      const handleRemoveCartItem = (index) => {
-        setCartItems(cartItems.filter((_, i) => i !== index));
-      };
-
-      const handleCreateInvoice = (e) => {
-        e.preventDefault();
-        if (!clientName.trim()) {
-          showToast('يرجى إدخال اسم العميل بشكل أساسي!', 'error');
+        if (!selectedDriverId) {
+          showToast('يرجى تحديد السائق المكلف بالتوصيل', 'error');
           return;
         }
         if (cartItems.length === 0) {
-          showToast('يرجى إضافة منتج واحد على الأقل للفاتورة!', 'error');
+          showToast('السلة فارغة، اضف منتجاً واحداً على الأقل للطلب', 'error');
           return;
         }
 
-        const { ref, push, set, update, db } = window.rtdbMethods;
-        const today = new Date().toISOString().slice(0, 10);
-        const timeNow = new Date().toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-        const invoiceNum = Math.floor(100000 + Math.random() * 900000);
+        const { ref, push, set, db } = window.rtdbMethods;
+        const client = clients.find(c => c.id === selectedClientId);
+        const driver = drivers.find(d => d.id === selectedDriverId);
 
-        const preparedItems = cartItems.map(item => ({
-          productId: item.productId,
-          productName: item.productName,
-          quantity: item.quantityBags,
-          unitLabel: 'شيكارة',
-          unitPrice: item.pricePerBag,
-          total: item.totalPrice,
-          weightKg: item.bagWeightKg * item.quantityBags
-        }));
-
-        const newSaleRef = push(ref(db, 'showroomSales'));
-        const invoiceData = {
-          invoiceNumber: invoiceNum,
-          clientName: clientName.trim(),
-          clientPhone: clientPhone.trim(),
-          date: today,
-          time: timeNow,
-          items: preparedItems,
-          totalAmount: cartTotalAmount,
-          totalBags: cartTotalBags,
-          notes: notes,
+        const newOrder = {
+          repId: currentRep ? currentRep.id : 'rep_direct',
+          repName: currentRep ? currentRep.name : 'مندوب المبيعات',
+          repPhone: currentRep ? currentRep.phone || '' : '',
+          clientId: selectedClientId,
+          clientName: client ? client.name : 'عميل',
+          clientAddress: client ? client.address || '' : '',
+          driverId: selectedDriverId,
+          driverName: driver ? driver.name : 'سائق',
+          driverTruck: driver ? driver.truckNumber || '' : '',
+          region: client ? client.region || (currentRep ? currentRep.region : '') : '',
+          items: cartItems,
+          cargoType: cartItems.map(i => i.productName).join(' + '),
+          quantity: totalOrderWeightTons.toFixed(2),
+          totalAmount: totalOrderAmount.toFixed(2),
+          tripsCount: 1,
+          notes: orderNotes,
+          status: 'قيد الانتظار', // عند قبول الإدارة تصبح 'مقبول' وتدخل تلقائياً في مديونية العميل الآجل
+          date: new Date().toISOString().slice(0, 10),
           createdAt: new Date().toISOString()
         };
 
-        set(newSaleRef, invoiceData).then(() => {
-          cartItems.forEach(item => {
-            const currentStock = showroomStock[item.productId] ? parseInt(showroomStock[item.productId].bagsCount) || 0 : 0;
-            const updatedBags = Math.max(0, currentStock - item.quantityBags);
-
-            update(ref(db, `showroomStock/${item.productId}`), {
-              bagsCount: updatedBags,
-              productName: item.productName,
-              updatedAt: new Date().toISOString()
-            });
-          });
-
-          push(ref(db, 'logs'), {
-            action: 'SHOWROOM_SALE',
-            description: `فاتورة معرض جديدة للعميل: ${clientName} بمبلغ ${cartTotalAmount} ج.م`,
-            timestamp: new Date().toISOString()
-          });
-
-          setSelectedInvoice({ id: newSaleRef.key, ...invoiceData });
-          setActiveModal('printInvoiceModal');
-
-          setClientName('');
-          setClientPhone('');
+        const newRef = push(ref(db, 'orders'));
+        set(newRef, newOrder).then(() => {
+          showToast('تم رفع الطلب للمصنع بنجاح!');
           setCartItems([]);
-          setNotes('');
-          setSearchQuery('');
-          showToast('تمت الفاتورة وخصم الكمية من مخزون المعرض بنجاح');
+          setSelectedClientId('');
+          setSelectedDriverId('');
+          setOrderNotes('');
+          setClientSearch('');
+          setActiveTab('myOrders');
         });
       };
 
-      const handleSaveStockEdit = (e) => {
+      // 💵 تسجيل التوريد النقدي وتخفيض المديونية لتسمع في المصنع والمندوب فوراً
+      const handleSaveCollection = (e) => {
         e.preventDefault();
-        if (!editingStockProduct || !window.rtdbMethods) return;
-        const { ref, update, db } = window.rtdbMethods;
-        const newBags = parseInt(stockInputValue) || 0;
+        if (!collectionClientId) {
+          showToast('يرجى اختيار العميل المطلوب التوريد لحسابه', 'error');
+          return;
+        }
+        const amt = parseFloat(collectionAmount);
+        if (!amt || amt <= 0) {
+          showToast('يرجى إدخال مبلغ تحصيل صحيح أكبر من صفر', 'error');
+          return;
+        }
 
-        update(ref(db, `showroomStock/${editingStockProduct.id}`), {
-          bagsCount: newBags,
-          productName: editingStockProduct.name,
-          updatedAt: new Date().toISOString()
-        }).then(() => {
-          showToast(`تم تعديل مخزون المعرض للمنتج (${editingStockProduct.name}) إلى ${newBags} شكارة`);
-          setActiveModal(null);
-          setEditingStockProduct(null);
+        const { ref, push, set, db } = window.rtdbMethods;
+        const clientObj = clients.find(c => c.id === collectionClientId);
+        const oldDebt = selectedClientAccountInfo.currentDebt;
+        const remainingDebt = oldDebt - amt;
+
+        const newCollection = {
+          repId: currentRep ? currentRep.id : 'rep_direct',
+          repName: currentRep ? currentRep.name : 'مندوب المبيعات',
+          clientId: collectionClientId,
+          clientName: clientObj ? clientObj.name : 'عميل',
+          amount: amt,
+          previousDebt: oldDebt,
+          remainingDebt: remainingDebt,
+          date: collectionDate,
+          method: collectionMethod,
+          notes: collectionNotes,
+          createdAt: new Date().toISOString()
+        };
+
+        const colRef = push(ref(db, 'collections'));
+        set(colRef, newCollection).then(() => {
+          setLastSavedCollection(newCollection);
+          showToast(`تم تنزيل ${amt.toLocaleString()} ج.م من حساب (${clientObj ? clientObj.name : ''}) بنجاح`);
+          setCollectionAmount('');
+          setCollectionNotes('');
+          setActiveModal('printCollectionReceiptModal');
         });
       };
 
-      const monthlyReportSales = useMemo(() => {
-        return showroomSales.filter(s => s.date && s.date.slice(0, 7) === reportMonth);
-      }, [showroomSales, reportMonth]);
+      // طلبات وتحصيلات المندوب الحالي
+      const repOrders = useMemo(() => {
+        if (!currentRep) return [];
+        return myOrders.filter(o => o.repId === currentRep.id || o.repPhone === currentRep.phone);
+      }, [myOrders, currentRep]);
+
+      const repCollections = useMemo(() => {
+        if (!currentRep) return [];
+        return collectionsList.filter(c => c.repId === currentRep.id || c.repName === currentRep.name);
+      }, [collectionsList, currentRep]);
+
+      // تصفية كشف حساب العملاء
+      const statementOrders = useMemo(() => {
+        return myOrders.filter(o => {
+          const matchClient = statementFilter.clientId ? o.clientId === statementFilter.clientId : true;
+          const matchFrom = statementFilter.fromDate ? o.date >= statementFilter.fromDate : true;
+          const matchTo = statementFilter.toDate ? o.date <= statementFilter.toDate : true;
+          return matchClient && matchFrom && matchTo;
+        });
+      }, [myOrders, statementFilter]);
+
+      const statementCollections = useMemo(() => {
+        return collectionsList.filter(c => {
+          const matchClient = statementFilter.clientId ? c.clientId === statementFilter.clientId : true;
+          const matchFrom = statementFilter.fromDate ? c.date >= statementFilter.fromDate : true;
+          const matchTo = statementFilter.toDate ? c.date <= statementFilter.toDate : true;
+          return matchClient && matchFrom && matchTo;
+        });
+      }, [collectionsList, statementFilter]);
+
+      // الحركة المركبة لكشف الحساب
+      const clientLedgerCombined = useMemo(() => {
+        const combined = [];
+        statementOrders.forEach(o => {
+          combined.push({
+            id: o.id,
+            date: o.date,
+            type: 'مبيعات أعلاف',
+            description: `فاتورة حمولة (${o.cargoType || 'علف'}) - سائق: ${o.driverName || 'سائق'}`,
+            debit: parseFloat(o.totalAmount) || 0,
+            credit: 0,
+            status: o.status || 'قيد الانتظار'
+          });
+        });
+        statementCollections.forEach(c => {
+          combined.push({
+            id: c.id,
+            date: c.date,
+            type: 'تحصيل نقدية',
+            description: `توريد وسداد نقدي (${c.method || 'نقدي'}) - ${c.notes || 'سداد جزء'}`,
+            debit: 0,
+            credit: parseFloat(c.amount) || 0,
+            status: 'مقبول'
+          });
+        });
+        return combined.sort((a, b) => new Date(a.date) - new Date(b.date));
+      }, [statementOrders, statementCollections]);
+
+      // إذا لم تتوفر بيانات الدخول تلقائياً
+      if (!currentRep) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4 bg-dark-950 text-white">
+            <div className="glass-card p-8 rounded-3xl text-center space-y-4 max-w-md w-full gold-glow">
+              <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto border border-gold p-1" />
+              <h2 className="text-xl font-bold">جاري التعرف على حساب المندوب...</h2>
+              <p className="text-xs text-gray-400">يرجى تسجيل الدخول من صفحة الدخول الموحدة الرئيسية</p>
+              <a href="index.html" className="inline-block gold-gradient text-dark-950 font-bold px-6 py-2.5 rounded-xl text-xs">
+                الانتقال لصفحة الدخول الرئيسية
+              </a>
+            </div>
+          </div>
+        );
+      }
 
       return (
-        <div className="min-h-screen flex flex-col bg-dark-900 text-white relative pb-20 md:pb-6">
+        <div className="min-h-screen flex flex-col bg-dark-900 text-white">
           
-          {/* 🐔 1. شاشة الانترو - الفرخة المتهزة فوق الرسالة الترحيبية */}
-          {showIntro && (
-            <div className="fixed inset-0 z-50 bg-dark-950 flex flex-col items-center justify-center p-4">
-              <div className="text-center space-y-4">
-                <div className="inline-block text-8xl md:text-9xl chicken-wiggler drop-shadow-[0_10px_25px_rgba(212,175,55,0.5)]">
-                  🐓
-                </div>
-                <h2 className="text-2xl md:text-4xl font-black gold-text">مرحباً بك في معرض مصنع المجد للأعلاف</h2>
-                <p className="text-xs md:text-sm text-gray-400">جاري فتح الواجهة الرئيسية...</p>
-              </div>
-            </div>
-          )}
-
-          {/* Toast */}
+          {/* Toast Notification */}
           {toast && (
-            <div className={`fixed bottom-20 md:bottom-6 right-4 left-4 md:left-auto z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center justify-between md:justify-start gap-2 border ${toast.type === 'error' ? 'bg-red-950 text-red-300 border-red-800' : 'bg-dark-800 text-gold border-gold/40'}`}>
-              <div className="flex items-center gap-2">
-                <Icon name={toast.type === 'error' ? 'alert-triangle' : 'check-circle'} className="w-5 h-5" />
-                {toast.message}
-              </div>
+            <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-950 text-red-300 border-red-800' : 'bg-dark-800 text-gold border-gold/40'}`}>
+              <i data-lucide={toast.type === 'error' ? 'alert-triangle' : 'check-circle'} className="w-5 h-5"></i>
+              {toast.message}
             </div>
           )}
 
@@ -563,370 +536,263 @@
                 <img src={LOGO_URL} alt="Logo" className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-gold p-0.5 bg-dark-900 object-contain" />
                 <div>
                   <h1 className="font-bold text-sm md:text-base">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
-                  <p className="text-[9px] md:text-[10px] text-gray-400">صفحة مبيعات المعرض والمخزون المباشر</p>
+                  <p className="text-[10px] text-gold font-bold">حساب المندوب: {currentRep.name} ({currentRep.phone})</p>
                 </div>
               </div>
+
+              <a href="index.html" className="md:hidden text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-lg border border-red-500/20">
+                خروج
+              </a>
             </div>
 
-            <nav className="hidden md:flex items-center gap-2 bg-dark-800/80 p-1.5 rounded-2xl border border-dark-700">
+            <nav className="flex flex-wrap items-center justify-center gap-1.5 md:gap-2 bg-dark-800/80 p-1.5 rounded-2xl border border-dark-700 w-full md:w-auto">
               {[
-                { id: 'pos', label: 'إنشاء فاتورة', icon: 'shopping-cart' },
-                { id: 'stock', label: 'المخزون', icon: 'boxes' },
-                { id: 'sales', label: 'سجل المبيعات', icon: 'receipt' },
-                { id: 'reports', label: 'التقارير', icon: 'bar-chart-2' }
+                { id: 'newOrder', label: 'إنشاء طلب', icon: 'plus-circle' },
+                { id: 'myOrders', label: 'سجل مبيعاتي', icon: 'shopping-cart' },
+                { id: 'collections', label: 'قسم التحصيلات', icon: 'dollar-sign' },
+                { id: 'clientStatement', label: 'كشف حساب العملاء', icon: 'file-text' },
+                { id: 'repStatement', label: 'سجل العمال والمندوبين', icon: 'user-check' }
               ].map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${activeTab === tab.id ? 'gold-gradient text-dark-950 shadow-md' : 'text-gray-400 hover:text-white'}`}
+                  className={`px-3 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ${activeTab === tab.id ? 'gold-gradient text-dark-950 shadow-md' : 'text-gray-400 hover:text-white'}`}
                 >
-                  <Icon name={tab.icon} className="w-4 h-4" />
+                  <i data-lucide={tab.icon} className="w-4 h-4"></i>
                   {tab.label}
-                  {tab.id === 'stock' && lowStockItems.length > 0 && (
-                    <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                  )}
                 </button>
               ))}
             </nav>
+
+            <a href="index.html" className="hidden md:flex bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-2 rounded-xl text-xs items-center gap-1.5">
+              <i data-lucide="log-out" className="w-4 h-4"></i> خروج
+            </a>
           </header>
 
-          <main className="flex-1 max-w-7xl w-full mx-auto px-3 md:px-4 py-4 md:py-6 space-y-4 md:space-y-6">
+          {/* Main Container */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-3 md:px-4 py-4 md:py-8 space-y-6">
 
-            {/* 🚨 تنبيه النواقص */}
-            {lowStockItems.length > 0 && (
-              <div className="bg-red-950/80 border border-red-600/60 p-3 md:p-4 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xl animate-pulse">
-                <div className="flex items-center gap-3">
-                  <Icon name="alert-triangle" className="w-6 h-6 text-red-400 shrink-0" />
-                  <div>
-                    <h4 className="font-bold text-xs md:text-sm text-red-200">تنبيه بالنواقص بالمخزن!</h4>
-                    <p className="text-[11px] md:text-xs text-red-300">
-                      أصناف رصيدها 5 أو أقل: {lowStockItems.map(i => i.name).join('، ')}
-                    </p>
-                  </div>
-                </div>
-                <button onClick={() => setActiveTab('stock')} className="w-full sm:w-auto bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-xl text-xs shrink-0 text-center">
-                  تعديل الرصيد
-                </button>
-              </div>
-            )}
-
-            {/* TAB: POS (إنشاء الفاتورة والبحث والنتائج المباشرة) */}
-            {activeTab === 'pos' && (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 md:gap-6">
+            {/* TAB 1: NEW ORDER FORM (فتح تلقائي وإنشاء الفواتير) */}
+            {activeTab === 'newOrder' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
-                {/* 🔍 قسم البحث للظهور المباشر أسفل الخانة عند البحث فقط */}
-                <div className="lg:col-span-7 space-y-4">
-                  <div className="glass-card p-3 md:p-4 rounded-2xl flex items-center gap-3 border border-gold/40 shadow-lg">
-                    <Icon name="search" className="w-5 h-5 text-gold shrink-0" />
-                    <input
-                      type="text"
-                      placeholder="ابحث باسم صنف العلف للظهور والإضافة..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="bg-transparent border-none text-white text-xs md:text-sm w-full focus:outline-none placeholder:text-gray-500"
-                    />
-                    {searchQuery && (
-                      <button onClick={() => setSearchQuery('')} className="text-gray-400 hover:text-white text-xs">
-                        <Icon name="x" className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* 📜 المنتجات التي تبحث عنها فقط تعرض أسفل حقل البحث */}
-                  {searchQuery.trim().length > 0 ? (
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-bold text-gold flex items-center gap-1">
-                        <Icon name="filter" className="w-3.5 h-3.5" />
-                        نتائج البحث عن ({searchQuery}):
-                      </h4>
-                      {searchedProducts.length === 0 ? (
-                        <div className="glass-card p-6 text-center text-xs text-gray-400 rounded-2xl">
-                          لا يوجد منتج مطابق لهذا الاسم
-                        </div>
-                      ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {searchedProducts.map(prod => {
-                            const stockObj = showroomStock[prod.id];
-                            const bagsCount = stockObj ? parseInt(stockObj.bagsCount) || 0 : 0;
-                            const pricePerBag = parseFloat(prod.pricePerBag) || (((parseFloat(prod.pricePerTon) || 0) * (parseFloat(prod.bagWeightKg) || 25)) / 1000);
-                            const isLow = bagsCount <= 5;
-
-                            return (
-                              <div key={prod.id} className={`glass-card p-3.5 rounded-2xl border flex flex-col justify-between space-y-3 ${isLow ? 'border-red-500/50 bg-red-950/10' : 'border-dark-700'}`}>
-                                <div>
-                                  <div className="flex justify-between items-start">
-                                    <h4 className="font-bold text-xs md:text-sm text-white">{prod.name}</h4>
-                                    <span className="text-[9px] text-gray-400 bg-dark-950 px-2 py-0.5 rounded-lg">وزن {prod.bagWeightKg || 25}كجم</span>
-                                  </div>
-                                  <p className="text-xs text-gold font-bold mt-1">سعر الشيكارة: {pricePerBag.toLocaleString()} ج.م</p>
-                                </div>
-
-                                <div className="flex justify-between items-center pt-2 border-t border-dark-700/60">
-                                  <span className={`text-[11px] font-bold ${isLow ? 'text-red-400' : 'text-green-400'}`}>
-                                    المتوفر: {bagsCount} شكارة
-                                  </span>
-                                  <button
-                                    onClick={() => handleAddToCart(prod)}
-                                    disabled={bagsCount <= 0}
-                                    className={`px-3 py-1.5 rounded-xl text-[11px] font-bold flex items-center gap-1 ${bagsCount > 0 ? 'gold-gradient text-dark-950 hover:brightness-110' : 'bg-gray-800 text-gray-500 cursor-not-allowed'}`}
-                                  >
-                                    <Icon name="plus" className="w-3.5 h-3.5" /> إضافة للفاتورة
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="glass-card p-8 text-center text-xs text-gray-400 rounded-2xl space-y-2 border border-dashed border-dark-700">
-                      <Icon name="search" className="w-8 h-8 text-gold/40 mx-auto" />
-                      <p>اكتب اسم المنتجات في خانة البحث أعلاه لعرض الأصناف وإضافتها للفاتورة</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* 🛒 قسم الفاتورة الحالية والعميل */}
-                <div className="lg:col-span-5 space-y-4">
-                  <form onSubmit={handleCreateInvoice} className="glass-card p-4 md:p-6 rounded-3xl border border-dark-700 space-y-4 gold-glow">
-                    <div className="flex items-center gap-3 border-b border-dark-700 pb-3">
-                      <img src={LOGO_URL} alt="Logo" className="w-7 h-7 rounded-full border border-gold object-contain" />
-                      <h3 className="font-bold text-sm md:text-base text-gold">فاتورة مبيعات المعرض</h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-3">
-                      <div>
-                        <label className="text-xs text-gray-300 block mb-1 font-bold">اسم العميل <span className="text-red-400">*</span></label>
+                <div className="lg:col-span-7 space-y-6">
+                  
+                  {/* Step 1: Select Client & Driver */}
+                  <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
+                    <h3 className="text-sm md:text-base font-bold text-gold flex items-center gap-2">
+                      <i data-lucide="user-check" className="w-5 h-5"></i>
+                      ١. تحديد العميل والسائق المكلف
+                    </h3>
+                    
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-300 block font-bold">ابحث باسم العميل للظهور المباشر:</label>
+                      <div className="relative">
                         <input
                           type="text"
-                          required
-                          placeholder="اكتب اسم العميل بالكامل..."
-                          value={clientName}
-                          onChange={e => setClientName(e.target.value)}
-                          className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 md:p-3 text-xs text-white outline-none focus:border-gold"
+                          placeholder="اكتب اسم العميل لظهوره مباشرة هنا..."
+                          value={clientSearch}
+                          onChange={e => setClientSearch(e.target.value)}
+                          className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold"
                         />
+                        {clientSearch && (
+                          <button onClick={() => setClientSearch('')} className="absolute left-3 top-3 text-gray-400 hover:text-white">
+                            <i data-lucide="x" className="w-4 h-4"></i>
+                          </button>
+                        )}
+                      </div>
+
+                      {clientSearch.trim().length > 0 && (
+                        <div className="bg-dark-950 border border-gold/40 rounded-2xl p-2 max-h-48 overflow-y-auto space-y-1">
+                          {searchedClientsList.length === 0 ? (
+                            <p className="text-xs text-gray-500 p-2 text-center">لا يوجد عميل بهذا الاسم</p>
+                          ) : (
+                            searchedClientsList.map(c => (
+                              <div
+                                key={c.id}
+                                onClick={() => {
+                                  setSelectedClientId(c.id);
+                                  setClientSearch(c.name);
+                                }}
+                                className={`p-2.5 rounded-xl cursor-pointer text-xs flex justify-between items-center ${selectedClientId === c.id ? 'bg-gold text-dark-950 font-bold' : 'hover:bg-dark-800 text-white'}`}
+                              >
+                                <span>{c.name}</span>
+                                <span className="text-[10px] opacity-80">{c.address || 'العنوان غير محدد'}</span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      )}
+
+                      <select
+                        value={selectedClientId}
+                        onChange={e => {
+                          setSelectedClientId(e.target.value);
+                          const obj = clients.find(c => c.id === e.target.value);
+                          if (obj) setClientSearch(obj.name);
+                        }}
+                        className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none"
+                      >
+                        <option value="">-- أو اختر العميل من القائمة مباشرة --</option>
+                        {clients.map(c => (
+                          <option key={c.id} value={c.id}>{c.name} - ({c.address || 'عنوان غير محدد'})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="space-y-2 pt-3 border-t border-dark-700">
+                      <label className="text-xs text-gray-300 block font-bold">تحديد السائق المكلف بالتوصيل:</label>
+                      <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                        <option value="">-- اختر السائق المكلف بالسيارة --</option>
+                        {drivers.map(d => (
+                          <option key={d.id} value={d.id}>{d.name} (سيارة: {d.truckNumber || 'عامة'})</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Step 2: Select Products */}
+                  <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
+                    <h3 className="text-sm md:text-base font-bold text-gold flex items-center gap-2">
+                      <i data-lucide="package" className="w-5 h-5"></i>
+                      ٢. تحديد المنتج والكمية (بالطن / بالشيكارة) للإضافة
+                    </h3>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="md:col-span-1">
+                        <label className="text-xs text-gray-400 block mb-1 font-bold">اختر صنف العلف</label>
+                        <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none focus:border-gold">
+                          <option value="">-- اختر الصنف --</option>
+                          {products.map(p => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </select>
                       </div>
 
                       <div>
-                        <label className="text-xs text-gray-300 block mb-1 font-bold">رقم هاتف العميل (لإرسال الفاتورة للواتساب)</label>
-                        <input
-                          type="tel"
-                          placeholder="مثال: 01012345678"
-                          value={clientPhone}
-                          onChange={e => setClientPhone(e.target.value)}
-                          className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-xs text-white outline-none focus:border-gold"
-                        />
+                        <label className="text-xs text-gray-400 block mb-1 font-bold">وحدة الكمية</label>
+                        <select value={unitType} onChange={e => setUnitType(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none focus:border-gold">
+                          <option value="ton">بالطن</option>
+                          <option value="bag">بالشيكارة</option>
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1 font-bold">الكمية المطلوبة</label>
+                        <input type="number" step="0.1" min="0.1" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold" />
                       </div>
                     </div>
 
-                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                      <label className="text-xs text-gray-400 block">الأصناف المضافة بالفاتورة:</label>
+                    <button
+                      type="button"
+                      onClick={() => handleAddToCart(null)}
+                      className="w-full bg-dark-800 border border-gold/50 hover:bg-gold hover:text-dark-950 text-gold font-black p-3.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow"
+                    >
+                      <i data-lucide="plus" className="w-4 h-4"></i> إدراج المنتج المختار في السلة
+                    </button>
+                  </div>
+                </div>
+
+                {/* Right Side: Order Cart Summary */}
+                <div className="lg:col-span-5 glass-card p-4 md:p-6 rounded-3xl space-y-6 flex flex-col justify-between gold-glow">
+                  <div className="space-y-4">
+                    <h3 className="text-base font-bold text-white border-b border-dark-700 pb-3 flex justify-between items-center">
+                      <span className="text-gold">سلة الطلب والمجموع</span>
+                      <span className="text-xs text-gray-300 font-normal">{cartItems.length} أصناف</span>
+                    </h3>
+
+                    <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
                       {cartItems.length === 0 ? (
-                        <p className="text-xs text-gray-500 text-center py-4 bg-dark-950 rounded-xl">لم تقم بإضافة منتجات بعد</p>
+                        <p className="text-xs text-gray-500 text-center py-8 bg-dark-950 rounded-2xl">لم يتم إضافة أي منتج للسلة حتى الآن</p>
                       ) : (
-                        cartItems.map((item, idx) => (
-                          <div key={idx} className="bg-dark-950 p-2.5 rounded-xl border border-dark-700 flex justify-between items-center text-xs">
-                            <div className="max-w-[45%]">
-                              <strong className="text-white block truncate">{item.productName}</strong>
-                              <span className="text-gray-400 text-[10px]">{item.pricePerBag} ج.م</span>
+                        cartItems.map(item => (
+                          <div key={item.id} className="bg-dark-950 p-3 rounded-2xl flex justify-between items-center text-xs border border-dark-700">
+                            <div>
+                              <h5 className="font-bold text-white">{item.productName}</h5>
+                              <p className="text-[10px] text-gray-400 mt-0.5">
+                                {item.quantity} {item.unitLabel} | <span className="text-gold font-bold">{item.price.toLocaleString()} ج.م</span>
+                              </p>
                             </div>
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                type="number"
-                                min="1"
-                                value={item.quantityBags}
-                                onChange={e => handleUpdateCartQty(idx, e.target.value)}
-                                className="w-12 bg-dark-800 border border-dark-700 rounded-lg p-1 text-center text-gold font-bold text-xs"
-                              />
-                              <span className="font-bold text-white text-[11px] min-w-[50px] text-left">{item.totalPrice.toLocaleString()} ج.م</span>
-                              <button type="button" onClick={() => handleRemoveCartItem(idx)} className="text-red-400 p-1 hover:text-red-300">
-                                <Icon name="trash" className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
+                            <button onClick={() => removeFromCart(item.id)} className="text-red-400 hover:text-red-300 p-1">
+                              <i data-lucide="trash-2" className="w-4 h-4"></i>
+                            </button>
                           </div>
                         ))
                       )}
                     </div>
 
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">ملاحظات إضافية</label>
-                      <input
-                        type="text"
-                        placeholder="اختياري..."
-                        value={notes}
-                        onChange={e => setNotes(e.target.value)}
-                        className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none"
-                      />
+                      <label className="text-xs text-gray-400 block mb-1">ملاحظات خاصة بالتوصيل (اختياري)</label>
+                      <textarea rows="2" value={orderNotes} onChange={e => setOrderNotes(e.target.value)} placeholder="أي تعليمات خاصة بالطلب أو التفريغ..." className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white"></textarea>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 border-t border-dark-700 pt-4">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-400">إجمالي وزن النقلة:</span>
+                      <span className="font-bold text-white">{totalOrderWeightTons.toFixed(2)} طن</span>
+                    </div>
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-300 font-bold">المبلغ الإجمالي المطلـوب:</span>
+                      <span className="font-black text-gold text-base">{totalOrderAmount.toLocaleString()} ج.م</span>
                     </div>
 
-                    <div className="bg-dark-950 p-3.5 rounded-2xl border border-gold/30 space-y-1.5 text-xs">
-                      <div className="flex justify-between text-gray-300">
-                        <span>إجمالي الشكاير:</span>
-                        <strong className="text-white font-black">{cartTotalBags} شكارة</strong>
-                      </div>
-                      <div className="flex justify-between text-sm md:text-base font-black border-t border-dark-700 pt-2">
-                        <span className="gold-text">المبلغ الإجمالي:</span>
-                        <span className="text-gold">{cartTotalAmount.toLocaleString()} ج.م</span>
-                      </div>
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="w-full gold-gradient text-dark-950 font-black py-3 rounded-xl hover:brightness-110 transition-all text-xs md:text-sm flex items-center justify-center gap-2 shadow-lg"
-                    >
-                      <Icon name="printer" className="w-4 h-4" /> تأكيد الفاتورة والطباعة
+                    <button onClick={handleSubmitOrder} className="w-full gold-gradient text-dark-950 font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 hover:brightness-110 shadow-lg">
+                      <i data-lucide="send" className="w-4 h-4"></i> رفع الطلب للمصنع (تسجيل المديونية آجل)
                     </button>
-                  </form>
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* TAB: STOCK CONTROL */}
-            {activeTab === 'stock' && (
-              <div className="space-y-4 md:space-y-6">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <h2 className="text-base md:text-xl font-bold flex items-center gap-2">
-                    <Icon name="boxes" className="w-5 h-5 text-gold" />
-                    التحكم في مخزون شيكارات المعرض
-                  </h2>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {products.map(prod => {
-                    const stockObj = showroomStock[prod.id];
-                    const bagsCount = stockObj ? parseInt(stockObj.bagsCount) || 0 : 0;
-                    const isLow = bagsCount <= 5;
-
-                    return (
-                      <div key={prod.id} className={`glass-card p-4 md:p-5 rounded-3xl border flex flex-col justify-between space-y-3 ${isLow ? 'border-red-500/80 bg-red-950/20' : 'border-dark-700'}`}>
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-bold text-sm md:text-base text-white">{prod.name}</h3>
-                            <p className="text-xs text-gray-400">الوزن: {prod.bagWeightKg || 25} كجم</p>
-                          </div>
-                          {isLow && (
-                            <span className="px-2 py-0.5 rounded-full text-[9px] font-bold bg-red-500/20 text-red-400 border border-red-500/40 animate-pulse">
-                              رصيد حرج!
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="bg-dark-950 p-3 rounded-2xl border border-dark-700 flex justify-between items-center">
-                          <span className="text-xs text-gray-400">الرصيد المعروض:</span>
-                          <span className={`text-xl md:text-2xl font-black ${isLow ? 'text-red-400' : 'text-gold'}`}>
-                            {bagsCount} <span className="text-xs font-normal text-white">شكارة</span>
-                          </span>
-                        </div>
-
-                        <button
-                          onClick={() => {
-                            setEditingStockProduct(prod);
-                            setStockInputValue(bagsCount);
-                            setActiveModal('editStockModal');
-                          }}
-                          className="w-full bg-dark-800 hover:bg-gold hover:text-dark-950 text-gold font-bold py-2 rounded-xl text-xs border border-gold/30 transition-all flex items-center justify-center gap-1.5"
-                        >
-                          <Icon name="edit-3" className="w-3.5 h-3.5" /> تعديل الرصيد
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* TAB: SALES LOG (البحث باسم العميل وتحديد الفترة والطباعة) */}
-            {activeTab === 'sales' && (
-              <div className="space-y-4 md:space-y-6">
-                <div className="flex flex-col md:flex-row justify-between md:items-center gap-3">
-                  <h2 className="text-base md:text-xl font-bold flex items-center gap-2">
-                    <Icon name="receipt" className="w-5 h-5 text-gold" />
-                    سجل مبيعات المعرض
+            {/* TAB 2: MY ORDERS & STATUS */}
+            {activeTab === 'myOrders' && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                    <i data-lucide="shopping-cart" className="w-5 h-5 text-gold"></i>
+                    سجل طلبات ومبيعات المندوب ({currentRep.name})
                   </h2>
 
                   <button
-                    onClick={() => setActiveModal('printSalesLogModal')}
-                    className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow self-start md:self-auto"
+                    onClick={() => setActiveModal('printRepSalesModal')}
+                    className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow"
                   >
-                    <Icon name="printer" className="w-4 h-4" /> طباعة كشف المبيعات المفلتر
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة كشف سجل المبيعات الشامل
                   </button>
                 </div>
 
-                {/* 🔍 أدوات البحث والتصفية لفواتير المبيعات */}
-                <div className="glass-card p-4 rounded-2xl border border-dark-700 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="text-[11px] text-gray-400 block mb-1">ابحث باسم العميل:</label>
-                    <input
-                      type="text"
-                      placeholder="اكتب اسم العميل..."
-                      value={salesSearchClient}
-                      onChange={e => setSalesSearchClient(e.target.value)}
-                      className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none focus:border-gold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-gray-400 block mb-1">من تاريخ:</label>
-                    <input
-                      type="date"
-                      value={salesStartDate}
-                      onChange={e => setSalesStartDate(e.target.value)}
-                      className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none focus:border-gold"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-gray-400 block mb-1">إلى تاريخ:</label>
-                    <input
-                      type="date"
-                      value={salesEndDate}
-                      onChange={e => setSalesEndDate(e.target.value)}
-                      className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none focus:border-gold"
-                    />
-                  </div>
-                </div>
-
                 <div className="glass-card rounded-2xl overflow-x-auto border border-dark-700">
-                  <table className="w-full text-right text-xs min-w-[600px]">
+                  <table className="w-full text-right text-xs min-w-[650px]">
                     <thead className="bg-dark-800 text-gold font-bold">
                       <tr>
-                        <th className="p-3">رقم الفاتورة</th>
-                        <th className="p-3">التاريخ والوقت</th>
-                        <th className="p-3">اسم العميل</th>
-                        <th className="p-3">عدد الشكاير</th>
-                        <th className="p-3">المبلغ الإجمالي</th>
-                        <th className="p-3 text-center">الإجراءات</th>
+                        <th className="p-4">تاريخ الطلب</th>
+                        <th className="p-4">اسم العميل</th>
+                        <th className="p-4">السائق المكلف</th>
+                        <th className="p-4">حمولة العلف</th>
+                        <th className="p-4">الكمية الإجمالية</th>
+                        <th className="p-4">المبلغ الإجمالي</th>
+                        <th className="p-4">حالة الطلب بمصنع المجد</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-700">
-                      {filteredSalesLog.length === 0 ? (
+                      {repOrders.length === 0 ? (
                         <tr>
-                          <td colSpan="6" className="p-6 text-center text-gray-400">لا توجد فواتير مطابقة لخيارات البحث الحالية</td>
+                          <td colSpan="7" className="p-6 text-center text-gray-400">لا توجد طلبات مسجلة باسم المندوب حالياً</td>
                         </tr>
                       ) : (
-                        filteredSalesLog.map(sale => (
-                          <tr key={sale.id} className="hover:bg-dark-800/40">
-                            <td className="p-3 font-mono font-bold text-gray-300">#{sale.invoiceNumber || String(sale.id).slice(-5)}</td>
-                            <td className="p-3 text-gray-400">{sale.date} - {sale.time}</td>
-                            <td className="p-3 font-bold text-white">{sale.clientName}</td>
-                            <td className="p-3 text-green-400 font-bold">{sale.totalBags} شكارة</td>
-                            <td className="p-3 font-black text-gold">{Number(sale.totalAmount || 0).toLocaleString()} ج.م</td>
-                            <td className="p-3 text-center flex justify-center gap-2">
-                              <button
-                                onClick={() => sendWhatsAppInvoice(sale)}
-                                className="px-2 py-1 bg-green-600/20 hover:bg-green-600 text-green-400 hover:text-white rounded-lg font-bold border border-green-500/30 transition-all flex items-center gap-1 text-[11px]"
-                                title="إرسال عبر الواتساب"
-                              >
-                                <Icon name="whatsapp" className="w-3.5 h-3.5" /> واتساب
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setSelectedInvoice(sale);
-                                  setActiveModal('printInvoiceModal');
-                                }}
-                                className="px-2.5 py-1 bg-dark-700 hover:text-gold rounded-lg font-bold border border-dark-600 transition-all flex items-center gap-1 text-[11px]"
-                              >
-                                <Icon name="eye" className="w-3.5 h-3.5" /> عرض
-                              </button>
+                        repOrders.map(order => (
+                          <tr key={order.id} className="hover:bg-dark-800/40">
+                            <td className="p-4 text-gray-300">{order.date}</td>
+                            <td className="p-4 font-bold text-white">{order.clientName}</td>
+                            <td className="p-4 font-bold text-gold">{order.driverName || 'سائق'}</td>
+                            <td className="p-4 text-gray-300">{order.cargoType || 'علف'}</td>
+                            <td className="p-4 font-black">{order.quantity} طن</td>
+                            <td className="p-4 font-bold text-gold">{order.totalAmount ? Number(order.totalAmount).toLocaleString() + ' ج.م' : '-'}</td>
+                            <td className="p-4">
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-bold ${order.status === 'مقبول' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : order.status === 'ملغي' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'}`}>
+                                {order.status === 'مقبول' ? 'تم القبول والربط بالمديونية' : (order.status || 'قيد الانتظار')}
+                              </span>
                             </td>
                           </tr>
                         ))
@@ -937,260 +803,486 @@
               </div>
             )}
 
-            {/* TAB: REPORTS */}
-            {activeTab === 'reports' && (
-              <div className="space-y-4 md:space-y-6">
+            {/* TAB 3: COLLECTIONS (قسم التحصيلات وعرض المديونية والخصم والتوريد) */}
+            {activeTab === 'collections' && (
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                
+                {/* 💵 نموذج توريد المبلغ النقدي لحساب العميل */}
+                <div className="lg:col-span-5 space-y-4">
+                  <form onSubmit={handleSaveCollection} className="glass-card p-5 md:p-6 rounded-3xl border border-dark-700 space-y-4 gold-glow">
+                    <h3 className="text-base font-bold text-gold flex items-center gap-2 border-b border-dark-700 pb-3">
+                      <i data-lucide="dollar-sign" className="w-5 h-5"></i>
+                      قسم التحصيلات وتنزيل المديونيات
+                    </h3>
+
+                    {/* اختيار العميل بالبحث السريع */}
+                    <div className="space-y-2">
+                      <label className="text-xs text-gray-300 block font-bold">ابحث عن العميل لفتح بيانات حسابه ومديونبته المقبولة:</label>
+                      <input
+                        type="text"
+                        placeholder="ابحث باسم العميل..."
+                        value={collectionSearchText}
+                        onChange={e => setCollectionSearchText(e.target.value)}
+                        className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-xs text-white outline-none focus:border-gold"
+                      />
+
+                      {collectionSearchText.trim().length > 0 && (
+                        <div className="bg-dark-950 border border-gold/40 rounded-xl p-2 max-h-40 overflow-y-auto space-y-1">
+                          {searchedCollectionClientsList.map(c => (
+                            <div
+                              key={c.id}
+                              onClick={() => {
+                                setCollectionClientId(c.id);
+                                setCollectionSearchText(c.name);
+                              }}
+                              className={`p-2 rounded-lg cursor-pointer text-xs ${collectionClientId === c.id ? 'bg-gold text-dark-950 font-bold' : 'hover:bg-dark-800'}`}
+                            >
+                              {c.name}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <select
+                        value={collectionClientId}
+                        onChange={e => {
+                          setCollectionClientId(e.target.value);
+                          const obj = clients.find(c => c.id === e.target.value);
+                          if (obj) setCollectionSearchText(obj.name);
+                        }}
+                        required
+                        className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-xs text-white outline-none"
+                      >
+                        <option value="">-- اختر العميل من القائمة --</option>
+                        {clients.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* 📊 عرض كارت مديونية العميل الحالية المعتمدة بالكامل */}
+                    {collectionClientId && (
+                      <div className="bg-dark-950 p-3.5 rounded-2xl border border-red-500/40 space-y-2 text-xs">
+                        <div className="flex justify-between items-center text-gray-300">
+                          <span>إجمالي الفواتير المقبولة من المصنع:</span>
+                          <strong className="text-white font-mono">{selectedClientAccountInfo.totalDebits.toLocaleString()} ج.م</strong>
+                        </div>
+                        <div className="flex justify-between items-center text-gray-300">
+                          <span>إجمالي المسدد سابقاً:</span>
+                          <strong className="text-green-400 font-mono">{selectedClientAccountInfo.totalCredits.toLocaleString()} ج.م</strong>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-dark-700 pt-2 font-bold text-sm">
+                          <span className="text-red-400">المديونية المترتبة حالياً:</span>
+                          <span className="text-red-400 font-mono text-base">{selectedClientAccountInfo.currentDebt.toLocaleString()} ج.م</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-xs text-gray-300 block font-bold mb-1">المبلغ المراد تنزيله من الحساب (مثال: 1000)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        placeholder="أدخل المبلغ النقدي..."
+                        value={collectionAmount}
+                        onChange={e => setCollectionAmount(e.target.value)}
+                        className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm text-gold font-bold outline-none focus:border-gold"
+                      />
+                    </div>
+
+                    {/* 💡 معاينة المديونية المتبقية بعد التنزيل */}
+                    {collectionAmount && collectionClientId && (
+                      <div className="bg-green-950/40 p-3 rounded-xl border border-green-500/40 text-xs space-y-1">
+                        <div className="flex justify-between text-green-300 font-bold">
+                          <span>المديونية المتبقية بعد خصم ({Number(collectionAmount).toLocaleString()} ج.م):</span>
+                          <span>{(selectedClientAccountInfo.currentDebt - (parseFloat(collectionAmount) || 0)).toLocaleString()} ج.م</span>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">تاريخ التحصيل</label>
+                        <input
+                          type="date"
+                          value={collectionDate}
+                          onChange={e => setCollectionDate(e.target.value)}
+                          className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">طريقة الدفع</label>
+                        <select
+                          value={collectionMethod}
+                          onChange={e => setCollectionMethod(e.target.value)}
+                          className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none"
+                        >
+                          <option value="نقدي">نقدي كاش</option>
+                          <option value="تحويل فودافون/إنستاباي">تحويل إنستاباي/محفظة</option>
+                          <option value="شيك بنكي">شيك بنكي</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">ملاحظات والتفاصيل</label>
+                      <input
+                        type="text"
+                        placeholder="اختياري..."
+                        value={collectionNotes}
+                        onChange={e => setCollectionNotes(e.target.value)}
+                        className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      className="w-full gold-gradient text-dark-950 font-black py-3 rounded-xl hover:brightness-110 text-xs md:text-sm shadow-lg flex items-center justify-center gap-2"
+                    >
+                      <i data-lucide="check-circle" className="w-4 h-4"></i> تنزيل الموديل والتوريد للمصنع
+                    </button>
+                  </form>
+                </div>
+
+                {/* 📜 سجل التحصيلات النقدية الموردة */}
+                <div className="lg:col-span-7 space-y-4">
+                  <div className="glass-card p-4 md:p-5 rounded-3xl space-y-4">
+                    <h3 className="text-sm md:text-base font-bold text-gold">سجل توريدات المبالغ وتخفيض المديونية</h3>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-right text-xs border-collapse">
+                        <thead className="bg-dark-800 text-gold font-bold">
+                          <tr>
+                            <th className="p-3">التاريخ</th>
+                            <th className="p-3">اسم العميل</th>
+                            <th className="p-3">المبلغ المورد</th>
+                            <th className="p-3">المديونية المتبقية</th>
+                            <th className="p-3">طريقة التوريد</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-dark-700">
+                          {repCollections.length === 0 ? (
+                            <tr>
+                              <td colSpan="5" className="p-6 text-center text-gray-400">لم يتم تسجيل أي توريدات نقدية بعد</td>
+                            </tr>
+                          ) : (
+                            repCollections.map(col => (
+                              <tr key={col.id} className="hover:bg-dark-800/40">
+                                <td className="p-3 text-gray-300">{col.date}</td>
+                                <td className="p-3 font-bold text-white">{col.clientName}</td>
+                                <td className="p-3 font-black text-green-400">{Number(col.amount || 0).toLocaleString()} ج.م</td>
+                                <td className="p-3 font-bold text-red-400">{col.remainingDebt !== undefined ? Number(col.remainingDebt).toLocaleString() + ' ج.م' : '-'}</td>
+                                <td className="p-3 text-gray-300">{col.method || 'نقدي'}</td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB 4: CLIENT STATEMENT */}
+            {activeTab === 'clientStatement' && (
+              <div className="space-y-6">
+                <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
+                  <h3 className="text-base font-bold text-gold">إعداد وتصفية كشف الحساب التفصيلي للعميل</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">اختر العميل</label>
+                      <select value={statementFilter.clientId} onChange={e => setStatementFilter({ ...statementFilter, clientId: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-xs text-white">
+                        <option value="">-- جميع العملاء --</option>
+                        {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">من تاريخ</label>
+                      <input type="date" value={statementFilter.fromDate} onChange={e => setStatementFilter({ ...statementFilter, fromDate: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-xs text-white" />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 block mb-1">إلى تاريخ</label>
+                      <input type="date" value={statementFilter.toDate} onChange={e => setStatementFilter({ ...statementFilter, toDate: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-xs text-white" />
+                    </div>
+                    <div className="flex items-end">
+                      <button onClick={() => setActiveModal('printStatementModal')} className="w-full gold-gradient text-dark-950 font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-1 shadow">
+                        <i data-lucide="printer" className="w-4 h-4"></i> طباعة كشف حساب العميل A4
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="glass-card rounded-2xl p-4 overflow-x-auto border border-dark-700">
+                  <table className="w-full text-right text-xs min-w-[700px]">
+                    <thead className="bg-dark-800 text-gold font-bold">
+                      <tr>
+                        <th className="p-3">التاريخ</th>
+                        <th className="p-3">نوع الحركة</th>
+                        <th className="p-3">البيان والتفاصيل</th>
+                        <th className="p-3 text-red-400">مدين (+) مبيعات</th>
+                        <th className="p-3 text-green-400">دائن (-) تحصيل</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-700">
+                      {clientLedgerCombined.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="p-6 text-center text-gray-400">لا توجد حركات مسجلة للعميل خلال هذه الفترة</td>
+                        </tr>
+                      ) : (
+                        clientLedgerCombined.map((item, idx) => (
+                          <tr key={idx} className="hover:bg-dark-800/50">
+                            <td className="p-3 text-gray-300">{item.date}</td>
+                            <td className="p-3 font-bold">
+                              <span className={`px-2 py-0.5 rounded-lg text-[10px] ${item.type === 'مبيعات أعلاف' ? 'bg-red-500/10 text-red-400' : 'bg-green-500/10 text-green-400'}`}>
+                                {item.type}
+                              </span>
+                            </td>
+                            <td className="p-3 text-white">{item.description}</td>
+                            <td className="p-3 font-bold text-red-400">{item.debit > 0 ? item.debit.toLocaleString() + ' ج.م' : '-'}</td>
+                            <td className="p-3 font-bold text-green-400">{item.credit > 0 ? item.credit.toLocaleString() + ' ج.م' : '-'}</td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 5: REP STATEMENT */}
+            {activeTab === 'repStatement' && (
+              <div className="space-y-6">
                 <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <h3 className="text-sm md:text-base font-bold text-gold">التقارير الشهريّة</h3>
-                    <input
-                      type="month"
-                      value={reportMonth}
-                      onChange={e => setReportMonth(e.target.value)}
-                      className="bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none focus:border-gold w-full sm:w-auto"
-                    />
+                    <h3 className="text-base font-bold text-gold">سجل أداء ومبيعات المندوب والعمال</h3>
+                    <button
+                      onClick={() => setActiveModal('printRepSalesModal')}
+                      className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow"
+                    >
+                      <i data-lucide="printer" className="w-4 h-4"></i> طباعة كشف السجل العام للمندوب
+                    </button>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-dark-950 p-3.5 rounded-2xl border border-dark-700 text-xs">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-dark-950 p-4 rounded-2xl border border-dark-700 text-xs">
                     <div>
-                      <span className="text-gray-400 block">إجمالي مبيعات الشهر:</span>
-                      <p className="text-xl md:text-2xl font-black text-gold mt-1">
-                        {monthlyReportSales.reduce((sum, s) => sum + (parseFloat(s.totalAmount) || 0), 0).toLocaleString()} ج.م
+                      <span className="text-gray-400 block">إجمالي المبيعات بالجنيه:</span>
+                      <p className="text-lg md:text-xl font-black text-gold mt-1">
+                        {repOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0).toLocaleString()} ج.م
                       </p>
                     </div>
                     <div>
-                      <span className="text-gray-400 block">عدد الفواتير المحررة:</span>
-                      <p className="text-xl md:text-2xl font-black text-white mt-1">{monthlyReportSales.length} فاتورة</p>
+                      <span className="text-gray-400 block">إجمالي الكمية (طن):</span>
+                      <p className="text-lg md:text-xl font-black text-white mt-1">
+                        {repOrders.reduce((sum, o) => sum + (parseFloat(o.quantity) || 0), 0).toFixed(2)} طن
+                      </p>
                     </div>
                     <div>
-                      <span className="text-gray-400 block">إجمالي الشكاير المباعة:</span>
-                      <p className="text-xl md:text-2xl font-black text-green-400 mt-1">
-                        {monthlyReportSales.reduce((sum, s) => sum + (parseInt(s.totalBags) || 0), 0)} شكارة
+                      <span className="text-gray-400 block">إجمالي المبالغ المحصلة:</span>
+                      <p className="text-lg md:text-xl font-black text-green-400 mt-1">
+                        {repCollections.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0).toLocaleString()} ج.م
                       </p>
                     </div>
                   </div>
+                </div>
+
+                <div className="glass-card rounded-2xl p-4 overflow-x-auto border border-dark-700">
+                  <table className="w-full text-right text-xs">
+                    <thead className="bg-dark-800 text-gold font-bold">
+                      <tr>
+                        <th className="p-3">التاريخ</th>
+                        <th className="p-3">اسم العميل</th>
+                        <th className="p-3">السائق</th>
+                        <th className="p-3">الكمية (طن)</th>
+                        <th className="p-3">المبلغ الإجمالي</th>
+                        <th className="p-3">حالة الطلب بالمصنع</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-dark-700">
+                      {repOrders.map(o => (
+                        <tr key={o.id} className="hover:bg-dark-800/50">
+                          <td className="p-3 text-gray-300">{o.date}</td>
+                          <td className="p-3 font-bold text-white">{o.clientName}</td>
+                          <td className="p-3 text-gold">{o.driverName || 'سائق'}</td>
+                          <td className="p-3 font-black text-white">{o.quantity} طن</td>
+                          <td className="p-3 font-bold text-gold">{Number(o.totalAmount || 0).toLocaleString()} ج.م</td>
+                          <td className="p-3 font-bold">{o.status || 'قيد الانتظار'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
 
           </main>
 
-          {/* Bottom Navigation للهواتف */}
-          <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-dark-950/95 backdrop-blur-lg border-t border-dark-700 px-2 py-2 flex justify-around items-center">
-            {[
-              { id: 'pos', label: 'الفاتورة', icon: 'shopping-cart' },
-              { id: 'stock', label: 'المخزون', icon: 'boxes' },
-              { id: 'sales', label: 'السجل', icon: 'receipt' },
-              { id: 'reports', label: 'التقارير', icon: 'bar-chart-2' }
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex flex-col items-center gap-1 px-3 py-1 rounded-xl text-[10px] font-bold transition-all relative ${activeTab === tab.id ? 'text-gold' : 'text-gray-400'}`}
-              >
-                <Icon name={tab.icon} className="w-5 h-5" />
-                <span>{tab.label}</span>
-                {tab.id === 'stock' && lowStockItems.length > 0 && (
-                  <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
-                )}
-              </button>
-            ))}
-          </nav>
-
-          {/* MODAL: EDIT STOCK */}
-          {activeModal === 'editStockModal' && editingStockProduct && (
+          {/* 🖨️ MODAL 1: PRINT CLIENT STATEMENT */}
+          {activeModal === 'printStatementModal' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
-              <form onSubmit={handleSaveStockEdit} className="glass-card p-5 md:p-6 rounded-3xl w-full max-w-md space-y-4">
-                <h3 className="text-base md:text-lg font-bold text-gold">تعديل المخزون: {editingStockProduct.name}</h3>
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">العدد المتوفر حالياً بالشكارة</label>
-                  <input
-                    type="number"
-                    min="0"
-                    required
-                    value={stockInputValue}
-                    onChange={e => setStockInputValue(e.target.value)}
-                    className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm text-white outline-none focus:border-gold"
-                  />
-                </div>
-                <div className="flex justify-end gap-2 pt-2">
-                  <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 rounded-xl bg-dark-800 text-gray-300 text-xs">إلغاء</button>
-                  <button type="submit" className="px-5 py-2 rounded-xl gold-gradient text-dark-950 font-bold text-xs">حفظ التحديث</button>
-                </div>
-              </form>
-            </div>
-          )}
-
-          {/* 📄 MODAL: PRINT SHOWROOM INVOICE (مع إرسال الواتساب واختيار المقاس A4 و A5) */}
-          {activeModal === 'printInvoiceModal' && selectedInvoice && (
-            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-4">
-              <div className="bg-white text-black p-4 md:p-6 rounded-3xl w-full max-w-3xl max-h-[92vh] overflow-y-auto space-y-4 shadow-2xl">
-                
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-gray-200 pb-3 no-print">
-                  <div className="flex items-center gap-3">
-                    <h3 className="text-sm md:text-lg font-bold text-black flex items-center gap-2">
-                      <Icon name="printer" className="w-5 h-5 text-gold" />
-                      معاينة الفاتورة الرسمية
-                    </h3>
-                    <select
-                      value={selectedPaperSize}
-                      onChange={e => setSelectedPaperSize(e.target.value)}
-                      className="bg-gray-100 border border-gray-300 text-black px-2.5 py-1 rounded-lg text-xs font-bold"
-                    >
-                      <option value="A4">مقاس A4 (ورقة كاملة)</option>
-                      <option value="A5">مقاس A5 (نصف ورقة)</option>
-                    </select>
-                  </div>
-
-                  <div className="flex items-center gap-2 w-full sm:w-auto">
-                    <button
-                      type="button"
-                      onClick={() => sendWhatsAppInvoice(selectedInvoice)}
-                      className="bg-green-600 hover:bg-green-700 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow"
-                    >
-                      <Icon name="whatsapp" className="w-4 h-4" /> إرسال عبر الواتساب
-                    </button>
-                    <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow">
-                      <Icon name="printer" className="w-4 h-4" /> طباعة
-                    </button>
-                    <button onClick={() => setActiveModal(null)} className="bg-gray-200 hover:bg-gray-300 text-black px-3 py-2 rounded-xl text-xs font-bold">إغلاق</button>
-                  </div>
+              <div className="bg-white text-black p-6 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
+                  <h3 className="text-lg font-bold text-black">معاينة كشف حساب العميل للطباعة</h3>
+                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة الكشف A4
+                  </button>
                 </div>
 
-                <div id="print-area" className={`p-4 space-y-5 print-border rounded-2xl bg-white ${selectedPaperSize === 'A5' ? 'max-w-xl mx-auto' : ''}`}>
-                  
-                  {/* رأس الفاتورة المحسّن */}
-                  <div className="flex justify-between items-center border-b-2 border-black pb-4">
-                    <div className="text-right space-y-1">
-                      <h1 className="text-2xl font-black text-black tracking-tight">مصنع المجد للأعلاف</h1>
-                      <p className="text-xs font-bold text-gray-800">فاتورة بيع مباشرة - المعرض الرئيسي</p>
-                      <p className="text-[11px] text-gray-700">التاريخ: <strong>{selectedInvoice.date}</strong> | الوقت: <strong>{selectedInvoice.time}</strong></p>
+                <div id="print-area">
+                  <div className="text-center border-b-2 border-black pb-3 mb-4">
+                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 border border-black object-contain" />
+                    <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
+                    <p className="text-sm font-bold text-black">كشف حساب مبيعات وتوريدات عميل تفصيلي</p>
+                    <div className="flex justify-between text-xs mt-3 text-black font-semibold">
+                      <span>المندوب المسؤول: <strong>{currentRep.name}</strong></span>
+                      <span>تاريخ الإصدار: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></span>
                     </div>
-                    <img src={LOGO_URL} alt="Logo" className="w-20 h-20 rounded-full border-2 border-black object-contain p-1" />
-                  </div>
-
-                  {/* معلومات العميل والفاتورة */}
-                  <div className="grid grid-cols-2 gap-4 bg-gray-100 p-4 rounded-xl border border-black text-xs">
-                    <div>
-                      <span className="text-gray-600 block">اسم العميل المحترم:</span>
-                      <strong className="text-base font-black text-black">{selectedInvoice.clientName}</strong>
-                      {selectedInvoice.clientPhone && (
-                        <span className="text-gray-700 block mt-0.5 font-mono">الهاتف: {selectedInvoice.clientPhone}</span>
-                      )}
-                    </div>
-                    <div className="text-left">
-                      <span className="text-gray-600 block">رقم الفاتورة:</span>
-                      <strong className="text-base text-black font-mono font-bold">#{selectedInvoice.invoiceNumber || String(selectedInvoice.id).slice(-6)}</strong>
-                    </div>
-                  </div>
-
-                  {/* جدول الأصناف التوضيحي */}
-                  <div className="space-y-2">
-                    <table className="w-full text-right text-xs border-collapse">
-                      <thead>
-                        <tr className="bg-gray-200 text-black">
-                          <th className="p-2.5 border border-black font-bold">#</th>
-                          <th className="p-2.5 border border-black font-bold">اسم صنف العلف</th>
-                          <th className="p-2.5 border border-black font-bold text-center">الكمية (شكارة)</th>
-                          <th className="p-2.5 border border-black font-bold">سعر الشيكارة</th>
-                          <th className="p-2.5 border border-black font-bold">المبلغ الإجمالي</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {Array.isArray(selectedInvoice.items) && selectedInvoice.items.map((item, idx) => (
-                          <tr key={idx}>
-                            <td className="p-2.5 border border-black text-center font-bold">{idx + 1}</td>
-                            <td className="p-2.5 border border-black font-bold text-black">{item.productName}</td>
-                            <td className="p-2.5 border border-black font-black text-center">{item.quantity} شكارة</td>
-                            <td className="p-2.5 border border-black font-bold">{Number(item.unitPrice || 0).toLocaleString()} ج.م</td>
-                            <td className="p-2.5 border border-black font-black text-black">{Number(item.total || 0).toLocaleString()} ج.م</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* الإجمالي والتوقيعات */}
-                  <div className="flex justify-between items-center bg-gray-100 p-4 rounded-xl border border-black text-xs">
-                    <div>
-                      <span className="text-gray-600 block">ملاحظات الفاتورة:</span>
-                      <p className="font-bold text-black">{selectedInvoice.notes || 'تسليم فوري من المعرض'}</p>
-                    </div>
-                    <div className="text-left space-y-1">
-                      <div>إجمالي عدد الشكاير: <strong className="text-black font-black">{selectedInvoice.totalBags} شكارة</strong></div>
-                      <div>المبلغ الإجمالي المطلوب: <strong className="text-black font-black text-lg underline">{Number(selectedInvoice.totalAmount || 0).toLocaleString()} جنيه</strong></div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4 text-center text-xs pt-8 font-bold border-t border-gray-400">
-                    <div>توقيع مسؤول المعرض: .......................</div>
-                    <div>توقيع مستلم البضاعة: .......................</div>
-                  </div>
-                </div>
-
-              </div>
-            </div>
-          )}
-
-          {/* 📄 MODAL: PRINT SALES LOG (طباعة كشف المبيعات المفلتر) */}
-          {activeModal === 'printSalesLogModal' && (
-            <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-3 md:p-4">
-              <div className="bg-white text-black p-4 md:p-6 rounded-3xl w-full max-w-4xl max-h-[92vh] overflow-y-auto space-y-4 shadow-2xl">
-                
-                <div className="flex justify-between items-center border-b border-gray-200 pb-3 no-print">
-                  <h3 className="text-sm md:text-lg font-bold text-black flex items-center gap-2">
-                    <Icon name="printer" className="w-5 h-5 text-gold" />
-                    معاينة كشف سجل المبيعات للطباعة
-                  </h3>
-                  <div className="flex items-center gap-2">
-                    <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow">
-                      <Icon name="printer" className="w-4 h-4" /> طباعة الكشف
-                    </button>
-                    <button onClick={() => setActiveModal(null)} className="bg-gray-200 hover:bg-gray-300 text-black px-3 py-2 rounded-xl text-xs font-bold">إغلاق</button>
-                  </div>
-                </div>
-
-                <div id="print-area" className="p-4 space-y-4 print-border rounded-2xl bg-white">
-                  <div className="flex justify-between items-center border-b-2 border-black pb-3">
-                    <div>
-                      <h1 className="text-xl font-black text-black">مصنع المجد للأعلاف - كشف المبيعات</h1>
-                      <p className="text-xs font-bold text-gray-700 mt-1">
-                        تصفية: {salesSearchClient ? `العميل (${salesSearchClient})` : 'جميع العملاء'} | 
-                        المدة: {salesStartDate || 'البداية'} إلى {salesEndDate || 'الآن'}
-                      </p>
-                    </div>
-                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full border border-black object-contain" />
                   </div>
 
                   <table className="w-full text-right text-xs border-collapse">
                     <thead>
-                      <tr className="bg-gray-200 text-black">
-                        <th className="p-2 border border-black font-bold">رقم الفاتورة</th>
-                        <th className="p-2 border border-black font-bold">التاريخ والوقت</th>
-                        <th className="p-2 border border-black font-bold">اسم العميل</th>
-                        <th className="p-2 border border-black font-bold">عدد الشكاير</th>
-                        <th className="p-2 border border-black font-bold">المبلغ الإجمالي</th>
+                      <tr className="bg-gray-200 text-black border-b">
+                        <th className="p-2 border border-black font-bold">التاريخ</th>
+                        <th className="p-2 border border-black font-bold">الحركة</th>
+                        <th className="p-2 border border-black font-bold">التفاصيل والبيان</th>
+                        <th className="p-2 border border-black font-bold">مدين (مبيعات)</th>
+                        <th className="p-2 border border-black font-bold">دائن (تحصيل)</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredSalesLog.map(sale => (
-                        <tr key={sale.id}>
-                          <td className="p-2 border border-black font-mono font-bold">#{sale.invoiceNumber || String(sale.id).slice(-5)}</td>
-                          <td className="p-2 border border-black">{sale.date} - {sale.time}</td>
-                          <td className="p-2 border border-black font-bold">{sale.clientName}</td>
-                          <td className="p-2 border border-black text-center font-bold">{sale.totalBags} شكارة</td>
-                          <td className="p-2 border border-black font-bold">{Number(sale.totalAmount || 0).toLocaleString()} ج.م</td>
+                      {clientLedgerCombined.map((o, idx) => (
+                        <tr key={idx} className="border-b text-black">
+                          <td className="p-2 border border-black font-medium">{o.date}</td>
+                          <td className="p-2 border border-black font-bold">{o.type}</td>
+                          <td className="p-2 border border-black font-medium">{o.description}</td>
+                          <td className="p-2 border border-black font-bold">{o.debit > 0 ? o.debit.toLocaleString() : '-'}</td>
+                          <td className="p-2 border border-black font-bold">{o.credit > 0 ? o.credit.toLocaleString() : '-'}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
 
-                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl border border-black text-xs font-bold">
-                    <div>إجمالي عدد الفواتير: {filteredSalesLog.length} فاتورة</div>
-                    <div>إجمالي المبيعات بالجنيه: {filteredSalesLog.reduce((sum, s) => sum + (parseFloat(s.totalAmount) || 0), 0).toLocaleString()} ج.م</div>
+                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border border-black">
+                    <span>إجمالي المبيعات (مدين): {clientLedgerCombined.reduce((a, b) => a + b.debit, 0).toLocaleString()} ج.م</span>
+                    <span>إجمالي التحصيلات (دائن): {clientLedgerCombined.reduce((a, b) => a + b.credit, 0).toLocaleString()} ج.م</span>
+                    <span>الصافي المتبقي: {(clientLedgerCombined.reduce((a, b) => a + b.debit, 0) - clientLedgerCombined.reduce((a, b) => a + b.credit, 0)).toLocaleString()} ج.م</span>
                   </div>
                 </div>
 
+                <div className="flex justify-end pt-2 no-print">
+                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-gray-800 text-white text-xs font-bold">إغلاق</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🖨️ MODAL 2: PRINT REP SALES LOG */}
+          {activeModal === 'printRepSalesModal' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="bg-white text-black p-6 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
+                  <h3 className="text-lg font-bold text-black">معاينة سجل مبيعات المندوب للطباعة</h3>
+                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة السجل A4
+                  </button>
+                </div>
+
+                <div id="print-area">
+                  <div className="text-center border-b-2 border-black pb-3 mb-4">
+                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 border border-black object-contain" />
+                    <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
+                    <p className="text-sm font-bold text-black">كشف سجل المبيعات والحمولات الشامل للمندوب</p>
+                    <p className="text-xs font-bold text-gray-700 mt-1">اسم المندوب: {currentRep.name} ({currentRep.phone})</p>
+                  </div>
+
+                  <table className="w-full text-right text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200 text-black border-b">
+                        <th className="p-2 border border-black font-bold">التاريخ</th>
+                        <th className="p-2 border border-black font-bold">اسم العميل</th>
+                        <th className="p-2 border border-black font-bold">السائق</th>
+                        <th className="p-2 border border-black font-bold">الحمولة</th>
+                        <th className="p-2 border border-black font-bold">الكمية (طن)</th>
+                        <th className="p-2 border border-black font-bold">المبلغ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repOrders.map((o, idx) => (
+                        <tr key={idx} className="border-b text-black">
+                          <td className="p-2 border border-black">{o.date}</td>
+                          <td className="p-2 border border-black font-bold">{o.clientName}</td>
+                          <td className="p-2 border border-black">{o.driverName || 'سائق'}</td>
+                          <td className="p-2 border border-black">{o.cargoType || 'علف'}</td>
+                          <td className="p-2 border border-black font-bold">{o.quantity} طن</td>
+                          <td className="p-2 border border-black font-bold">{Number(o.totalAmount || 0).toLocaleString()} ج.م</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border border-black">
+                    <span>إجمالي الحمولات: {repOrders.reduce((sum, o) => sum + (parseFloat(o.quantity) || 0), 0).toFixed(2)} طن</span>
+                    <span>إجمالي المبيعات بالجنيه: {repOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0).toLocaleString()} ج.م</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2 no-print">
+                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-gray-800 text-white text-xs font-bold">إغلاق</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🖨️ MODAL 3: PRINT COLLECTION RECEIPT */}
+          {activeModal === 'printCollectionReceiptModal' && lastSavedCollection && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="bg-white text-black p-6 rounded-3xl w-full max-w-lg space-y-6 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-3 no-print">
+                  <h3 className="text-base font-bold text-black">معاينة إيصال التوريد النقدي</h3>
+                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow">
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة الإيصال
+                  </button>
+                </div>
+
+                <div id="print-area" className="p-4 border-2 border-black rounded-2xl space-y-4">
+                  <div className="flex justify-between items-center border-b-2 border-black pb-3">
+                    <div>
+                      <h1 className="text-lg font-black text-black">مصنع المجد للأعلاف</h1>
+                      <p className="text-xs font-bold text-gray-800">إيصال توريد نقدية وتخصيم مديونية</p>
+                      <p className="text-[10px] text-gray-600">التاريخ: {lastSavedCollection.date}</p>
+                    </div>
+                    <img src={LOGO_URL} alt="Logo" className="w-14 h-14 rounded-full border border-black object-contain" />
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div>وصلنا من السيد العميل: <strong className="text-sm font-black underline">{lastSavedCollection.clientName}</strong></div>
+                    <div>مبلغ وقدره: <strong className="text-base font-black text-black underline">{Number(lastSavedCollection.amount).toLocaleString()} جنيه مصري فقط لا غير</strong></div>
+                    <div>طريقة الدفع: <strong>{lastSavedCollection.method || 'نقدي'}</strong></div>
+                    <div>ملاحظات: <strong>{lastSavedCollection.notes || 'سداد جزء من الحساب'}</strong></div>
+                  </div>
+
+                  <div className="bg-gray-100 p-3 rounded-xl border border-black text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span>المديونية المترتبة قبل التنزيل:</span>
+                      <strong>{Number(lastSavedCollection.previousDebt || 0).toLocaleString()} ج.م</strong>
+                    </div>
+                    <div className="flex justify-between text-black font-black">
+                      <span>المديونية المتبقية الحالية:</span>
+                      <strong className="underline">{Number(lastSavedCollection.remainingDebt || 0).toLocaleString()} ج.م</strong>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs pt-4 border-t border-gray-400 font-bold">
+                    <div>توقيع المندوب المستلم: ..................</div>
+                    <div>توقيع العميل: ..................</div>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2 no-print">
+                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-gray-800 text-white text-xs font-bold">إغلاق</button>
+                </div>
               </div>
             </div>
           )}
@@ -1200,11 +1292,7 @@
     }
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
-    root.render(
-      <ErrorBoundary>
-        <ShowroomApp />
-      </ErrorBoundary>
-    );
+    root.render(<RepApp />);
   </script>
 </body>
 </html>
