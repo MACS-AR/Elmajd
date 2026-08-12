@@ -188,7 +188,7 @@
       const [isAuthenticated, setIsAuthenticated] = useState(false);
       const [phoneInput, setPhoneInput] = useState('');
       const [passwordInput, setPasswordInput] = useState('');
-      const [currentUserRole, setCurrentUserRole] = useState('admin'); // admin, sales, rep, client
+      const [currentUserRole, setCurrentUserRole] = useState('admin'); // admin, sales, rep, driver, client
       const [currentUserData, setCurrentUserData] = useState(null);
 
       // Active View
@@ -242,7 +242,7 @@
 
       // Form Data States
       const [salesRepData, setSalesRepData] = useState({ name: '', phone: '', password: '', role: 'rep', region: '', status: 'active' });
-      const [driverData, setDriverData] = useState({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' });
+      const [driverData, setDriverData] = useState({ name: '', phone: '', password: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' });
       const [clientData, setClientData] = useState({ name: '', address: '', phone: '', city: '', region: '', paymentType: 'cash', creditLimit: '0', debtBalance: '0', notes: '' });
       const [productData, setProductData] = useState({ name: '', pricePerTon: '', bagWeightKg: '25', notes: '' });
       const [tripData, setTripData] = useState({ clientId: '', tripsCount: 1, cargoType: 'علف تسمين', weightTons: '2.5', truckNumber: '', notes: '' });
@@ -428,7 +428,7 @@
         push(ref(db, 'logs'), { action, description, timestamp: new Date().toISOString() });
       };
 
-      // Phone-Based Login Handler
+      // Phone-Based Login Handler (تشمل السائقين والعملاء والموظفين)
       const handleLogin = (e) => {
         e.preventDefault();
         const inputP = phoneInput.trim();
@@ -463,7 +463,19 @@
           return;
         }
 
-        // 3. Check Client Database
+        // 3. Check Driver Database
+        const matchedDriver = drivers.find(d => d.phone === inputP);
+        if (matchedDriver) {
+          setIsAuthenticated(true);
+          setCurrentUserRole('driver');
+          setCurrentUserData(matchedDriver);
+          setActiveTab('driverCards');
+          showToast(`أهلاً بك السائق: ${matchedDriver.name}`);
+          addLog('LOGIN', `تسجيل دخول سائق: ${matchedDriver.name}`);
+          return;
+        }
+
+        // 4. Check Client Database
         const matchedClient = clients.find(c => c.phone === inputP);
         if (matchedClient) {
           setIsAuthenticated(true);
@@ -476,6 +488,16 @@
         }
 
         showToast('رقم الهاتف أو كلمة المرور غير صحيحة', 'error');
+      };
+
+      // فتح موقع العميل على الخرائط (GPS / Google Maps)
+      const openClientLocation = (address) => {
+        if (!address) {
+          showToast('عنوان العميل غير مسجل', 'error');
+          return;
+        }
+        const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`;
+        window.open(url, '_blank');
       };
 
       // Save Product
@@ -567,7 +589,7 @@
         }
         setActiveModal(null);
         setSelectedDriver(null);
-        setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' });
+        setDriverData({ name: '', phone: '', password: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' });
       };
 
       // Save Client
@@ -703,7 +725,6 @@
             addLog('UPDATE_ORDER', `تعديل حالة طلب العميل ${order.clientName || ''} إلى ${newStatus}`);
 
             if (newStatus === 'مقبول') {
-              // احتساب المديونية إذا كان العميل آجل
               if (order.clientId) {
                 const targetClient = clients.find(c => c.id === order.clientId);
                 if (targetClient && targetClient.paymentType === 'credit') {
@@ -776,17 +797,17 @@
       const approvedOrdersCount = useMemo(() => Array.isArray(orders) ? orders.filter(o => o && o.status === 'مقبول').length : 0, [orders]);
       const rejectedOrdersCount = useMemo(() => Array.isArray(orders) ? orders.filter(o => o && o.status === 'ملغي').length : 0, [orders]);
 
-      // Filtered Trips for Reports
+      // Filtered Trips for Reports / Drivers
       const filteredReportTrips = useMemo(() => {
         if (!Array.isArray(trips)) return [];
         return trips.filter(t => {
           if (!t) return false;
-          const matchDriver = reportFilter.driverId ? t.driverId === reportFilter.driverId : true;
+          const matchDriver = currentUserRole === 'driver' && currentUserData ? t.driverId === currentUserData.id : (reportFilter.driverId ? t.driverId === reportFilter.driverId : true);
           const matchFrom = reportFilter.fromDate ? (t.date && t.date >= reportFilter.fromDate) : true;
           const matchTo = reportFilter.toDate ? (t.date && t.date <= reportFilter.toDate) : true;
           return matchDriver && matchFrom && matchTo;
         });
-      }, [trips, reportFilter]);
+      }, [trips, reportFilter, currentUserRole, currentUserData]);
 
       // Showroom Sales Filtered by Month & Unit
       const filteredShowroomSales = useMemo(() => {
@@ -884,7 +905,7 @@
                 { id: 'showroom', label: 'مبيعات المعرض', icon: 'store', roles: ['admin', 'sales'] },
                 { id: 'products', label: 'إدارة المنتجات', icon: 'package', roles: ['admin', 'sales'] },
                 { id: 'salesReps', label: 'إدارة الموظفين والمناديب', icon: 'user-check', roles: ['admin'] },
-                { id: 'driverCards', label: 'السائقين والنقلات', icon: 'truck', roles: ['admin'] },
+                { id: 'driverCards', label: 'السائقين والنقلات', icon: 'truck', roles: ['admin', 'driver'] },
                 { id: 'clients', label: 'إدارة العملاء والحسابات', icon: 'users', roles: ['admin', 'sales', 'rep'] },
                 { id: 'reports', label: 'التقارير والطباعة', icon: 'bar-chart-3', roles: ['admin'] },
                 { id: 'logs', label: 'السجلات', icon: 'shield-alert', roles: ['admin'] }
@@ -903,7 +924,7 @@
           <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-8">
 
             {/* ⚠️ شريط تنبيه حرج فور وجود نواقص في مخزن المعرض مع إمكانية الإخفاء المؤقت */}
-            {lowStockShowroomItems.length > 0 && !dismissStockAlert && (
+            {lowStockShowroomItems.length > 0 && !dismissStockAlert && currentUserRole === 'admin' && (
               <div className="mb-6 bg-red-950/90 border border-red-600/60 p-4 rounded-2xl flex items-center justify-between shadow-xl animate-pulse">
                 <div className="flex items-center gap-3">
                   <i data-lucide="alert-triangle" className="w-6 h-6 text-red-400"></i>
@@ -1284,7 +1305,7 @@
               </div>
             )}
 
-            {/* TAB: SALES REPS & EMPLOYEES (الموظفين والمناديب وإدارة الصلاحيات) */}
+            {/* TAB: SALES REPS & EMPLOYEES */}
             {activeTab === 'salesReps' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -1333,58 +1354,136 @@
               </div>
             )}
 
-            {/* TAB: DRIVER CARDS & TRIPS */}
+            {/* TAB: DRIVER CARDS & TRIPS (صفحة السائقين المحسنة مع خرائط جوجل واللوكيشن) */}
             {activeTab === 'driverCards' && (
               <div className="space-y-8">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-xl font-bold flex items-center gap-2">
-                    <i data-lucide="truck" className="w-5 h-5 text-gold"></i>
-                    بطاقات السائقين
-                  </h2>
-                  <button onClick={() => { setSelectedDriver(null); setDriverData({ name: '', phone: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' }); setActiveModal('driverForm'); }} className="gold-gradient text-dark-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
-                    <i data-lucide="plus" className="w-4 h-4"></i> إضافة سائق جديد
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {drivers.map(driver => (
-                    <div key={driver.id} className="glass-card p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between space-y-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-dark-800 border border-gold/30 flex items-center justify-center text-gold shadow-md">
-                          <i data-lucide="truck" className="w-7 h-7"></i>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-lg text-white">{driver.name}</h4>
-                          <p className="text-xs text-gray-400">السيارة / اللوحة: <span className="text-gold font-semibold">{driver.truckNumber}</span></p>
-                        </div>
+                {currentUserRole === 'driver' && currentUserData && (
+                  <div className="glass-card p-6 rounded-3xl border border-gold/40 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-xl font-black text-gold flex items-center gap-2">
+                          <i data-lucide="truck" className="w-6 h-6"></i>
+                          مرحباً السائق: {currentUserData.name}
+                        </h2>
+                        <p className="text-xs text-gray-400 mt-1">السيارة: {currentUserData.truckNumber || 'غير محدد'} | الهاتف: {currentUserData.phone}</p>
                       </div>
+                      <span className="px-3 py-1 rounded-full bg-green-500/20 text-green-400 font-bold text-xs border border-green-500/30">سائق معتمد</span>
+                    </div>
 
-                      <div className="bg-dark-950/60 p-3 rounded-2xl border border-dark-700/50 flex justify-between items-center text-xs">
-                        <div>
-                          <span className="text-gray-400 block">إجمالي النقلات</span>
-                          <span className="text-base font-black text-white">{driver.totalTripsCount || 0}</span>
-                        </div>
-                        <div className="text-left">
-                          <span className="text-gray-400 block">حساب التوصيل الحالي</span>
-                          <span className="text-xs font-bold text-green-400">{((driver.totalTripsCount || 0) * 25).toLocaleString()} ج.م</span>
-                        </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 bg-dark-950 p-4 rounded-2xl border border-dark-700">
+                      <div>
+                        <span className="text-xs text-gray-400 block">عدد النقلات المنجزة:</span>
+                        <strong className="text-2xl font-black text-white">{filteredReportTrips.length} نقلة</strong>
                       </div>
-
-                      <div className="flex gap-2 pt-2">
-                        <button onClick={() => { setSelectedDriver(driver); setActiveModal('tripForm'); }} className="flex-1 gold-gradient text-dark-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 hover:brightness-110">
-                          <i data-lucide="plus-circle" className="w-4 h-4"></i> إضافة نقلة
-                        </button>
-                        <button onClick={() => { setSelectedDriver(driver); setReportFilter({ ...reportFilter, driverId: driver.id }); setActiveModal('driverReportModal'); }} className="bg-dark-800 border border-dark-700 text-gray-300 p-2.5 rounded-xl text-xs" title="كشف حساب السائق">
-                          <i data-lucide="file-text" className="w-4 h-4 text-gold"></i>
-                        </button>
+                      <div>
+                        <span className="text-xs text-gray-400 block">إجمالي أجر التوصيل المستحق:</span>
+                        <strong className="text-2xl font-black text-green-400">{(filteredReportTrips.length * 25).toLocaleString()} ج.م</strong>
+                      </div>
+                      <div>
+                        <span className="text-xs text-gray-400 block">إجمالي حمولة النقلات:</span>
+                        <strong className="text-2xl font-black text-gold">{filteredReportTrips.reduce((sum, t) => sum + (parseFloat(t.weightTons) || 0), 0).toFixed(2)} طن</strong>
                       </div>
                     </div>
-                  ))}
-                </div>
+
+                    <div className="space-y-3 pt-4">
+                      <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                        <i data-lucide="navigation" className="w-4 h-4 text-gold"></i>
+                        سجل وسير نقلاتي ومواقع العملاء
+                      </h3>
+
+                      <div className="space-y-3">
+                        {filteredReportTrips.map(trip => {
+                          const client = clients.find(c => c.id === trip.clientId || c.name === trip.clientName);
+                          const address = trip.clientAddress || (client ? client.address : '');
+
+                          return (
+                            <div key={trip.id} className="bg-dark-800 p-4 rounded-2xl border border-dark-700 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-white text-base">{trip.clientName || 'عميل'}</span>
+                                  <span className="text-xs text-gold font-mono">({trip.date})</span>
+                                </div>
+                                <p className="text-xs text-gray-300">الحمولة: <strong>{trip.cargoType}</strong> - الوزن: <strong>{trip.weightTons} طن</strong></p>
+                                <p className="text-xs text-gray-400">العنوان: {address || 'غير محدد'}</p>
+                              </div>
+
+                              <div className="flex items-center gap-2 w-full md:w-auto">
+                                <button
+                                  onClick={() => openClientLocation(address)}
+                                  className="flex-1 md:flex-none px-4 py-2 bg-blue-600/20 hover:bg-blue-600/40 text-blue-300 rounded-xl text-xs font-bold border border-blue-500/30 flex items-center justify-center gap-1.5"
+                                >
+                                  <i data-lucide="map-pin" className="w-4 h-4"></i> فتح اللوكيشن الخريطة
+                                </button>
+                                {client && (
+                                  <button
+                                    onClick={() => { setSelectedClient(client); setActiveModal('clientDetailsModal'); }}
+                                    className="flex-1 md:flex-none px-4 py-2 bg-dark-700 hover:text-gold text-gray-200 rounded-xl text-xs font-bold border border-dark-600 flex items-center justify-center gap-1.5"
+                                  >
+                                    <i data-lucide="user" className="w-4 h-4"></i> عرض بيانات العميل
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {currentUserRole === 'admin' && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <h2 className="text-xl font-bold flex items-center gap-2">
+                        <i data-lucide="truck" className="w-5 h-5 text-gold"></i>
+                        بطاقات السائقين بالنظام
+                      </h2>
+                      <button onClick={() => { setSelectedDriver(null); setDriverData({ name: '', phone: '', password: '', address: '', truckNumber: '', truckType: 'تريلا', notes: '', status: 'active' }); setActiveModal('driverForm'); }} className="gold-gradient text-dark-950 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2">
+                        <i data-lucide="plus" className="w-4 h-4"></i> إضافة سائق جديد
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                      {drivers.map(driver => (
+                        <div key={driver.id} className="glass-card p-6 rounded-3xl relative overflow-hidden flex flex-col justify-between space-y-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-14 h-14 rounded-2xl bg-dark-800 border border-gold/30 flex items-center justify-center text-gold shadow-md">
+                              <i data-lucide="truck" className="w-7 h-7"></i>
+                            </div>
+                            <div>
+                              <h4 className="font-bold text-lg text-white">{driver.name}</h4>
+                              <p className="text-xs text-gray-400">السيارة / اللوحة: <span className="text-gold font-semibold">{driver.truckNumber}</span></p>
+                            </div>
+                          </div>
+
+                          <div className="bg-dark-950/60 p-3 rounded-2xl border border-dark-700/50 flex justify-between items-center text-xs">
+                            <div>
+                              <span className="text-gray-400 block">إجمالي النقلات</span>
+                              <span className="text-base font-black text-white">{driver.totalTripsCount || 0}</span>
+                            </div>
+                            <div className="text-left">
+                              <span className="text-gray-400 block">حساب التوصيل الحالي</span>
+                              <span className="text-xs font-bold text-green-400">{((driver.totalTripsCount || 0) * 25).toLocaleString()} ج.م</span>
+                            </div>
+                          </div>
+
+                          <div className="flex gap-2 pt-2">
+                            <button onClick={() => { setSelectedDriver(driver); setActiveModal('tripForm'); }} className="flex-1 gold-gradient text-dark-950 font-black py-2.5 rounded-xl text-xs flex items-center justify-center gap-1.5 hover:brightness-110">
+                              <i data-lucide="plus-circle" className="w-4 h-4"></i> إضافة نقلة
+                            </button>
+                            <button onClick={() => { setSelectedDriver(driver); setReportFilter({ ...reportFilter, driverId: driver.id }); setActiveModal('driverReportModal'); }} className="bg-dark-800 border border-dark-700 text-gray-300 p-2.5 rounded-xl text-xs" title="كشف حساب السائق">
+                              <i data-lucide="file-text" className="w-4 h-4 text-gold"></i>
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
               </div>
             )}
 
-            {/* TAB: CLIENTS MANAGEMENT (مع نظام التعامل النقدي والآجل) */}
+            {/* TAB: CLIENTS MANAGEMENT */}
             {activeTab === 'clients' && (
               <div className="space-y-6">
                 <div className="flex justify-between items-center">
@@ -1400,8 +1499,8 @@
                       <tr>
                         <th className="p-4">اسم العميل</th>
                         <th className="p-4">الهاتف</th>
+                        <th className="p-4">العنوان والموقع</th>
                         <th className="p-4">نظام التعامل</th>
-                        <th className="p-4">الحد الائتماني (آجل)</th>
                         <th className="p-4">المديونية الحالية</th>
                         <th className="p-4 text-center">الإجراءات</th>
                       </tr>
@@ -1412,13 +1511,21 @@
                           <td className="p-4 font-bold">{c.name}</td>
                           <td className="p-4 text-gray-300 font-mono">{c.phone}</td>
                           <td className="p-4">
+                            <div className="flex items-center gap-2">
+                              <span>{c.address}</span>
+                              <button onClick={() => openClientLocation(c.address)} className="text-blue-400 hover:text-blue-300" title="فتح الموقع على الخرائط">
+                                <i data-lucide="map-pin" className="w-4 h-4"></i>
+                              </button>
+                            </div>
+                          </td>
+                          <td className="p-4">
                             <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${c.paymentType === 'credit' ? 'bg-red-500/10 text-red-400 border border-red-500/20' : 'bg-green-500/10 text-green-400 border border-green-500/20'}`}>
                               {c.paymentType === 'credit' ? 'آجل' : 'نقدي'}
                             </span>
                           </td>
-                          <td className="p-4 text-gray-300">{c.paymentType === 'credit' ? Number(c.creditLimit || 0).toLocaleString() + ' ج.م' : '-'}</td>
                           <td className="p-4 font-black text-red-400">{Number(c.debtBalance || 0).toLocaleString()} ج.م</td>
                           <td className="p-4 text-center flex justify-center gap-2">
+                            <button onClick={() => { setSelectedClient(c); setActiveModal('clientDetailsModal'); }} className="p-2 bg-dark-700 text-blue-400 hover:text-gold rounded-lg" title="معاينة بيانات العميل"><i data-lucide="eye" className="w-4 h-4"></i></button>
                             <button onClick={() => { setSelectedClient(c); setClientData({ name: c.name, address: c.address || '', phone: c.phone || '', city: c.city || '', region: c.region || '', paymentType: c.paymentType || 'cash', creditLimit: c.creditLimit || '0', debtBalance: c.debtBalance || '0', notes: c.notes || '' }); setActiveModal('clientForm'); }} className="p-2 bg-dark-700 hover:text-gold rounded-lg"><i data-lucide="edit" className="w-4 h-4"></i></button>
                             <button onClick={() => { setDeleteTarget({ path: 'clients', id: c.id, name: c.name }); setActiveModal('deleteConfirm'); }} className="p-2 bg-dark-700 text-red-400 rounded-lg"><i data-lucide="trash-2" className="w-4 h-4"></i></button>
                           </td>
@@ -1507,7 +1614,7 @@
 
           </main>
 
-          {/* 📄 MODAL: FULL ORDER INVOICE DETAILS (مع التنسيق المصغر للطباعة) */}
+          {/* 📄 MODAL: FULL ORDER INVOICE DETAILS */}
           {activeModal === 'orderDetailsModal' && selectedOrderDetails && (
             <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-white text-black p-6 rounded-3xl w-full max-w-2xl max-h-[92vh] overflow-y-auto space-y-6 shadow-2xl">
@@ -1597,6 +1704,56 @@
             </div>
           )}
 
+          {/* MODAL: CLIENT DETAILS VIEW */}
+          {activeModal === 'clientDetailsModal' && selectedClient && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="glass-card p-6 rounded-3xl w-full max-w-md space-y-4 text-white">
+                <div className="flex justify-between items-center border-b border-dark-700 pb-3">
+                  <h3 className="text-lg font-bold text-gold flex items-center gap-2">
+                    <i data-lucide="user" className="w-5 h-5"></i>
+                    بطاقة بيانات العميل
+                  </h3>
+                  <button onClick={() => setActiveModal(null)} className="text-gray-400 hover:text-white">✕</button>
+                </div>
+
+                <div className="space-y-3 text-xs">
+                  <div>
+                    <span className="text-gray-400 block mb-0.5">اسم العميل:</span>
+                    <strong className="text-sm font-bold text-white block">{selectedClient.name}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block mb-0.5">رقم الهاتف:</span>
+                    <strong className="text-gold font-mono text-sm block">{selectedClient.phone}</strong>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 block mb-0.5">العنوان والموقع:</span>
+                    <strong className="text-gray-200 block">{selectedClient.address || 'غير محدد'}</strong>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 bg-dark-950 p-3 rounded-xl border border-dark-700">
+                    <div>
+                      <span className="text-gray-400 block">نظام التعامل:</span>
+                      <strong className="text-white">{selectedClient.paymentType === 'credit' ? 'آجل' : 'نقدي'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block">المديونية الحالية:</span>
+                      <strong className="text-red-400 font-bold">{Number(selectedClient.debtBalance || 0).toLocaleString()} ج.م</strong>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex justify-between gap-2 pt-2">
+                  <button
+                    onClick={() => openClientLocation(selectedClient.address)}
+                    className="flex-1 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow"
+                  >
+                    <i data-lucide="map-pin" className="w-4 h-4"></i> فتح الخريطة واللوكيشن
+                  </button>
+                  <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2.5 bg-dark-800 text-gray-300 rounded-xl text-xs">إغلاق</button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* MODAL: EDIT SHOWROOM STOCK */}
           {activeModal === 'editStockModal' && editingStockProduct && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
@@ -1622,7 +1779,7 @@
             </div>
           )}
 
-          {/* MODAL: SHOWROOM INVOICE PREVIEW (طباعة الفواتير المصغرة) */}
+          {/* MODAL: SHOWROOM INVOICE PREVIEW */}
           {activeModal === 'showroomInvoiceModal' && selectedShowroomInvoice && (
             <div className="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-white text-black p-6 rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
@@ -1752,7 +1909,7 @@
                 <h3 className="text-lg font-bold text-gold">{selectedDriver ? 'تعديل بيانات السائق' : 'إضافة سائق جديد'}</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <input type="text" placeholder="اسم السائق" required value={driverData.name} onChange={e => setDriverData({ ...driverData, name: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
-                  <input type="text" placeholder="رقم الهاتف" required value={driverData.phone} onChange={e => setDriverData({ ...driverData, phone: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
+                  <input type="text" placeholder="رقم الهاتف (للدخول)" required value={driverData.phone} onChange={e => setDriverData({ ...driverData, phone: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
                 </div>
                 <div>
                   <input type="text" placeholder="رقم السيارة / رقم اللوحة" required value={driverData.truckNumber} onChange={e => setDriverData({ ...driverData, truckNumber: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
@@ -1772,8 +1929,8 @@
                 <h3 className="text-lg font-bold text-gold">{selectedClient ? 'تعديل بيانات العميل' : 'إضافة عميل جديد'}</h3>
                 <input type="text" placeholder="اسم العميل" required value={clientData.name} onChange={e => setClientData({ ...clientData, name: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
                 <div className="grid grid-cols-2 gap-3">
-                  <input type="text" placeholder="رقم الهاتف" required value={clientData.phone} onChange={e => setClientData({ ...clientData, phone: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
-                  <input type="text" placeholder="العنوان" required value={clientData.address} onChange={e => setClientData({ ...clientData, address: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
+                  <input type="text" placeholder="رقم الهاتف (للدخول)" required value={clientData.phone} onChange={e => setClientData({ ...clientData, phone: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
+                  <input type="text" placeholder="العنوان بالتفصيل" required value={clientData.address} onChange={e => setClientData({ ...clientData, address: e.target.value })} className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
