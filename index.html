@@ -230,7 +230,7 @@
           id="submitBtn"
           class="w-full gold-gradient text-dark-950 font-black py-4 rounded-2xl text-sm transition-all hover:brightness-110 shadow-xl flex items-center justify-center gap-2 group cursor-pointer"
         >
-          <span id="btnText">تسجيل الدخول والتوجيه التلقائي</span>
+          <span id="btnText">تسجيل الدخول والنظام</span>
           <i id="btnIcon" data-lucide="arrow-left" class="w-5 h-5 group-hover:-translate-x-1 transition-transform"></i>
         </button>
 
@@ -271,7 +271,7 @@
     if (window.lucide) window.lucide.createIcons();
   </script>
 
-  <!-- كود التوجيه المحدث والمضمون 100% -->
+  <!-- كود التوجيه المحدث والرافض لأي رقم غير مسجل -->
   <script>
     function showToast(message, type = 'info') {
       const toast = document.getElementById('toast');
@@ -290,7 +290,7 @@
       }, 4000);
     }
 
-    // دالة تنظيف وتوحيد الأرقام (تضمن تحويل الأرقام العربية إلى إنجليزية وإزالة المسافات)
+    // دالة تنظيف وتوحيد الأرقام
     function normalizePhone(phone) {
       if (!phone) return '';
       return String(phone)
@@ -314,7 +314,7 @@
       }
 
       submitBtn.disabled = true;
-      btnText.innerText = 'جاري التحقق والتوجيه...';
+      btnText.innerText = 'جاري التحقق من قاعدة البيانات...';
       showToast('جاري الفحص ومطابقة بيانات الحساب...', 'info');
 
       try {
@@ -394,31 +394,23 @@
           }
         }
 
-        // 4. تنفيذ التوجيه التلقائي
+        // 4. التوجيه أو الرفض النهائي لو البيانات غير موجودة تماماً
         if (redirectTarget) {
           setTimeout(() => {
             window.location.href = redirectTarget;
           }, 800);
         } else {
-          showToast('رقم الهاتف غير مسجل، جاري التحويل لبوابة العملاء...', 'info');
-          localStorage.setItem('userPhone', cleanPhone);
-          
-          setTimeout(() => {
-            window.location.href = `client.html?phone=${encodeURIComponent(cleanPhone)}`;
-          }, 1200);
+          // تم الإلغاء تماماً لفتح صفحة العملاء بأرقام وهمية -> الآن يرفض نهائياً
+          showToast('عذراً، رقم الهاتف غير مسجل في قاعدة البيانات. يرجى مراجعة الإدارة.', 'error');
+          submitBtn.disabled = false;
+          btnText.innerText = 'تسجيل الدخول والنظام';
         }
 
       } catch (error) {
         console.error("Login Error:", error);
-        showToast('جاري التوجيه التلقائي...', 'info');
-        
-        setTimeout(() => {
-          localStorage.setItem('userPhone', cleanPhone);
-          window.location.href = `client.html?phone=${encodeURIComponent(cleanPhone)}`;
-        }, 1000);
-      } finally {
+        showToast('حدث خطأ أثناء الاتصال بقاعدة البيانات. حاول مرة أخرى.', 'error');
         submitBtn.disabled = false;
-        btnText.innerText = 'تسجيل الدخول والتوجيه التلقائي';
+        btnText.innerText = 'تسجيل الدخول والنظام';
       }
     }
   </script>
