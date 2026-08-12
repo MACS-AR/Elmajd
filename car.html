@@ -80,7 +80,7 @@
 </head>
 <body class="p-3 md:p-6 pb-20">
 
-    <!-- شاشة تسجيل دخول السائق (تظهر إذا لم يتم التعرف على الرقم) -->
+    <!-- شاشة تسجيل دخول السائق -->
     <div id="loginScreen" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="glass-card gold-border rounded-3xl w-full max-w-md p-6 md:p-8 text-center space-y-6 shadow-2xl">
             <div class="w-20 h-20 rounded-full mx-auto gold-border overflow-hidden p-1 bg-black/50 flex justify-center items-center shadow-inner">
@@ -116,11 +116,9 @@
         </div>
 
         <div class="flex items-center gap-2">
-            <!-- Dark / Light Mode Toggle -->
             <button onclick="toggleTheme()" title="تغيير المظهر" class="bg-slate-800 text-amber-400 w-10 h-10 rounded-xl flex items-center justify-center gold-border transition hover:scale-105">
                 <i id="themeIcon" class="fa-solid fa-moon text-sm"></i>
             </button>
-            <!-- Logout Button -->
             <button onclick="driverLogout()" title="تسجيل الخروج" class="bg-rose-500/10 text-rose-400 hover:bg-rose-500/20 w-10 h-10 rounded-xl flex items-center justify-center border border-rose-500/20 transition">
                 <i class="fa-solid fa-right-from-bracket text-sm"></i>
             </button>
@@ -172,7 +170,7 @@
             <div class="glass-card gold-border rounded-2xl p-5 md:p-6 gold-shadow space-y-4">
                 <h3 class="text-lg font-bold gold-gradient-text flex items-center gap-2 border-b border-amber-500/20 pb-3">
                     <i class="fa-solid fa-file-invoice-dollar text-amber-500"></i>
-                    ملخص حساب السائق والنقلات
+                    ملخص حساب السائق والنقلات الشامل
                 </h3>
                 
                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -185,7 +183,7 @@
                         <span id="totalTipsAmount" class="text-2xl font-black text-emerald-400">0 ج.م</span>
                     </div>
                     <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-center">
-                        <span class="text-xs text-slate-400 block mb-1">إجمالي المبالغ / المستحقات</span>
+                        <span class="text-xs text-slate-400 block mb-1">إجمالي أجر التوصيل / المستحقات</span>
                         <span id="totalDuesAmount" class="text-2xl font-black text-amber-500">0 ج.م</span>
                     </div>
                 </div>
@@ -194,7 +192,7 @@
             <div class="glass-card gold-border rounded-2xl p-5 space-y-4">
                 <h3 class="text-md font-bold text-white flex items-center gap-2">
                     <i class="fa-solid fa-truck-fast text-amber-500"></i>
-                    سجل نقلات السائق الخاصة بك
+                    سجل نقلات السائق المرتبطة بك
                 </h3>
                 <div id="driverTripsList" class="space-y-3">
                     <p class="text-center text-xs text-slate-400 py-6">لا توجد نقلات مسجلة باسمك حتى الآن.</p>
@@ -236,7 +234,6 @@
                         class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3 text-sm text-white focus:outline-none focus:border-amber-400">
                 </div>
 
-                <!-- Location Mode -->
                 <div class="pt-2">
                     <label class="block text-xs font-semibold text-amber-500 mb-2">طريقة تحديد المكان *</label>
                     <div class="grid grid-cols-2 gap-2 mb-3">
@@ -250,7 +247,6 @@
                         </button>
                     </div>
 
-                    <!-- GPS -->
                     <div id="secAuto" class="space-y-2">
                         <button type="button" onclick="getCurrentLocation()" id="locBtn"
                             class="w-full bg-slate-800 hover:opacity-90 gold-border text-amber-500 font-semibold p-3.5 rounded-xl transition text-sm flex items-center justify-center gap-2">
@@ -259,7 +255,6 @@
                         </button>
                     </div>
 
-                    <!-- Manual Link -->
                     <div id="secManual" class="hidden space-y-2">
                         <label class="block text-[11px] text-slate-400 mb-1">انسخ رابط خرائط جوجل وحطه هنا:</label>
                         <input type="text" id="custMapUrl" oninput="parseMapUrl()" placeholder="https://maps.app.goo.gl/..." 
@@ -283,7 +278,7 @@
         </div>
     </div>
 
-    <!-- Firebase SDK v10 (Realtime Database Module) -->
+    <!-- Firebase SDK v10 -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
         import { getDatabase, ref, update, onValue, get } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
@@ -301,13 +296,15 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const customersRef = ref(db, 'clients'); // الربط بنفس جدول العملاء الأساسي في صفحة الإدارة
+        const customersRef = ref(db, 'clients'); 
         const driversRef = ref(db, 'drivers');
         const ordersRef = ref(db, 'orders');
+        const tripsRef = ref(db, 'trips');
 
         let allCustomers = [];
         let allDrivers = [];
         let allOrders = [];
+        let allTrips = [];
         let currentDriver = null;
 
         function normalizePhone(phone) {
@@ -315,7 +312,6 @@
             return String(phone).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '');
         }
 
-        // 📲 التحقق التلقائي وتسجيل الدخول برقم الهاتف من الرابط أو LocalStorage
         window.addEventListener('DOMContentLoaded', async () => {
             const urlParams = new URLSearchParams(window.location.search);
             const phoneParam = urlParams.get('phone') || localStorage.getItem('userPhone');
@@ -329,7 +325,6 @@
                 } catch(e) {}
             }
 
-            // جلب البيانات من السيرفر والتحقق من رقم الهاتف
             try {
                 const snapshot = await get(driversRef);
                 if (snapshot.exists()) {
@@ -352,7 +347,6 @@
                 console.error(err);
             }
 
-            // إذا لم يتم العثور على السائق، إظهار نافذة تسجيل الدخول اليدوي
             if (!currentDriver) {
                 document.getElementById('loginScreen').classList.remove('hidden');
             }
@@ -376,7 +370,6 @@
                 localStorage.setItem('driverData', JSON.stringify(found));
                 initDriverSession();
             } else {
-                // فتح جلسة مؤقتة برقم التليفون
                 currentDriver = { name: `سائق (${rawPhone})`, phone: rawPhone };
                 localStorage.setItem('userPhone', cleanP);
                 localStorage.setItem('driverData', JSON.stringify(currentDriver));
@@ -390,7 +383,6 @@
             location.href = 'index.html';
         };
 
-        // Realtime Listeners للنظام الموحد
         function startRealtimeListeners() {
             onValue(customersRef, (snapshot) => {
                 const data = snapshot.val();
@@ -403,9 +395,14 @@
                 allOrders = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
                 renderDriverAccount();
             });
+
+            onValue(tripsRef, (snapshot) => {
+                const data = snapshot.val();
+                allTrips = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
+                renderDriverAccount();
+            });
         }
 
-        // Theme Toggle
         window.toggleTheme = () => {
             const html = document.documentElement;
             const icon = document.getElementById('themeIcon');
@@ -427,7 +424,6 @@
             document.getElementById('themeIcon').className = "fa-solid fa-sun text-sm";
         }
 
-        // Tabs Switching
         window.switchTab = (tab) => {
             const btnLoc = document.getElementById('tabBtnLocations');
             const btnAcc = document.getElementById('tabBtnAccount');
@@ -448,7 +444,6 @@
             }
         };
 
-        // Modal Controls & Dropdown Population
         window.toggleAddModal = () => {
             const modal = document.getElementById('addModal');
             modal.classList.toggle('hidden');
@@ -627,37 +622,49 @@
         function renderDriverAccount() {
             if (!currentDriver) return;
 
-            // تصفية النقلات الخاصة بهذا السائق (مطابقة بالاسم أو رقم الهاتف أو الـ ID)
-            const myTrips = allOrders.filter(o => {
-                const matchId = o.driverId && currentDriver.id && o.driverId === currentDriver.id;
-                const matchName = o.driverName && currentDriver.name && o.driverName.trim() === currentDriver.name.trim();
-                const matchPhone = o.driverPhone && currentDriver.phone && normalizePhone(o.driverPhone) === normalizePhone(currentDriver.phone);
-                return matchId || matchName || matchPhone;
+            // جلب النقلات من جدول trips وجدول orders المسجلة لهذا السائق
+            const myTrips = allTrips.filter(t => {
+                const matchId = t.driverId && currentDriver.id && t.driverId === currentDriver.id;
+                const matchName = t.driverName && currentDriver.name && t.driverName.trim() === currentDriver.name.trim();
+                return matchId || matchName;
             });
 
-            document.getElementById('totalTripsCount').innerText = myTrips.length;
-            
-            const totalTips = myTrips.reduce((sum, o) => sum + (parseFloat(o.tips || o.smoke || o.driverTip || 0)), 0);
-            const totalDues = myTrips.reduce((sum, o) => sum + (parseFloat(o.totalAmount || o.dues || 0)), 0);
+            const myOrders = allOrders.filter(o => {
+                const matchId = o.driverId && currentDriver.id && o.driverId === currentDriver.id;
+                const matchName = o.driverName && currentDriver.name && o.driverName.trim() === currentDriver.name.trim();
+                return (matchId || matchName) && o.status === 'مقبول';
+            });
 
+            // إجمالي عدد النقلات الشامل
+            const totalTripsCount = myTrips.reduce((sum, t) => sum + (parseInt(t.tripsCount) || 1), 0) + myOrders.length;
+            document.getElementById('totalTripsCount').innerText = totalTripsCount;
+            
+            // إجمالي أجر التوصيل (25 جنيه لكل نقلة حسب نظام صفحة الإدارة)
+            const totalDeliveryDues = totalTripsCount * 25;
+            document.getElementById('totalDuesAmount').innerText = totalDeliveryDues.toLocaleString() + ' ج.م';
+
+            // إجمالي الإكراميات (الدخان) المسجلة
+            const totalTips = myTrips.reduce((sum, t) => sum + (parseFloat(t.tips || t.smoke || t.driverTip || 0), 0), 0) +
+                              myOrders.reduce((sum, o) => sum + (parseFloat(o.tips || o.smoke || o.driverTip || 0), 0), 0);
             document.getElementById('totalTipsAmount').innerText = totalTips.toLocaleString() + ' ج.م';
-            document.getElementById('totalDuesAmount').innerText = totalDues.toLocaleString() + ' ج.م';
 
             const tripsContainer = document.getElementById('driverTripsList');
-            if (myTrips.length === 0) {
+            const combinedList = [...myTrips, ...myOrders];
+
+            if (combinedList.length === 0) {
                 tripsContainer.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">لا توجد نقلات مسجلة باسمك حتى الآن.</p>`;
                 return;
             }
 
-            tripsContainer.innerHTML = myTrips.map(t => `
+            tripsContainer.innerHTML = combinedList.map(t => `
                 <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
                     <div>
                         <strong class="text-amber-400 block mb-1">${t.clientName || 'عميل'}</strong>
-                        <span class="text-slate-400">التاريخ: ${t.date || new Date().toLocaleDateString('ar-EG')} | الحمولة: ${t.cargoType || 'علف'}</span>
+                        <span class="text-slate-400">التاريخ: ${t.date || new Date().toLocaleDateString('ar-EG')} | الحمولة: ${t.cargoType || 'علف'} (${t.weightTons || t.quantity || 0} طن)</span>
                     </div>
                     <div class="text-left">
                         <span class="text-emerald-400 font-bold block">إكرامية/دخان: ${t.tips || t.smoke || t.driverTip || 0} ج.م</span>
-                        <span class="text-slate-300">الإجمالي: ${Number(t.totalAmount || 0).toLocaleString()} ج.م</span>
+                        <span class="text-amber-300">أجر التوصيل: ${((parseInt(t.tripsCount) || 1) * 25)} ج.م</span>
                     </div>
                 </div>
             `).join('');
