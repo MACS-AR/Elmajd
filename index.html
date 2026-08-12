@@ -42,7 +42,7 @@
       }
     }
   </script>
-  
+
   <style>
     body {
       background-color: #090A0F;
@@ -79,11 +79,11 @@
       scrollbar-width: none;
     }
 
-    /* أنماط المعاينة والطباعة الرسمية عالية الوضوح (A4 & A5) */
+    /* أنماط المعاينة والطباعة الرسمية عالية الوضوح والخطوط المكبرة (A4 & A5) */
     @media print {
       @page {
         size: auto;
-        margin: 5mm;
+        margin: 6mm;
       }
       body {
         background: #ffffff !important;
@@ -104,11 +104,11 @@
         top: 0;
         width: 100% !important;
         margin: 0 auto !important;
-        padding: 12px !important;
+        padding: 10px !important;
         background: #ffffff !important;
         color: #000000 !important;
-        font-size: 13px !important;
-        line-height: 1.5 !important;
+        font-size: 14px !important;
+        line-height: 1.6 !important;
       }
       .no-print {
         display: none !important;
@@ -116,8 +116,8 @@
       table {
         width: 100% !important;
         border-collapse: collapse !important;
-        margin-top: 10px !important;
-        margin-bottom: 10px !important;
+        margin-top: 12px !important;
+        margin-bottom: 12px !important;
         page-break-inside: auto;
       }
       tr {
@@ -125,16 +125,29 @@
         page-break-after: auto;
       }
       th, td {
-        border: 1.5px solid #000000 !important;
+        border: 2px solid #000000 !important;
         color: #000000 !important;
-        padding: 7px 10px !important;
-        font-size: 12px !important;
-        font-weight: 600 !important;
+        padding: 8px 10px !important;
+        font-size: 13px !important;
+        font-weight: 700 !important;
         text-align: right !important;
       }
       th {
-        background-color: #f0f0f0 !important;
+        background-color: #e5e7eb !important;
+        font-size: 14px !important;
+        font-weight: 900 !important;
+      }
+      h1 {
+        font-size: 24px !important;
+        font-weight: 900 !important;
+      }
+      h2, h3 {
+        font-size: 18px !important;
         font-weight: 800 !important;
+      }
+      p, span, div {
+        color: #000000 !important;
+        font-weight: 700 !important;
       }
     }
   </style>
@@ -206,15 +219,19 @@
       const [activeTab, setActiveTab] = useState('dashboard');
       const [orderStatusFilter, setOrderStatusFilter] = useState('قيد الانتظار');
 
-      // Factory Settings State
+      // Factory Settings State (تم إضافة customPages للتنقل الديناميكي)
       const [settings, setSettings] = useState({
         factoryName: 'مصنع المجد للأعلاف',
         logoUrl: DEFAULT_LOGO,
         phone: '01000000000',
         address: 'المنطقة الصناعية - مصنع المجد للأعلاف',
         commissionPerTon: 50,
-        printPaperSize: 'A4'
+        printPaperSize: 'A4',
+        customPages: []
       });
+
+      // New Custom Page Form Input
+      const [newCustomPage, setNewCustomPage] = useState({ name: '', path: '' });
 
       // Dismiss Stock Alert State
       const [dismissStockAlert, setDismissStockAlert] = useState(false);
@@ -517,6 +534,46 @@
           showToast('تم حفظ إعدادات المصنع والتصميم بنجاح');
           addLog('UPDATE_SETTINGS', 'تحديث إعدادات المصنع الأساسية والتصميم');
         });
+      };
+
+      // Add Dynamic Custom Page Link
+      const handleAddCustomPage = (e) => {
+        e.preventDefault();
+        if (!newCustomPage.name.trim() || !newCustomPage.path.trim()) {
+          showToast('يرجى ملء اسم الصفحة ومسار الملف بشكل صحيح', 'error');
+          return;
+        }
+        const updatedCustomPages = [...(settings.customPages || []), {
+          id: Date.now().toString(),
+          name: newCustomPage.name.trim(),
+          path: newCustomPage.path.trim()
+        }];
+        const updatedSettings = { ...settings, customPages: updatedCustomPages };
+        setSettings(updatedSettings);
+        setNewCustomPage({ name: '', path: '' });
+
+        if (window.rtdbMethods) {
+          const { ref, set, db } = window.rtdbMethods;
+          set(ref(db, 'settings'), updatedSettings).then(() => {
+            showToast(`تم إضافة صفحة (${newCustomPage.name}) إلى القائمة الرئيسية بنجاح`);
+            addLog('ADD_CUSTOM_PAGE', `إضافة زر صفحة جديدة: ${newCustomPage.name} -> ${newCustomPage.path}`);
+          });
+        }
+      };
+
+      // Delete Custom Page
+      const handleDeleteCustomPage = (pageId) => {
+        const updatedPages = (settings.customPages || []).filter(p => p.id !== pageId);
+        const updatedSettings = { ...settings, customPages: updatedPages };
+        setSettings(updatedSettings);
+
+        if (window.rtdbMethods) {
+          const { ref, set, db } = window.rtdbMethods;
+          set(ref(db, 'settings'), updatedSettings).then(() => {
+            showToast('تم حذف الصفحة من القائمة الرئيسية');
+            addLog('DELETE_CUSTOM_PAGE', `حذف زر صفحة إضافية ID: ${pageId}`);
+          });
+        }
       };
 
       // Export JSON Backup
@@ -1150,7 +1207,7 @@
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <img src={settings.logoUrl || DEFAULT_LOGO} alt="Logo" className="w-10 h-10 rounded-full border border-gold p-0.5 bg-dark-900 object-contain" />
-                <div className="flex flex-col">
+                <div className="flex flex-col space-y-0.5">
                   <h1 className="font-bold text-base text-white">{settings.factoryName || 'مصنع المجد للأعلاف'}</h1>
                   <p className="text-[10px] text-gray-400">نظام لوحة الإدارة المباشرة الشاملة (Admin Portal)</p>
                 </div>
@@ -1164,8 +1221,8 @@
               </div>
             </div>
 
-            {/* شريط التنقل المتجاوب للهاتف والكمبيوتر */}
-            <nav className="flex items-center gap-2 bg-dark-800/80 p-2 rounded-2xl border border-dark-700 overflow-x-auto no-scrollbar">
+            {/* شريط التنقل المتجاوب المترتب رأسياً وبدون تمرير أفقي (Grid Layout) */}
+            <nav className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 bg-dark-800/80 p-2.5 rounded-2xl border border-dark-700">
               {[
                 { id: 'dashboard', label: 'طلبات المناديب', icon: 'shopping-bag' },
                 { id: 'showroom', label: 'مبيعات المعرض', icon: 'store' },
@@ -1180,12 +1237,31 @@
                 { id: 'reports', label: 'التقارير والطباعة', icon: 'bar-chart-3' },
                 { id: 'settings', label: 'الإعدادات والتصميم', icon: 'sliders' }
               ].map(tab => (
-                <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap ${activeTab === tab.id ? 'gold-gradient text-dark-950 shadow-md' : 'text-gray-400 hover:text-white bg-dark-900/50'}`}>
-                  <i data-lucide={tab.icon} className="w-3.5 h-3.5"></i>
-                  <span>{tab.label}</span>
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 w-full text-center ${activeTab === tab.id ? 'gold-gradient text-dark-950 shadow-md' : 'text-gray-400 hover:text-white bg-dark-900/50 hover:bg-dark-700'}`}
+                >
+                  <i data-lucide={tab.icon} className="w-3.5 h-3.5 shrink-0"></i>
+                  <span className="truncate">{tab.label}</span>
                   {tab.id === 'showroom' && lowStockShowroomItems.length > 0 && (
                     <span className="w-2 h-2 rounded-full bg-red-500 animate-ping"></span>
                   )}
+                </button>
+              ))}
+
+              {/* الأزرار والصفحات الإضافية المضافة ديناميكياً بواسطة المستخدم */}
+              {Array.isArray(settings.customPages) && settings.customPages.map(cp => (
+                <button
+                  key={cp.id}
+                  onClick={() => {
+                    if (cp.path) window.location.href = cp.path;
+                  }}
+                  className="px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 w-full text-center text-blue-400 hover:text-white bg-blue-950/40 hover:bg-blue-900/60 border border-blue-500/30"
+                  title={`فتح المسار: ${cp.path}`}
+                >
+                  <i data-lucide="external-link" className="w-3.5 h-3.5 shrink-0 text-blue-400"></i>
+                  <span className="truncate">{cp.name}</span>
                 </button>
               ))}
             </nav>
@@ -2202,6 +2278,71 @@
                       </button>
                     </div>
                   </form>
+                </div>
+
+                {/* 🔗 قسم إدارة الصفحات الجديدة والروابط الخارجية */}
+                <div className="glass-card p-6 rounded-3xl space-y-6 border border-dark-700">
+                  <div className="border-b border-dark-700 pb-4 flex flex-col space-y-1">
+                    <h3 className="text-base font-bold text-gold flex items-center gap-2">
+                      <i data-lucide="plus-square" className="w-5 h-5"></i>
+                      <span>إضافة صفحات جديدة وأزرار تنقل مخصصة</span>
+                    </h3>
+                    <p className="text-xs text-gray-400">قم بإضافة اسم الصفحة ومسار الملف (مثل: car.html) لتظهر تلقائياً كزر مخصص ضمن أزرار القائمة الرئيسية.</p>
+                  </div>
+
+                  <form onSubmit={handleAddCustomPage} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-xs text-gray-400">اسم الصفحة (الذي يظهر على الزر)</label>
+                      <input
+                        type="text"
+                        placeholder="مثال: صفحة السيارات"
+                        value={newCustomPage.name}
+                        onChange={e => setNewCustomPage({ ...newCustomPage, name: e.target.value })}
+                        className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none focus:border-gold"
+                      />
+                    </div>
+                    <div className="flex flex-col space-y-1">
+                      <label className="text-xs text-gray-400">مسار الملف أو الرابط (URL)</label>
+                      <input
+                        type="text"
+                        placeholder="مثال: car.html أو /cars"
+                        value={newCustomPage.path}
+                        onChange={e => setNewCustomPage({ ...newCustomPage, path: e.target.value })}
+                        className="bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none focus:border-gold"
+                      />
+                    </div>
+                    <button type="submit" className="gold-gradient text-dark-950 font-bold p-3 rounded-xl text-xs flex items-center justify-center gap-2 shadow">
+                      <i data-lucide="plus" className="w-4 h-4"></i>
+                      <span>إضافة الصفحة إلى القائمة</span>
+                    </button>
+                  </form>
+
+                  {/* قائمة الصفحات المضافة */}
+                  <div className="space-y-3 pt-2">
+                    <h4 className="text-xs font-bold text-gray-300">الصفحات والمسارات المضافة حالياً:</h4>
+                    {(!settings.customPages || settings.customPages.length === 0) ? (
+                      <p className="text-xs text-gray-500 italic">لا يوجد صفحات إضافية مضافة بعد.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {settings.customPages.map(page => (
+                          <div key={page.id} className="bg-dark-950/80 p-3.5 rounded-2xl border border-dark-700 flex justify-between items-center text-xs">
+                            <div className="flex flex-col space-y-0.5 truncate">
+                              <span className="font-bold text-blue-400">{page.name}</span>
+                              <span className="text-[10px] text-gray-400 font-mono truncate">المسار: {page.path}</span>
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <a href={page.path} target="_self" className="px-3 py-1.5 bg-blue-600/20 text-blue-300 rounded-lg text-[11px] font-bold border border-blue-500/30">
+                                تجربة
+                              </a>
+                              <button onClick={() => handleDeleteCustomPage(page.id)} className="p-1.5 bg-red-950/80 text-red-400 rounded-lg hover:bg-red-900 border border-red-800">
+                                <i data-lucide="trash-2" className="w-4 h-4"></i>
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="glass-card p-6 rounded-3xl space-y-4 border border-dark-700">
