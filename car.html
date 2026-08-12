@@ -80,8 +80,8 @@
 </head>
 <body class="p-3 md:p-6 pb-20">
 
-    <!-- شاشة تسجيل دخول السائق (تظهر إذا لم يتم تسجيل الدخول) -->
-    <div id="loginScreen" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4">
+    <!-- شاشة تسجيل دخول السائق (تظهر إذا لم يتم التعرف على الرقم) -->
+    <div id="loginScreen" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
         <div class="glass-card gold-border rounded-3xl w-full max-w-md p-6 md:p-8 text-center space-y-6 shadow-2xl">
             <div class="w-20 h-20 rounded-full mx-auto gold-border overflow-hidden p-1 bg-black/50 flex justify-center items-center shadow-inner">
                 <img src="https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png" alt="شعار المجد" class="object-contain w-full h-full rounded-full">
@@ -90,7 +90,7 @@
                 <h2 class="text-2xl font-black gold-gradient-text">بوابة السائقين</h2>
                 <p class="text-xs text-slate-400 mt-1">أدخل رقم هاتفك المسجل لعرض حسابك ونقلاتك</p>
             </div>
-            <form onsubmit="handleDriverLogin(event)" class="space-y-4 text-right">
+            <form onsubmit="handleDriverManualLogin(event)" class="space-y-4 text-right">
                 <div>
                     <label class="block text-xs font-semibold text-slate-300 mb-1">رقم تليفون السائق</label>
                     <input type="tel" id="loginPhoneInput" required placeholder="010xxxxxxxx" 
@@ -148,7 +148,7 @@
                         class="w-full dark:bg-slate-900/90 light:bg-white gold-border dark:text-white light:text-slate-900 text-sm rounded-xl py-3 pr-11 pl-4 focus:outline-none focus:border-amber-400">
                 </div>
                 <button onclick="toggleAddModal()" class="bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 text-slate-950 font-bold px-4 py-3 rounded-xl shadow-lg transition flex items-center gap-2 text-xs md:text-sm shrink-0">
-                    <i class="fa-solid fa-plus"></i> اضافة / تحديث مكان
+                    <i class="fa-solid fa-plus"></i> تحديث مكان عميل
                 </button>
             </div>
 
@@ -185,8 +185,8 @@
                         <span id="totalTipsAmount" class="text-2xl font-black text-emerald-400">0 ج.م</span>
                     </div>
                     <div class="bg-slate-900/60 p-4 rounded-xl border border-slate-800 text-center">
-                        <span class="text-xs text-slate-400 block mb-1">إجمالي المستحقات</span>
-                        <span id="totalDuesAmount" class="text-2xl font-black text-royal-gold">0 ج.م</span>
+                        <span class="text-xs text-slate-400 block mb-1">إجمالي المبالغ / المستحقات</span>
+                        <span id="totalDuesAmount" class="text-2xl font-black text-amber-500">0 ج.م</span>
                     </div>
                 </div>
             </div>
@@ -283,10 +283,10 @@
         </div>
     </div>
 
-    <!-- Firebase SDK v10 -->
+    <!-- Firebase SDK v10 (Realtime Database Module) -->
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { getDatabase, ref, update, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
+        import { getDatabase, ref, update, onValue, get } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBgRkceRq7FRbhCevLlULYNy-A5Tl_cr0w",
@@ -301,46 +301,109 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const customersRef = ref(db, 'customers');
+        const customersRef = ref(db, 'clients'); // الربط بنفس جدول العملاء الأساسي في صفحة الإدارة
+        const driversRef = ref(db, 'drivers');
         const ordersRef = ref(db, 'orders');
 
         let allCustomers = [];
+        let allDrivers = [];
         let allOrders = [];
-        let currentDriverPhone = localStorage.getItem('almagd_driver_phone') || '';
-        let currentDriverName = localStorage.getItem('almagd_driver_name') || '';
+        let currentDriver = null;
 
-        // Check Driver Login State
-        window.onload = () => {
-            if (currentDriverPhone) {
-                document.getElementById('loginScreen').classList.add('hidden');
-                document.getElementById('driverWelcomeText').innerText = `السائق: ${currentDriverName || currentDriverPhone}`;
-                loadDriverData();
+        function normalizePhone(phone) {
+            if (!phone) return '';
+            return String(phone).replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d)).replace(/\D/g, '');
+        }
+
+        // 📲 التحقق التلقائي وتسجيل الدخول برقم الهاتف من الرابط أو LocalStorage
+        window.addEventListener('DOMContentLoaded', async () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            const phoneParam = urlParams.get('phone') || localStorage.getItem('userPhone');
+            const savedDriver = localStorage.getItem('driverData');
+
+            if (savedDriver) {
+                try {
+                    currentDriver = JSON.parse(savedDriver);
+                    initDriverSession();
+                    return;
+                } catch(e) {}
+            }
+
+            // جلب البيانات من السيرفر والتحقق من رقم الهاتف
+            try {
+                const snapshot = await get(driversRef);
+                if (snapshot.exists()) {
+                    const data = snapshot.val();
+                    allDrivers = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+
+                    if (phoneParam) {
+                        const cleanP = normalizePhone(phoneParam);
+                        const matched = allDrivers.find(d => normalizePhone(d.phone) === cleanP);
+                        if (matched) {
+                            currentDriver = matched;
+                            localStorage.setItem('userPhone', cleanP);
+                            localStorage.setItem('driverData', JSON.stringify(matched));
+                            initDriverSession();
+                            return;
+                        }
+                    }
+                }
+            } catch(err) {
+                console.error(err);
+            }
+
+            // إذا لم يتم العثور على السائق، إظهار نافذة تسجيل الدخول اليدوي
+            if (!currentDriver) {
+                document.getElementById('loginScreen').classList.remove('hidden');
+            }
+        });
+
+        function initDriverSession() {
+            document.getElementById('loginScreen').classList.add('hidden');
+            document.getElementById('driverWelcomeText').innerText = `السائق: ${currentDriver.name} (${currentDriver.phone})`;
+            startRealtimeListeners();
+        }
+
+        window.handleDriverManualLogin = (e) => {
+            e.preventDefault();
+            const rawPhone = document.getElementById('loginPhoneInput').value.trim();
+            const cleanP = normalizePhone(rawPhone);
+
+            const found = allDrivers.find(d => normalizePhone(d.phone) === cleanP);
+            if (found) {
+                currentDriver = found;
+                localStorage.setItem('userPhone', cleanP);
+                localStorage.setItem('driverData', JSON.stringify(found));
+                initDriverSession();
+            } else {
+                // فتح جلسة مؤقتة برقم التليفون
+                currentDriver = { name: `سائق (${rawPhone})`, phone: rawPhone };
+                localStorage.setItem('userPhone', cleanP);
+                localStorage.setItem('driverData', JSON.stringify(currentDriver));
+                initDriverSession();
             }
         };
 
-        window.handleDriverLogin = (e) => {
-            e.preventDefault();
-            const phone = document.getElementById('loginPhoneInput').value.trim();
-            if (!phone) return;
-
-            currentDriverPhone = phone;
-            localStorage.setItem('almagd_driver_phone', phone);
-            
-            // Search in orders to find driver name if exists
-            const matchedOrder = allOrders.find(o => o.driverPhone === phone || (o.driverName && o.driverName.includes(phone)));
-            currentDriverName = matchedOrder ? matchedOrder.driverName : phone;
-            localStorage.setItem('almagd_driver_name', currentDriverName);
-
-            document.getElementById('loginScreen').classList.add('hidden');
-            document.getElementById('driverWelcomeText').innerText = `السائق: ${currentDriverName}`;
-            loadDriverData();
-        };
-
         window.driverLogout = () => {
-            localStorage.removeItem('almagd_driver_phone');
-            localStorage.removeItem('almagd_driver_name');
-            location.reload();
+            localStorage.removeItem('driverData');
+            localStorage.removeItem('userPhone');
+            location.href = 'index.html';
         };
+
+        // Realtime Listeners للنظام الموحد
+        function startRealtimeListeners() {
+            onValue(customersRef, (snapshot) => {
+                const data = snapshot.val();
+                allCustomers = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : [];
+                renderCustomers(allCustomers);
+            });
+
+            onValue(ordersRef, (snapshot) => {
+                const data = snapshot.val();
+                allOrders = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
+                renderDriverAccount();
+            });
+        }
 
         // Theme Toggle
         window.toggleTheme = () => {
@@ -416,7 +479,6 @@
             }
         };
 
-        // Location Tab switching in modal
         window.switchLocationTab = (type) => {
             const btnAuto = document.getElementById('tabAuto');
             const btnManual = document.getElementById('tabManual');
@@ -516,25 +578,12 @@
             }
 
             try {
-                await update(ref(db, 'customers/' + custId), updateData);
+                await update(ref(db, 'clients/' + custId), updateData);
                 toggleAddModal();
             } catch (err) {
                 alert('خطأ أثناء الحفظ: ' + err.message);
             }
         };
-
-        // Listeners for Realtime Database
-        onValue(customersRef, (snapshot) => {
-            const data = snapshot.val();
-            allCustomers = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : [];
-            renderCustomers(allCustomers);
-        });
-
-        onValue(ordersRef, (snapshot) => {
-            const data = snapshot.val();
-            allOrders = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : [];
-            if (currentDriverPhone) renderDriverAccount();
-        });
 
         window.filterCustomers = () => {
             const q = document.getElementById('searchInput').value.toLowerCase().trim();
@@ -552,7 +601,7 @@
             }
 
             container.innerHTML = list.map(c => {
-                let mapLink = c.isCustomLink ? c.mapUrl : `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}`;
+                let mapLink = c.isCustomLink ? c.mapUrl : (c.lat && c.lng ? `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}` : '#');
                 return `
                 <div class="glass-card gold-border rounded-2xl p-4 md:p-5 gold-shadow">
                     <div class="flex justify-between items-start mb-3">
@@ -560,13 +609,14 @@
                             <h3 class="font-bold text-lg text-white mb-1 flex items-center gap-2">
                                 <i class="fa-solid fa-feather text-amber-500 text-sm"></i> ${c.name}
                             </h3>
-                            ${c.phone ? `<a href="tel:${c.phone}" class="text-amber-500 text-sm font-semibold flex items-center gap-2 hover:underline"><i class="fa-solid fa-phone text-xs"></i><span dir="ltr">${c.phone}</span></a>` : ''}
+                            ${c.phone ? `<a href="tel:${c.phone}" class="text-amber-500 text-sm font-semibold flex items-center gap-2 hover:underline"><i class="fa-solid fa-phone text-xs"></i><span dir="ltr">${c.phone}</span></a>` : '<span class="text-xs text-slate-500">بدون رقم تليفون</span>'}
+                            ${c.address ? `<p class="text-xs text-slate-300 mt-1"><i class="fa-solid fa-location-dot text-amber-500 ml-1"></i>${c.address}</p>` : ''}
                             ${c.notes && c.notes !== "مافيش ملاحظات" ? `<p class="text-xs text-slate-400 mt-1"><i class="fa-regular fa-note-sticky text-amber-500 ml-1"></i>${c.notes}</p>` : ''}
                         </div>
                     </div>
                     <div class="flex gap-2.5 pt-3 border-t border-slate-800">
                         ${c.phone ? `<a href="tel:${c.phone}" class="flex-1 bg-slate-800 text-white font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700"><i class="fa-solid fa-phone-volume text-emerald-500"></i>اتصال</a>` : ''}
-                        <a href="${mapLink}" target="_blank" class="flex-1 bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-md">
+                        <a href="${mapLink}" target="_blank" class="flex-1 bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-md ${mapLink === '#' ? 'opacity-50 pointer-events-none' : ''}">
                             <i class="fa-solid fa-location-arrow"></i> فتح الخريطة والتنقل
                         </a>
                     </div>
@@ -574,22 +624,21 @@
             }).join('');
         }
 
-        function loadDriverData() {
-            renderDriverAccount();
-        }
-
         function renderDriverAccount() {
-            // Filter orders belonging to this driver
-            const myTrips = allOrders.filter(o => 
-                (o.driverPhone && o.driverPhone === currentDriverPhone) || 
-                (o.driverName && currentDriverName && o.driverName.toLowerCase().includes(currentDriverName.toLowerCase()))
-            );
+            if (!currentDriver) return;
+
+            // تصفية النقلات الخاصة بهذا السائق (مطابقة بالاسم أو رقم الهاتف أو الـ ID)
+            const myTrips = allOrders.filter(o => {
+                const matchId = o.driverId && currentDriver.id && o.driverId === currentDriver.id;
+                const matchName = o.driverName && currentDriver.name && o.driverName.trim() === currentDriver.name.trim();
+                const matchPhone = o.driverPhone && currentDriver.phone && normalizePhone(o.driverPhone) === normalizePhone(currentDriver.phone);
+                return matchId || matchName || matchPhone;
+            });
 
             document.getElementById('totalTripsCount').innerText = myTrips.length;
             
-            // Calculate tips/smoke if available in orders, else 0
-            const totalTips = myTrips.reduce((sum, o) => sum + (parseFloat(o.tips || o.smoke || 0)), 0);
-            const totalDues = myTrips.reduce((sum, o) => sum + (parseFloat(o.dues || o.amount || 0)), 0);
+            const totalTips = myTrips.reduce((sum, o) => sum + (parseFloat(o.tips || o.smoke || o.driverTip || 0)), 0);
+            const totalDues = myTrips.reduce((sum, o) => sum + (parseFloat(o.totalAmount || o.dues || 0)), 0);
 
             document.getElementById('totalTipsAmount').innerText = totalTips.toLocaleString() + ' ج.م';
             document.getElementById('totalDuesAmount').innerText = totalDues.toLocaleString() + ' ج.م';
@@ -604,11 +653,11 @@
                 <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 flex justify-between items-center text-xs">
                     <div>
                         <strong class="text-amber-400 block mb-1">${t.clientName || 'عميل'}</strong>
-                        <span class="text-slate-400">التاريخ: ${new Date(t.createdAt || Date.now()).toLocaleDateString('ar-EG')}</span>
+                        <span class="text-slate-400">التاريخ: ${t.date || new Date().toLocaleDateString('ar-EG')} | الحمولة: ${t.cargoType || 'علف'}</span>
                     </div>
                     <div class="text-left">
-                        <span class="text-emerald-400 font-bold block">إكرامية/دخان: ${t.tips || t.smoke || 0} ج.م</span>
-                        <span class="text-slate-300">الحالة: ${t.status || 'منفذة'}</span>
+                        <span class="text-emerald-400 font-bold block">إكرامية/دخان: ${t.tips || t.smoke || t.driverTip || 0} ج.م</span>
+                        <span class="text-slate-300">الإجمالي: ${Number(t.totalAmount || 0).toLocaleString()} ج.م</span>
                     </div>
                 </div>
             `).join('');
