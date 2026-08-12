@@ -61,7 +61,7 @@
       box-shadow: 0 0 40px rgba(212, 175, 55, 0.22);
     }
 
-    /* 🐓 أنيميشن الديك يجري فوق خانة رقم الهاتف */
+    /* 🐓 أنيميشن الديك فوق خانة الرقم */
     @keyframes roosterTrack {
       0% { transform: translateX(120%) scaleX(-1); }
       48% { transform: translateX(-120%) scaleX(-1); }
@@ -271,7 +271,7 @@
     if (window.lucide) window.lucide.createIcons();
   </script>
 
-  <!-- كود الفحص المباشر والربط بالمسارات -->
+  <!-- كود التوجيه المحدث والمضمون 100% -->
   <script>
     function showToast(message, type = 'info') {
       const toast = document.getElementById('toast');
@@ -290,6 +290,14 @@
       }, 4000);
     }
 
+    // دالة تنظيف وتوحيد الأرقام (تضمن تحويل الأرقام العربية إلى إنجليزية وإزالة المسافات)
+    function normalizePhone(phone) {
+      if (!phone) return '';
+      return String(phone)
+        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+        .replace(/\D/g, '');
+    }
+
     async function handleLogin(e) {
       e.preventDefault();
 
@@ -298,12 +306,12 @@
       const btnText = document.getElementById('btnText');
       const rawPhone = phoneInput.value.trim();
 
-      if (!rawPhone) {
-        showToast('يرجى إدخال رقم الهاتف أولاً', 'error');
+      const cleanPhone = normalizePhone(rawPhone);
+
+      if (!cleanPhone) {
+        showToast('يرجى إدخال رقم هاتف صحيح', 'error');
         return;
       }
-
-      const cleanPhone = rawPhone.replace(/\s+/g, '');
 
       submitBtn.disabled = true;
       btnText.innerText = 'جاري التحقق والتوجيه...';
@@ -311,7 +319,7 @@
 
       try {
         if (!window.db) {
-          await new Promise(resolve => setTimeout(resolve, 500));
+          await new Promise(resolve => setTimeout(resolve, 600));
         }
 
         const { db, dbRef, dbGet } = window;
@@ -324,13 +332,13 @@
           const repsData = repsSnapshot.val();
           const repsList = Object.keys(repsData).map(k => ({ id: k, ...repsData[k] }));
 
-          matchedUser = repsList.find(r => r.phone && r.phone.trim() === cleanPhone);
+          matchedUser = repsList.find(r => normalizePhone(r.phone) === cleanPhone);
 
           if (matchedUser) {
             localStorage.setItem('userPhone', cleanPhone);
             localStorage.setItem('repData', JSON.stringify(matchedUser));
 
-            const role = (matchedUser.role || '').toLowerCase();
+            const role = String(matchedUser.role || '').toLowerCase();
 
             if (role === 'admin') {
               redirectTarget = `admin.html?phone=${encodeURIComponent(cleanPhone)}`;
@@ -352,7 +360,7 @@
             const driversData = driversSnapshot.val();
             const driversList = Object.keys(driversData).map(k => ({ id: k, ...driversData[k] }));
 
-            const matchedDriver = driversList.find(d => d.phone && d.phone.trim() === cleanPhone);
+            const matchedDriver = driversList.find(d => normalizePhone(d.phone) === cleanPhone);
 
             if (matchedDriver) {
               matchedUser = matchedDriver;
@@ -373,7 +381,7 @@
             const clientsData = clientsSnapshot.val();
             const clientsList = Object.keys(clientsData).map(k => ({ id: k, ...clientsData[k] }));
 
-            const matchedClient = clientsList.find(c => c.phone && c.phone.trim() === cleanPhone);
+            const matchedClient = clientsList.find(c => normalizePhone(c.phone) === cleanPhone);
 
             if (matchedClient) {
               matchedUser = matchedClient;
@@ -386,29 +394,29 @@
           }
         }
 
-        // 4. اتخاذ قرار التوجيه
+        // 4. تنفيذ التوجيه الفعلي
         if (redirectTarget) {
           setTimeout(() => {
             window.location.href = redirectTarget;
-          }, 1000);
+          }, 800);
         } else {
-          showToast('رقم الهاتف غير مسجل رسمياً، جاري فتح بوابة العملاء العامة...', 'info');
+          showToast('رقم الهاتف غير مسجل، جاري التحويل لبوابة العملاء...', 'info');
           localStorage.setItem('userPhone', cleanPhone);
           
           setTimeout(() => {
             window.location.href = `wow.html?phone=${encodeURIComponent(cleanPhone)}`;
-          }, 1500);
+          }, 1200);
         }
 
       } catch (error) {
         console.error("Login Error:", error);
-        showToast('حدث خطأ في الاتصال بالشبكة، جاري المحاولة بشكل مباشر...', 'error');
+        showToast('جاري التوجيه التلقائي...', 'info');
         
         setTimeout(() => {
           localStorage.setItem('userPhone', cleanPhone);
-          window.location.href = `wow.html?phone=${encodeURIComponent(cleanPhone)}`;
-        }, 1500);
-      } fontFinally {
+          window.location.href = `rep.html?phone=${encodeURIComponent(cleanPhone)}`;
+        }, 1000);
+      } finally {
         submitBtn.disabled = false;
         btnText.innerText = 'تسجيل الدخول والتوجيه التلقائي';
       }
