@@ -88,7 +88,7 @@
             </div>
             <div>
                 <h2 class="text-2xl font-black gold-gradient-text">بوابة السائقين</h2>
-                <p class="text-xs text-slate-400 mt-1">أدخل رقم هاتفك المسجل لعرض حسابك ونقلاتك</p>
+                <p class="text-xs text-slate-400 mt-1">أدخل رقم هاتفك المسجل لعرض النقل المطلوب وحسابك</p>
             </div>
             <form onsubmit="handleDriverManualLogin(event)" class="space-y-4 text-right">
                 <div>
@@ -97,7 +97,7 @@
                         class="w-full bg-slate-900 border border-slate-700 rounded-xl p-3.5 text-sm text-white text-right focus:outline-none focus:border-amber-400 font-mono">
                 </div>
                 <button type="submit" class="w-full bg-gradient-to-r from-amber-500 to-yellow-600 hover:from-amber-600 text-slate-950 font-bold p-3.5 rounded-xl shadow-lg transition text-sm">
-                    تسجيل الدخول وعرض الحساب
+                    تسجيل الدخول وعرض البوابة
                 </button>
             </form>
         </div>
@@ -127,18 +127,38 @@
 
     <main class="max-w-4xl mx-auto space-y-6">
         
-        <!-- Navigation Tabs -->
-        <div class="grid grid-cols-2 gap-3">
-            <button onclick="switchTab('locations')" id="tabBtnLocations" class="py-3 px-4 rounded-xl font-bold text-xs md:text-sm gold-border transition bg-amber-500/20 text-amber-500 flex items-center justify-center gap-2 shadow">
-                <i class="fa-solid fa-map-location-dot"></i> مواقع وعملاء المصنع
+        <!-- Navigation Tabs (تم إضافة تبويب "النقل المطلوب") -->
+        <div class="grid grid-cols-3 gap-2">
+            <button onclick="switchTab('requiredTrips')" id="tabBtnRequired" class="py-3 px-2 rounded-xl font-bold text-xs gold-border transition bg-amber-500/20 text-amber-500 flex items-center justify-center gap-1.5 shadow">
+                <i class="fa-solid fa-truck-ramp-box"></i> النقل المطلوب
             </button>
-            <button onclick="switchTab('account')" id="tabBtnAccount" class="py-3 px-4 rounded-xl font-bold text-xs md:text-sm gold-border transition dark:bg-slate-900/90 light:bg-white text-slate-400 flex items-center justify-center gap-2 shadow">
-                <i class="fa-solid fa-wallet"></i> حسابي ونقلاتي (الدخان)
+            <button onclick="switchTab('locations')" id="tabBtnLocations" class="py-3 px-2 rounded-xl font-bold text-xs gold-border transition dark:bg-slate-900/90 light:bg-white text-slate-400 flex items-center justify-center gap-1.5 shadow">
+                <i class="fa-solid fa-map-location-dot"></i> مواقع العملاء
+            </button>
+            <button onclick="switchTab('account')" id="tabBtnAccount" class="py-3 px-2 rounded-xl font-bold text-xs gold-border transition dark:bg-slate-900/90 light:bg-white text-slate-400 flex items-center justify-center gap-1.5 shadow">
+                <i class="fa-solid fa-wallet"></i> حسابي (الدخان)
             </button>
         </div>
 
-        <!-- TAB 1: Locations & Customers -->
-        <div id="sectionLocations" class="space-y-4">
+        <!-- TAB 1: REQUIRED TRIPS (النقل المطلوب المعتمد من الإدارة) -->
+        <div id="sectionRequired" class="space-y-4">
+            <div class="flex justify-between items-center px-2">
+                <h2 class="text-sm md:text-base font-bold flex items-center gap-2">
+                    <i class="fa-solid fa-bell text-amber-500 animate-bounce"></i>
+                    الطلبات والنقلات المطلوبة منك والموافقة عليها (<span id="requiredCount" class="text-amber-500 font-black">0</span>)
+                </h2>
+            </div>
+
+            <div id="requiredTripsList" class="space-y-4">
+                <div class="text-center py-12 glass-card rounded-2xl gold-border">
+                    <i class="fa-solid fa-circle-notch fa-spin text-3xl text-amber-500 mb-3"></i>
+                    <p class="text-sm">جاري جلب النقلات المطلوبة...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Locations & Customers -->
+        <div id="sectionLocations" class="hidden space-y-4">
             <div class="flex justify-between items-center px-2">
                 <div class="relative flex-1 ml-3">
                     <i class="fa-solid fa-magnifying-glass absolute right-4 top-1/2 -translate-y-1/2 text-amber-400"></i>
@@ -165,7 +185,7 @@
             </div>
         </div>
 
-        <!-- TAB 2: Driver Account & Trips -->
+        <!-- TAB 3: Driver Account & Trips -->
         <div id="sectionAccount" class="hidden space-y-4">
             <div class="glass-card gold-border rounded-2xl p-5 md:p-6 gold-shadow space-y-4">
                 <h3 class="text-lg font-bold gold-gradient-text flex items-center gap-2 border-b border-amber-500/20 pb-3">
@@ -192,7 +212,7 @@
             <div class="glass-card gold-border rounded-2xl p-5 space-y-4">
                 <h3 class="text-md font-bold text-white flex items-center gap-2">
                     <i class="fa-solid fa-truck-fast text-amber-500"></i>
-                    سجل نقلات السائق المرتبطة بك
+                    سجل النقلات المكتملة
                 </h3>
                 <div id="driverTripsList" class="space-y-3">
                     <p class="text-center text-xs text-slate-400 py-6">لا توجد نقلات مسجلة باسمك حتى الآن.</p>
@@ -393,6 +413,7 @@
             onValue(ordersRef, (snapshot) => {
                 const data = snapshot.val();
                 allOrders = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })).reverse() : [];
+                renderRequiredTrips();
                 renderDriverAccount();
             });
 
@@ -425,24 +446,122 @@
         }
 
         window.switchTab = (tab) => {
+            const btnReq = document.getElementById('tabBtnRequired');
             const btnLoc = document.getElementById('tabBtnLocations');
             const btnAcc = document.getElementById('tabBtnAccount');
+            
+            const secReq = document.getElementById('sectionRequired');
             const secLoc = document.getElementById('sectionLocations');
             const secAcc = document.getElementById('sectionAccount');
 
-            if (tab === 'locations') {
-                btnLoc.className = "py-3 px-4 rounded-xl font-bold text-xs md:text-sm gold-border transition bg-amber-500/20 text-amber-500 flex items-center justify-center gap-2 shadow";
-                btnAcc.className = "py-3 px-4 rounded-xl font-bold text-xs md:text-sm gold-border transition dark:bg-slate-900/90 light:bg-white text-slate-400 flex items-center justify-center gap-2 shadow";
+            // إخفاء الكل وإظهار المطلوب
+            secReq.classList.add('hidden');
+            secLoc.classList.add('hidden');
+            secAcc.classList.add('hidden');
+
+            btnReq.className = "py-3 px-2 rounded-xl font-bold text-xs gold-border transition dark:bg-slate-900/90 light:bg-white text-slate-400 flex items-center justify-center gap-1.5 shadow";
+            btnLoc.className = "py-3 px-2 rounded-xl font-bold text-xs gold-border transition dark:bg-slate-900/90 light:bg-white text-slate-400 flex items-center justify-center gap-1.5 shadow";
+            btnAcc.className = "py-3 px-2 rounded-xl font-bold text-xs gold-border transition dark:bg-slate-900/90 light:bg-white text-slate-400 flex items-center justify-center gap-1.5 shadow";
+
+            if (tab === 'requiredTrips') {
+                secReq.classList.remove('hidden');
+                btnReq.className = "py-3 px-2 rounded-xl font-bold text-xs gold-border transition bg-amber-500/20 text-amber-500 flex items-center justify-center gap-1.5 shadow";
+                renderRequiredTrips();
+            } else if (tab === 'locations') {
                 secLoc.classList.remove('hidden');
-                secAcc.classList.add('hidden');
+                btnLoc.className = "py-3 px-2 rounded-xl font-bold text-xs gold-border transition bg-amber-500/20 text-amber-500 flex items-center justify-center gap-1.5 shadow";
             } else {
-                btnAcc.className = "py-3 px-4 rounded-xl font-bold text-xs md:text-sm gold-border transition bg-amber-500/20 text-amber-500 flex items-center justify-center gap-2 shadow";
-                btnLoc.className = "py-3 px-4 rounded-xl font-bold text-xs md:text-sm gold-border transition dark:bg-slate-900/90 light:bg-white text-slate-400 flex items-center justify-center gap-2 shadow";
                 secAcc.classList.remove('hidden');
-                secLoc.classList.add('hidden');
+                btnAcc.className = "py-3 px-2 rounded-xl font-bold text-xs gold-border transition bg-amber-500/20 text-amber-500 flex items-center justify-center gap-1.5 shadow";
                 renderDriverAccount();
             }
         };
+
+        // تحديث حالة النقلة (تم التوصيل / لم يتم التوصيل)
+        window.updateOrderStatusByDriver = async (orderId, newStatus) => {
+            try {
+                await update(ref(db, 'orders/' + orderId), { status: newStatus });
+                alert(`تم تحديث حالة النقلة إلى: ${newStatus}`);
+            } catch (err) {
+                alert('خطأ أثناء التحديث: ' + err.message);
+            }
+        };
+
+        // عرض النقل المطلوب المعتمد من الإدارة لهذا السائق
+        function renderRequiredTrips() {
+            if (!currentDriver) return;
+
+            const myRequiredOrders = allOrders.filter(o => {
+                const matchId = o.driverId && currentDriver.id && o.driverId === currentDriver.id;
+                const matchName = o.driverName && currentDriver.name && o.driverName.trim() === currentDriver.name.trim();
+                // يظهر فقط الطلبات التي وافقت عليها الإدارة (حالة مقبول أو قيد الانتظار حسب اختيارك، والأفضل المعتمدة)
+                return (matchId || matchName) && (o.status === 'مقبول' || o.status === 'قيد الانتظار');
+            });
+
+            document.getElementById('requiredCount').innerText = myRequiredOrders.length;
+            const container = document.getElementById('requiredTripsList');
+
+            if (myRequiredOrders.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-12 glass-card rounded-2xl gold-border">
+                        <i class="fa-solid fa-truck-fast text-4xl text-slate-500 mb-3"></i>
+                        <p class="text-sm text-slate-400">لا يوجد نقل مطلوب مسجل باسمك حالياً من الإدارة.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = myRequiredOrders.map(o => {
+                // العثور على بيانات العميل المرتبط لجلب اللوكيشن ورقم الهاتف بدقة
+                const cust = allCustomers.find(c => c.id === o.clientId || (c.name && o.clientName && c.name.trim() === o.clientName.trim())) || {};
+                const phone = o.clientPhone || cust.phone || '';
+                const mapLink = cust.isCustomLink ? cust.mapUrl : (cust.lat && cust.lng ? `https://www.google.com/maps/dir/?api=1&destination=${cust.lat},${cust.lng}` : (o.mapUrl || '#'));
+
+                return `
+                <div class="glass-card gold-border rounded-2xl p-4 md:p-5 gold-shadow space-y-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span class="text-[10px] text-amber-400 font-mono">التاريخ: ${o.date || new Date().toLocaleDateString('ar-EG')}</span>
+                            <h3 class="font-bold text-lg text-white mt-0.5 flex items-center gap-2">
+                                <i class="fa-solid fa-user-tag text-amber-500"></i> ${o.clientName || 'عميل'}
+                            </h3>
+                        </div>
+                        <span class="px-3 py-1 rounded-full text-xs font-bold border ${o.status === 'مقبول' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-amber-500/10 text-amber-400 border-amber-500/30'}">
+                            ${o.status || 'قيد الانتظار'}
+                        </span>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 bg-slate-900/70 p-3 rounded-xl border border-slate-800 text-xs">
+                        <div><span class="text-slate-400">الحمولة:</span> <strong class="text-white">${o.cargoType || 'علف'}</strong></div>
+                        <div><span class="text-slate-400">الكمية:</span> <strong class="text-amber-400">${o.quantity || 0} طن</strong></div>
+                        <div><span class="text-slate-400">المبلغ:</span> <strong class="text-white">${Number(o.totalAmount || 0).toLocaleString()} ج.م</strong></div>
+                        <div><span class="text-slate-400">طريقة الدفع:</span> <strong class="text-white">${o.paymentType === 'credit' ? 'آجل' : 'نقدي'}</strong></div>
+                    </div>
+
+                    ${phone ? `
+                        <a href="tel:${phone}" class="text-amber-400 text-xs font-semibold flex items-center gap-2 hover:underline">
+                            <i class="fa-solid fa-phone"></i> تليفون العميل: <span dir="ltr">${phone}</span>
+                        </a>
+                    ` : ''}
+
+                    <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-800">
+                        ${phone ? `<a href="tel:${phone}" class="flex-1 bg-slate-800 text-white font-semibold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 border border-slate-700"><i class="fa-solid fa-phone-volume text-emerald-500"></i>اتصال بالعميل</a>` : ''}
+                        <a href="${mapLink}" target="_blank" class="flex-1 bg-gradient-to-r from-amber-500 to-yellow-600 text-slate-950 font-bold py-2.5 rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-md ${mapLink === '#' ? 'opacity-50 pointer-events-none' : ''}">
+                            <i class="fa-solid fa-location-arrow"></i> فتح خريطة وموقع العميل
+                        </a>
+                    </div>
+
+                    <div class="flex gap-2 pt-1">
+                        <button onclick="updateOrderStatusByDriver('${o.id}', 'تم التوصيل بنجاح')" class="flex-1 bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-300 font-bold py-2 rounded-xl text-xs border border-emerald-500/30 transition">
+                            ✓ تم التوصيل
+                        </button>
+                        <button onclick="updateOrderStatusByDriver('${o.id}', 'تعذر التوصيل / لم يتم')" class="flex-1 bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 font-bold py-2 rounded-xl text-xs border border-rose-500/30 transition">
+                            ✕ لم يتم التوصيل
+                        </button>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
 
         window.toggleAddModal = () => {
             const modal = document.getElementById('addModal');
@@ -622,7 +741,6 @@
         function renderDriverAccount() {
             if (!currentDriver) return;
 
-            // جلب النقلات من جدول trips وجدول orders المسجلة لهذا السائق
             const myTrips = allTrips.filter(t => {
                 const matchId = t.driverId && currentDriver.id && t.driverId === currentDriver.id;
                 const matchName = t.driverName && currentDriver.name && t.driverName.trim() === currentDriver.name.trim();
@@ -632,20 +750,17 @@
             const myOrders = allOrders.filter(o => {
                 const matchId = o.driverId && currentDriver.id && o.driverId === currentDriver.id;
                 const matchName = o.driverName && currentDriver.name && o.driverName.trim() === currentDriver.name.trim();
-                return (matchId || matchName) && o.status === 'مقبول';
+                return (matchId || matchName) && (o.status === 'مقبول' || o.status === 'تم التوصيل بنجاح');
             });
 
-            // إجمالي عدد النقلات الشامل
             const totalTripsCount = myTrips.reduce((sum, t) => sum + (parseInt(t.tripsCount) || 1), 0) + myOrders.length;
             document.getElementById('totalTripsCount').innerText = totalTripsCount;
             
-            // إجمالي أجر التوصيل (25 جنيه لكل نقلة حسب نظام صفحة الإدارة)
             const totalDeliveryDues = totalTripsCount * 25;
             document.getElementById('totalDuesAmount').innerText = totalDeliveryDues.toLocaleString() + ' ج.م';
 
-            // إجمالي الإكراميات (الدخان) المسجلة
-            const totalTips = myTrips.reduce((sum, t) => sum + (parseFloat(t.tips || t.smoke || t.driverTip || 0), 0), 0) +
-                              myOrders.reduce((sum, o) => sum + (parseFloat(o.tips || o.smoke || o.driverTip || 0), 0), 0);
+            const totalTips = myTrips.reduce((sum, t) => sum + (parseFloat(t.tips || t.smoke || t.driverTip || 0)), 0) +
+                              myOrders.reduce((sum, o) => sum + (parseFloat(o.tips || o.smoke || o.driverTip || 0)), 0);
             document.getElementById('totalTipsAmount').innerText = totalTips.toLocaleString() + ' ج.م';
 
             const tripsContainer = document.getElementById('driverTripsList');
@@ -664,7 +779,7 @@
                     </div>
                     <div class="text-left">
                         <span class="text-emerald-400 font-bold block">إكرامية/دخان: ${t.tips || t.smoke || t.driverTip || 0} ج.م</span>
-                        <span class="text-amber-300">أجر التوصيل: ${((parseInt(t.tripsCount) || 1) * 25)} ج.م</span>
+                        <span class="text-amber-300">الحالة: ${t.status || 'منفذة'}</span>
                     </div>
                 </div>
             `).join('');
