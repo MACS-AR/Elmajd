@@ -68,7 +68,7 @@
 
     @media print {
       @page {
-        size: auto;
+        size: A4 portrait;
         margin: 8mm;
       }
       body {
@@ -144,17 +144,12 @@
   <script type="text/babel">
     const { useState, useEffect, useMemo } = React;
 
-    // اللوجو الرسمي
     const LOGO_URL = "https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png"; 
 
     function RepApp() {
-      // تم إلغاء صفحة تسجيل الدخول والدخول مباشر للمندوب الحالي
-      const [currentRep, setCurrentRep] = useState({
-        id: 'rep_default',
-        name: 'مندوب المبيعات المباشر',
-        region: 'جميع المناطق',
-        phone: '01000000000'
-      });
+      // حالة الدخول برقم الهاتف
+      const [currentRep, setCurrentRep] = useState(null);
+      const [phoneInput, setPhoneInput] = useState('');
 
       // Active View
       const [activeTab, setActiveTab] = useState('newOrder'); // newOrder, myOrders, collections, clientStatement, repStatement
@@ -171,7 +166,8 @@
       const [toast, setToast] = useState(null);
       const [clientSearch, setClientSearch] = useState('');
       const [productSearch, setProductSearch] = useState('');
-      const [activeModal, setActiveModal] = useState(null);
+      const [activeModal, setActiveModal] = useState(null); // printStatementModal, printRepSalesModal, printCollectionReceiptModal
+      const [lastSavedCollection, setLastSavedCollection] = useState(null);
 
       // Form & Cart States للطلب الجديد
       const [selectedClientId, setSelectedClientId] = useState('');
@@ -197,8 +193,6 @@
         toDate: new Date().toISOString().slice(0, 10)
       });
 
-      const [selectedRepForStatement, setSelectedRepForStatement] = useState('');
-
       const showToast = (message, type = 'success') => {
         setToast({ message, type });
         setTimeout(() => setToast(null), 3000);
@@ -215,9 +209,6 @@
               const data = snapshot.val();
               const list = data ? Object.keys(data).map(k => ({ id: k, ...data[k] })) : [];
               setSalesReps(list);
-              if (list.length > 0 && currentRep.id === 'rep_default') {
-                setCurrentRep(list[0]);
-              }
             });
 
             onValue(ref(db, 'clients'), snapshot => {
@@ -252,16 +243,43 @@
 
       useEffect(() => {
         if (window.lucide) window.lucide.createIcons();
-      }, [activeTab, activeModal, currentRep, cartItems, clientSearch, productSearch, collectionSearchText]);
+      }, [activeTab, activeModal, currentRep, cartItems, clientSearch, productSearch, collectionClientId, collectionSearchText]);
 
-      // 🔍 بحث مباشر وسريع عن المنتجات (نفس أسلوب صفحة المعرض)
+      // 📲 الدخول التلقائي للمندوب عبر رقم الهاتف
+      const handlePhoneLogin = (e) => {
+        e.preventDefault();
+        const cleanPhone = phoneInput.trim();
+        if (!cleanPhone) {
+          showToast('يرجى إدخال رقم الهاتف أولاً', 'error');
+          return;
+        }
+
+        const foundRep = salesReps.find(r => r.phone && r.phone.trim() === cleanPhone);
+
+        if (foundRep) {
+          setCurrentRep(foundRep);
+          showToast(`تم التعرف عليك بنجاح: أهلاً بك يا ${foundRep.name}`);
+        } else {
+          // فتح حساب للمندوب برقم هاتفه مباشرة إن لم يكن مسجلاً مسبقاً
+          const autoRep = {
+            id: 'rep_' + cleanPhone,
+            name: `مندوب (${cleanPhone})`,
+            phone: cleanPhone,
+            region: 'مبيعات عامة'
+          };
+          setCurrentRep(autoRep);
+          showToast(`تم فتح الواجهة برقم الهاتف: ${cleanPhone}`);
+        }
+      };
+
+      // 🔍 بحث مباشر وسريع عن المنتجات
       const searchedProductsList = useMemo(() => {
         const q = productSearch.trim().toLowerCase();
         if (!q) return [];
         return products.filter(p => p.name && p.name.toLowerCase().includes(q));
       }, [products, productSearch]);
 
-      // 🔍 بحث مباشر وسريع عن العملاء (نفس أسلوب صفحة المعرض)
+      // 🔍 بحث مباشر وسريع عن العملاء
       const searchedClientsList = useMemo(() => {
         const q = clientSearch.trim().toLowerCase();
         if (!q) return [];
@@ -275,7 +293,24 @@
         return clients.filter(c => c.name && c.name.toLowerCase().includes(q));
       }, [clients, collectionSearchText]);
 
-      // إضافة منتج لسلة الطلب من خيارات المعرض/البحث المباشر
+      // 💰 حساب مديونية العميل المختار الحالية بالتفصيل
+      const selectedClientAccountInfo = useMemo(() => {
+        if (!collectionClientId) return { totalDebits: 0, totalCredits: 0, currentDebt: 0 };
+
+        // المديونيات من الطلبات
+        const clientOrders = myOrders.filter(o => o.clientId === collectionClientId && o.status !== 'ملغي');
+        const totalDebits = clientOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
+
+        // التوريدات النقدية الموردة
+        const clientCollections = collectionsList.filter(c => c.clientId === collectionClientId);
+        const totalCredits = clientCollections.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
+
+        const currentDebt = totalDebits - totalCredits;
+
+        return { totalDebits, totalCredits, currentDebt };
+      }, [collectionClientId, myOrders, collectionsList]);
+
+      // إضافة منتج لسلة الطلب فقط دون الإدراج الفوري بالفاتورة
       const handleAddToCart = (productParam) => {
         const product = productParam || products.find(p => p.id === selectedProductId);
         if (!product) {
@@ -309,7 +344,7 @@
         setCartItems([...cartItems, newItem]);
         setSelectedProductId('');
         setQuantity('1');
-        showToast(`تمت إضافة (${product.name}) إلى الطلب`);
+        showToast(`تم إدراج (${product.name}) بالسلة بنجاح`);
       };
 
       const removeFromCart = (itemId) => {
@@ -319,7 +354,7 @@
       const totalOrderAmount = useMemo(() => cartItems.reduce((a, b) => a + b.price, 0), [cartItems]);
       const totalOrderWeightTons = useMemo(() => cartItems.reduce((a, b) => a + b.weightTons, 0), [cartItems]);
 
-      // رفع الطلب النهائي للإدارة مع ربط السائق والعميل
+      // رفع الطلب النهائي للإدارة
       const handleSubmitOrder = (e) => {
         e.preventDefault();
         if (!selectedClientId) {
@@ -331,7 +366,7 @@
           return;
         }
         if (cartItems.length === 0) {
-          showToast('السلة فارغة، أضف منتجاً واحداً على الأقل', 'error');
+          showToast('السلة فارغة، اضف منتجاً واحداً على الأقل للطلب', 'error');
           return;
         }
 
@@ -374,7 +409,7 @@
         });
       };
 
-      // 💵 تسجيل تحصيل مبلغ نقدي من عميل
+      // 💵 حفظ التوريد النقدي وعرض بيانات الحساب المحفوظة والمديونية المتبقية
       const handleSaveCollection = (e) => {
         e.preventDefault();
         if (!collectionClientId) {
@@ -389,6 +424,8 @@
 
         const { ref, push, set, db } = window.rtdbMethods;
         const clientObj = clients.find(c => c.id === collectionClientId);
+        const oldDebt = selectedClientAccountInfo.currentDebt;
+        const remainingDebt = oldDebt - amt;
 
         const newCollection = {
           repId: currentRep.id,
@@ -396,6 +433,8 @@
           clientId: collectionClientId,
           clientName: clientObj ? clientObj.name : 'عميل',
           amount: amt,
+          previousDebt: oldDebt,
+          remainingDebt: remainingDebt,
           date: collectionDate,
           method: collectionMethod,
           notes: collectionNotes,
@@ -404,14 +443,15 @@
 
         const colRef = push(ref(db, 'collections'));
         set(colRef, newCollection).then(() => {
-          showToast(`تم تحصيل مبلغ ${amt.toLocaleString()} ج.م لحساب العميل (${clientObj ? clientObj.name : ''}) بنجاح`);
+          setLastSavedCollection(newCollection);
+          showToast(`تم تنزيل ${amt.toLocaleString()} ج.م من حساب (${clientObj ? clientObj.name : ''}) بنجاح`);
           setCollectionAmount('');
           setCollectionNotes('');
-          setCollectionSearchText('');
+          setActiveModal('printCollectionReceiptModal');
         });
       };
 
-      // طلبات المندوب الحالي فقط
+      // طلبات المندوب الحالي
       const repOrders = useMemo(() => {
         if (!currentRep) return [];
         return myOrders.filter(o => o.repId === currentRep.id);
@@ -443,18 +483,7 @@
         });
       }, [collectionsList, statementFilter]);
 
-      // كشف حساب المندوبين والتوزيع حسب العامل/المندوب
-      const selectedRepOrders = useMemo(() => {
-        const repId = selectedRepForStatement || currentRep.id;
-        return myOrders.filter(o => o.repId === repId);
-      }, [myOrders, selectedRepForStatement, currentRep]);
-
-      const selectedRepCollections = useMemo(() => {
-        const repId = selectedRepForStatement || currentRep.id;
-        return collectionsList.filter(c => c.repId === repId);
-      }, [collectionsList, selectedRepForStatement, currentRep]);
-
-      // حساب الحركة المركبة للعميل (مبيعات + تحصيلات)
+      // الحركة المركبة لكشف حساب العميل
       const clientLedgerCombined = useMemo(() => {
         const combined = [];
         statementOrders.forEach(o => {
@@ -462,10 +491,9 @@
             id: o.id,
             date: o.date,
             type: 'مبيعات',
-            description: `طلب مبيعات (${o.cargoType || 'أعلاف'}) - سائق: ${o.driverName || 'سائق'}`,
-            debit: parseFloat(o.totalAmount) || 0, // مديونية على العميل
-            credit: 0,
-            status: o.status || 'قيد الانتظار'
+            description: `طلب مبيعات أعلاف (${o.cargoType || 'أعلاف'}) - سائق: ${o.driverName || 'سائق'}`,
+            debit: parseFloat(o.totalAmount) || 0,
+            credit: 0
           });
         });
         statementCollections.forEach(c => {
@@ -475,15 +503,48 @@
             type: 'تحصيل نقدية',
             description: `توريد مبلغ نقدي (${c.method || 'نقدي'}) - ملاحظات: ${c.notes || 'سداد جزء'}`,
             debit: 0,
-            credit: parseFloat(c.amount) || 0, // دفعة نقدية لصالح العميل
-            status: 'مقبول'
+            credit: parseFloat(c.amount) || 0
           });
         });
         return combined.sort((a, b) => new Date(a.date) - new Date(b.date));
       }, [statementOrders, statementCollections]);
 
+      // 📲 شاشة تسجيل الدخول برقم الهاتف تلقائيًا
+      if (!currentRep) {
+        return (
+          <div className="min-h-screen flex items-center justify-center p-4 bg-dark-950">
+            <form onSubmit={handlePhoneLogin} className="glass-card p-6 md:p-8 rounded-3xl w-full max-w-md gold-glow space-y-6">
+              <div className="text-center">
+                <img src={LOGO_URL} alt="Logo" className="w-20 h-20 rounded-full mx-auto mb-3 border-2 border-gold shadow-lg p-1 bg-dark-900 object-contain" />
+                <h1 className="text-2xl font-black text-white">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
+                <p className="text-xs text-gray-400 mt-1">أدخل رقم هاتفك لفتح حسابك وتلقي الفواتير مباشرة</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="text-xs text-gray-300 block mb-1 font-bold">ادخل رقم الهاتف المسجل</label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="مثال: 01012345678"
+                    value={phoneInput}
+                    onChange={e => setPhoneInput(e.target.value)}
+                    className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm text-gold font-bold focus:border-gold outline-none"
+                  />
+                </div>
+
+                <button type="submit" className="w-full gold-gradient text-dark-950 font-black py-3.5 rounded-xl hover:brightness-110 transition-all text-xs md:text-sm shadow-lg flex items-center justify-center gap-2">
+                  <i data-lucide="log-in" className="w-4 h-4"></i> فتح اللوحة وتأكيد الحساب
+                </button>
+              </div>
+            </form>
+          </div>
+        );
+      }
+
       return (
         <div className="min-h-screen flex flex-col bg-dark-900 text-white">
+          
           {/* Toast Notification */}
           {toast && (
             <div className={`fixed bottom-6 right-6 z-50 px-5 py-3 rounded-xl shadow-2xl text-sm font-bold flex items-center gap-2 border ${toast.type === 'error' ? 'bg-red-950 text-red-300 border-red-800' : 'bg-dark-800 text-gold border-gold/40'}`}>
@@ -492,41 +553,29 @@
             </div>
           )}
 
-          {/* Header */}
+          {/* Header Bar */}
           <header className="glass-card sticky top-0 z-40 px-4 md:px-6 py-3 md:py-4 flex flex-col md:flex-row items-center justify-between border-b border-dark-700 gap-3">
             <div className="flex items-center justify-between w-full md:w-auto">
               <div className="flex items-center gap-3">
                 <img src={LOGO_URL} alt="Logo" className="w-9 h-9 md:w-10 md:h-10 rounded-full border border-gold p-0.5 bg-dark-900 object-contain" />
                 <div>
                   <h1 className="font-bold text-sm md:text-base">مصنع <span className="gold-text">المجد للأعلاف</span></h1>
-                  <p className="text-[10px] text-gray-400">بوابة المندوب والمبيعات المباشرة</p>
+                  <p className="text-[10px] text-gold font-bold">المندوب الحالي: {currentRep.name} ({currentRep.phone})</p>
                 </div>
               </div>
 
-              {/* اختيار المندوب الحلي */}
-              <div className="md:hidden">
-                <select
-                  value={currentRep.id}
-                  onChange={e => {
-                    const found = salesReps.find(r => r.id === e.target.value);
-                    if (found) setCurrentRep(found);
-                  }}
-                  className="bg-dark-800 border border-gold/40 text-gold text-xs font-bold rounded-xl p-2 outline-none"
-                >
-                  {salesReps.map(r => (
-                    <option key={r.id} value={r.id}>{r.name}</option>
-                  ))}
-                </select>
-              </div>
+              <button onClick={() => setCurrentRep(null)} className="md:hidden text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-lg border border-red-500/20">
+                خروج
+              </button>
             </div>
 
             <nav className="flex flex-wrap items-center justify-center gap-1.5 md:gap-2 bg-dark-800/80 p-1.5 rounded-2xl border border-dark-700 w-full md:w-auto">
               {[
                 { id: 'newOrder', label: 'إنشاء طلب', icon: 'plus-circle' },
-                { id: 'myOrders', label: 'طلباتي والسجل', icon: 'shopping-cart' },
+                { id: 'myOrders', label: 'سجل مبيعاتي', icon: 'shopping-cart' },
                 { id: 'collections', label: 'قسم التحصيلات', icon: 'dollar-sign' },
-                { id: 'clientStatement', label: 'كشف العملاء', icon: 'file-text' },
-                { id: 'repStatement', label: 'سجل المندوبين', icon: 'user-check' }
+                { id: 'clientStatement', label: 'كشف حساب العملاء', icon: 'file-text' },
+                { id: 'repStatement', label: 'سجل العمال والمندوبين', icon: 'user-check' }
               ].map(tab => (
                 <button
                   key={tab.id}
@@ -539,40 +588,27 @@
               ))}
             </nav>
 
-            <div className="hidden md:flex items-center gap-2">
-              <span className="text-xs text-gray-400">المندوب:</span>
-              <select
-                value={currentRep.id}
-                onChange={e => {
-                  const found = salesReps.find(r => r.id === e.target.value);
-                  if (found) setCurrentRep(found);
-                }}
-                className="bg-dark-800 border border-gold/40 text-gold text-xs font-bold rounded-xl p-2 outline-none"
-              >
-                {salesReps.map(r => (
-                  <option key={r.id} value={r.id}>{r.name} ({r.region || 'عام'})</option>
-                ))}
-              </select>
-            </div>
+            <button onClick={() => setCurrentRep(null)} className="hidden md:flex bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-2 rounded-xl text-xs items-center gap-1.5">
+              <i data-lucide="log-out" className="w-4 h-4"></i> تغيير الحساب
+            </button>
           </header>
 
           {/* Main Container */}
           <main className="flex-1 max-w-7xl w-full mx-auto px-3 md:px-4 py-4 md:py-8 space-y-6">
 
-            {/* TAB 1: NEW ORDER FORM (مع البحث المباشر للعميل والمنتج) */}
+            {/* TAB 1: NEW ORDER FORM (اختيار المنتج والكمية بالطن أو الشيكارة ثم الإضافة للسلة) */}
             {activeTab === 'newOrder' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
                 <div className="lg:col-span-7 space-y-6">
                   
-                  {/* Step 1: Select Client & Driver مع البحث المباشر للعملاء */}
+                  {/* Step 1: Select Client & Driver */}
                   <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
                     <h3 className="text-sm md:text-base font-bold text-gold flex items-center gap-2">
                       <i data-lucide="user-check" className="w-5 h-5"></i>
                       ١. تحديد العميل والسائق المكلف
                     </h3>
                     
-                    {/* البحث المباشر للعميل على غرار صفحة المعرض */}
                     <div className="space-y-2">
                       <label className="text-xs text-gray-300 block font-bold">ابحث باسم العميل للظهور المباشر:</label>
                       <div className="relative">
@@ -590,7 +626,6 @@
                         )}
                       </div>
 
-                      {/* قائمة النتائج للعملاء المباشرة */}
                       {clientSearch.trim().length > 0 && (
                         <div className="bg-dark-950 border border-gold/40 rounded-2xl p-2 max-h-48 overflow-y-auto space-y-1">
                           {searchedClientsList.length === 0 ? (
@@ -629,7 +664,6 @@
                       </select>
                     </div>
 
-                    {/* اختيار السائق المسجل بالإدارة */}
                     <div className="space-y-2 pt-3 border-t border-dark-700">
                       <label className="text-xs text-gray-300 block font-bold">تحديد السائق المكلف بالتوصيل:</label>
                       <select value={selectedDriverId} onChange={e => setSelectedDriverId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
@@ -641,60 +675,17 @@
                     </div>
                   </div>
 
-                  {/* Step 2: Select Products مع البحث المباشر للأعلاف */}
+                  {/* Step 2: Select Products مع الاختيار والزر للإضافة */}
                   <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
                     <h3 className="text-sm md:text-base font-bold text-gold flex items-center gap-2">
                       <i data-lucide="package" className="w-5 h-5"></i>
-                      ٢. إضافة أصناف العلف إلى السلة
+                      ٢. تحديد المنتج والكمية (بالطن / بالشيكارة) للإضافة
                     </h3>
 
-                    <div className="space-y-2">
-                      <label className="text-xs text-gray-300 block font-bold">ابحث باسم العلف للظهور والإضافة المباشرة:</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          placeholder="اكتب اسم العلف (مثال: بادي، نامي، ناهي...)"
-                          value={productSearch}
-                          onChange={e => setProductSearch(e.target.value)}
-                          className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold"
-                        />
-                        {productSearch && (
-                          <button onClick={() => setProductSearch('')} className="absolute left-3 top-3 text-gray-400 hover:text-white">
-                            <i data-lucide="x" className="w-4 h-4"></i>
-                          </button>
-                        )}
-                      </div>
-
-                      {/* نتائج بحث المنتجات المباشرة */}
-                      {productSearch.trim().length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                          {searchedProductsList.length === 0 ? (
-                            <p className="text-xs text-gray-500 p-3 col-span-2 text-center bg-dark-950 rounded-xl">لا يوجد صنف بهذا الاسم</p>
-                          ) : (
-                            searchedProductsList.map(prod => (
-                              <div key={prod.id} className="bg-dark-950 p-3 rounded-2xl border border-dark-700 flex justify-between items-center">
-                                <div>
-                                  <strong className="text-xs text-white block">{prod.name}</strong>
-                                  <span className="text-[10px] text-gold">{Number(prod.pricePerTon || 0).toLocaleString()} ج.م / طن</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => handleAddToCart(prod)}
-                                  className="gold-gradient text-dark-950 font-bold px-3 py-1.5 rounded-xl text-[11px] hover:brightness-110 flex items-center gap-1"
-                                >
-                                  <i data-lucide="plus" className="w-3.5 h-3.5"></i> إضافة
-                                </button>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-dark-700">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                       <div className="md:col-span-1">
-                        <label className="text-xs text-gray-400 block mb-1">اختر العلف يدويًا</label>
-                        <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                        <label className="text-xs text-gray-400 block mb-1 font-bold">اختر صنف العلف</label>
+                        <select value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none focus:border-gold">
                           <option value="">-- اختر الصنف --</option>
                           {products.map(p => (
                             <option key={p.id} value={p.id}>{p.name}</option>
@@ -703,21 +694,25 @@
                       </div>
 
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">وحدة الكمية</label>
-                        <select value={unitType} onChange={e => setUnitType(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none">
+                        <label className="text-xs text-gray-400 block mb-1 font-bold">وحدة الكمية</label>
+                        <select value={unitType} onChange={e => setUnitType(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs text-white outline-none focus:border-gold">
                           <option value="ton">بالطن</option>
                           <option value="bag">بالشيكارة</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="text-xs text-gray-400 block mb-1">الكمية المطلوبة</label>
-                        <input type="number" step="0.1" min="0.1" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white" />
+                        <label className="text-xs text-gray-400 block mb-1 font-bold">الكمية المطلوبة</label>
+                        <input type="number" step="0.1" min="0.1" value={quantity} onChange={e => setQuantity(e.target.value)} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-xs outline-none text-white focus:border-gold" />
                       </div>
                     </div>
 
-                    <button type="button" onClick={() => handleAddToCart(null)} className="w-full bg-dark-800 border border-gold/40 hover:border-gold text-gold font-bold p-3 rounded-xl text-xs flex items-center justify-center gap-2">
-                      <i data-lucide="plus" className="w-4 h-4"></i> تأكيد إضافة الصنف المختار للسلة
+                    <button
+                      type="button"
+                      onClick={() => handleAddToCart(null)}
+                      className="w-full bg-dark-800 border border-gold/50 hover:bg-gold hover:text-dark-950 text-gold font-black p-3.5 rounded-xl text-xs flex items-center justify-center gap-2 transition-all shadow"
+                    >
+                      <i data-lucide="plus" className="w-4 h-4"></i> إدراج المنتج المختار في السلة
                     </button>
                   </div>
                 </div>
@@ -767,21 +762,28 @@
                     </div>
 
                     <button onClick={handleSubmitOrder} className="w-full gold-gradient text-dark-950 font-black py-3.5 rounded-xl text-xs flex items-center justify-center gap-2 hover:brightness-110 shadow-lg">
-                      <i data-lucide="send" className="w-4 h-4"></i> تأكيد ورفع الطلب للإدارة
+                      <i data-lucide="send" className="w-4 h-4"></i> تأكيد ورفع الطلب للإدارة (بدون طباعة)
                     </button>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* TAB 2: MY ORDERS & STATUS */}
+            {/* TAB 2: MY ORDERS & STATUS (بدون طباعة فواتير فردية لطلبات العلف) */}
             {activeTab === 'myOrders' && (
               <div className="space-y-6">
-                <div className="flex justify-between items-center">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                   <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
                     <i data-lucide="shopping-cart" className="w-5 h-5 text-gold"></i>
-                    سجل مبيعات المندوب ({currentRep.name})
+                    سجل طلبات ومبيعات المندوب ({currentRep.name})
                   </h2>
+
+                  <button
+                    onClick={() => setActiveModal('printRepSalesModal')}
+                    className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow"
+                  >
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة كشف سجل المبيعات الشامل
+                  </button>
                 </div>
 
                 <div className="glass-card rounded-2xl overflow-x-auto border border-dark-700">
@@ -791,7 +793,7 @@
                         <th className="p-4">تاريخ الطلب</th>
                         <th className="p-4">اسم العميل</th>
                         <th className="p-4">السائق المكلف</th>
-                        <th className="p-4">نوع حمولة الأعلاف</th>
+                        <th className="p-4">حمولة العلف</th>
                         <th className="p-4">الكمية الإجمالية</th>
                         <th className="p-4">المبلغ الإجمالي</th>
                         <th className="p-4">حالة الطلب لدى الإدارة</th>
@@ -825,7 +827,7 @@
               </div>
             )}
 
-            {/* TAB 3: COLLECTIONS (قسم التحصيلات والتوريدات النقدية) */}
+            {/* TAB 3: COLLECTIONS (قسم التحصيلات وعرض المديونية والخصم والتوريد) */}
             {activeTab === 'collections' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
@@ -834,12 +836,12 @@
                   <form onSubmit={handleSaveCollection} className="glass-card p-5 md:p-6 rounded-3xl border border-dark-700 space-y-4 gold-glow">
                     <h3 className="text-base font-bold text-gold flex items-center gap-2 border-b border-dark-700 pb-3">
                       <i data-lucide="dollar-sign" className="w-5 h-5"></i>
-                      قسم التحصيلات والتوريدات النقدية
+                      قسم التحصيلات وتنزيل المديونيات
                     </h3>
 
                     {/* اختيار العميل بالبحث السريع */}
                     <div className="space-y-2">
-                      <label className="text-xs text-gray-300 block font-bold">ابحث عن العميل للتوريد لحسابه:</label>
+                      <label className="text-xs text-gray-300 block font-bold">ابحث عن العميل لفتح بيانات حسابه ومديونبته:</label>
                       <input
                         type="text"
                         placeholder="ابحث باسم العميل..."
@@ -882,8 +884,26 @@
                       </select>
                     </div>
 
+                    {/* 📊 عرض كارت مديونية العميل الحالية المحسوبة تلقائياً */}
+                    {collectionClientId && (
+                      <div className="bg-dark-950 p-3.5 rounded-2xl border border-red-500/40 space-y-2 text-xs">
+                        <div className="flex justify-between items-center text-gray-300">
+                          <span>إجمالي المسحوبات (الفواتير):</span>
+                          <strong className="text-white font-mono">{selectedClientAccountInfo.totalDebits.toLocaleString()} ج.م</strong>
+                        </div>
+                        <div className="flex justify-between items-center text-gray-300">
+                          <span>إجمالي المسدد سابقاً:</span>
+                          <strong className="text-green-400 font-mono">{selectedClientAccountInfo.totalCredits.toLocaleString()} ج.م</strong>
+                        </div>
+                        <div className="flex justify-between items-center border-t border-dark-700 pt-2 font-bold text-sm">
+                          <span className="text-red-400">المديونية الحالية على العميل:</span>
+                          <span className="text-red-400 font-mono text-base">{selectedClientAccountInfo.currentDebt.toLocaleString()} ج.م</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div>
-                      <label className="text-xs text-gray-300 block font-bold mb-1">المبلغ المحصل بالجنيه (مثال: 1000)</label>
+                      <label className="text-xs text-gray-300 block font-bold mb-1">المبلغ المراد تنزيله من الحساب (مثال: 1000)</label>
                       <input
                         type="number"
                         min="1"
@@ -894,6 +914,16 @@
                         className="w-full bg-dark-800 border border-dark-700 rounded-xl p-3 text-sm text-gold font-bold outline-none focus:border-gold"
                       />
                     </div>
+
+                    {/* 💡 معاينة فورية للمبلغ المتبقي بعد التنزيل */}
+                    {collectionAmount && collectionClientId && (
+                      <div className="bg-green-950/40 p-3 rounded-xl border border-green-500/40 text-xs space-y-1">
+                        <div className="flex justify-between text-green-300 font-bold">
+                          <span>المديونية المتبقية بعد خصم ({Number(collectionAmount).toLocaleString()} ج.م):</span>
+                          <span>{(selectedClientAccountInfo.currentDebt - (parseFloat(collectionAmount) || 0)).toLocaleString()} ج.م</span>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-3">
                       <div>
@@ -920,10 +950,10 @@
                     </div>
 
                     <div>
-                      <label className="text-xs text-gray-400 block mb-1">ملاحظات وتفاصيل التوريد</label>
+                      <label className="text-xs text-gray-400 block mb-1">ملاحظات والتفاصيل</label>
                       <input
                         type="text"
-                        placeholder="مثال: سداد جزء من حساب الشحنة الأخيرة..."
+                        placeholder="اختياري..."
                         value={collectionNotes}
                         onChange={e => setCollectionNotes(e.target.value)}
                         className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2 text-xs text-white outline-none"
@@ -934,15 +964,15 @@
                       type="submit"
                       className="w-full gold-gradient text-dark-950 font-black py-3 rounded-xl hover:brightness-110 text-xs md:text-sm shadow-lg flex items-center justify-center gap-2"
                     >
-                      <i data-lucide="check-circle" className="w-4 h-4"></i> تسجيل المورد وتنزيله بحساب العميل
+                      <i data-lucide="check-circle" className="w-4 h-4"></i> تنزيل الموديل وحفظ البيانات الحسابية
                     </button>
                   </form>
                 </div>
 
-                {/* 📜 سجل التحصيلات النقدية الموردة بواسطة المندوب */}
+                {/* 📜 سجل التحصيلات النقدية الموردة */}
                 <div className="lg:col-span-7 space-y-4">
                   <div className="glass-card p-4 md:p-5 rounded-3xl space-y-4">
-                    <h3 className="text-sm md:text-base font-bold text-gold">سجل توريدات التحصيل المباشرة</h3>
+                    <h3 className="text-sm md:text-base font-bold text-gold">سجل توريدات المبالغ وتخفيض المديونية</h3>
 
                     <div className="overflow-x-auto">
                       <table className="w-full text-right text-xs border-collapse">
@@ -951,14 +981,14 @@
                             <th className="p-3">التاريخ</th>
                             <th className="p-3">اسم العميل</th>
                             <th className="p-3">المبلغ المورد</th>
-                            <th className="p-3">الطريقة</th>
-                            <th className="p-3">ملاحظات</th>
+                            <th className="p-3">المديونية المتبقية</th>
+                            <th className="p-3">طريقة التوريد</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-dark-700">
                           {repCollections.length === 0 ? (
                             <tr>
-                              <td colSpan="5" className="p-6 text-center text-gray-400">لم يتم تسجيل أي تحصيلات نقدية بعد</td>
+                              <td colSpan="5" className="p-6 text-center text-gray-400">لم يتم تسجيل أي توريدات نقدية بعد</td>
                             </tr>
                           ) : (
                             repCollections.map(col => (
@@ -966,8 +996,8 @@
                                 <td className="p-3 text-gray-300">{col.date}</td>
                                 <td className="p-3 font-bold text-white">{col.clientName}</td>
                                 <td className="p-3 font-black text-green-400">{Number(col.amount || 0).toLocaleString()} ج.م</td>
+                                <td className="p-3 font-bold text-red-400">{col.remainingDebt !== undefined ? Number(col.remainingDebt).toLocaleString() + ' ج.م' : '-'}</td>
                                 <td className="p-3 text-gray-300">{col.method || 'نقدي'}</td>
-                                <td className="p-3 text-gray-400">{col.notes || '-'}</td>
                               </tr>
                             ))
                           )}
@@ -980,7 +1010,7 @@
               </div>
             )}
 
-            {/* TAB 4: CLIENT STATEMENT (كشف حساب مفصل وشامل للعميل) */}
+            {/* TAB 4: CLIENT STATEMENT (كشف حساب مفصل مع الطباعة) */}
             {activeTab === 'clientStatement' && (
               <div className="space-y-6">
                 <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
@@ -1002,8 +1032,8 @@
                       <input type="date" value={statementFilter.toDate} onChange={e => setStatementFilter({ ...statementFilter, toDate: e.target.value })} className="w-full bg-dark-800 border border-dark-700 rounded-xl p-2.5 text-xs text-white" />
                     </div>
                     <div className="flex items-end">
-                      <button onClick={() => setActiveModal('printStatementModal')} className="w-full gold-gradient text-dark-950 font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-1">
-                        <i data-lucide="printer" className="w-4 h-4"></i> معاينة وطباعة كشف الحساب
+                      <button onClick={() => setActiveModal('printStatementModal')} className="w-full gold-gradient text-dark-950 font-bold p-2.5 rounded-xl text-xs flex items-center justify-center gap-1 shadow">
+                        <i data-lucide="printer" className="w-4 h-4"></i> طباعة كشف حساب العميل A4
                       </button>
                     </div>
                   </div>
@@ -1047,53 +1077,43 @@
               </div>
             )}
 
-            {/* TAB 5: REP STATEMENT (سجل حساب مفصل المندوبين والعمال منفردين) */}
+            {/* TAB 5: REP STATEMENT (سجل كشف المندوبين والعمال مع طباعة السجلات) */}
             {activeTab === 'repStatement' && (
               <div className="space-y-6">
                 <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <h3 className="text-base font-bold text-gold">كشف سجل الأداء والمبيعات التفصيلي للمندوب / العامل</h3>
-                    
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-300">اختر المندوب/العامل:</span>
-                      <select
-                        value={selectedRepForStatement || currentRep.id}
-                        onChange={e => setSelectedRepForStatement(e.target.value)}
-                        className="bg-dark-800 border border-gold/40 text-gold font-bold rounded-xl p-2 text-xs outline-none"
-                      >
-                        {salesReps.map(r => (
-                          <option key={r.id} value={r.id}>{r.name} ({r.region || 'عام'})</option>
-                        ))}
-                      </select>
-                    </div>
+                    <h3 className="text-base font-bold text-gold">سجل أداء ومبيعات المندوب الحالي والعمال</h3>
+                    <button
+                      onClick={() => setActiveModal('printRepSalesModal')}
+                      className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-2 shadow"
+                    >
+                      <i data-lucide="printer" className="w-4 h-4"></i> طباعة كشف السجل العام للمندوب
+                    </button>
                   </div>
 
-                  {/* كروت الإحصائيات للمندوب المختار */}
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 bg-dark-950 p-4 rounded-2xl border border-dark-700 text-xs">
                     <div>
-                      <span className="text-gray-400 block">إجمالي مبيعات الأعلاف:</span>
+                      <span className="text-gray-400 block">إجمالي المبيعات بالجنيه:</span>
                       <p className="text-lg md:text-xl font-black text-gold mt-1">
-                        {selectedRepOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0).toLocaleString()} ج.م
+                        {repOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0).toLocaleString()} ج.م
                       </p>
                     </div>
                     <div>
-                      <span className="text-gray-400 block">إجمالي الكميات المرفوعة:</span>
+                      <span className="text-gray-400 block">إجمالي الكمية (طن):</span>
                       <p className="text-lg md:text-xl font-black text-white mt-1">
-                        {selectedRepOrders.reduce((sum, o) => sum + (parseFloat(o.quantity) || 0), 0).toFixed(2)} طن
+                        {repOrders.reduce((sum, o) => sum + (parseFloat(o.quantity) || 0), 0).toFixed(2)} طن
                       </p>
                     </div>
                     <div>
-                      <span className="text-gray-400 block">إجمالي التحصيلات الموردة:</span>
+                      <span className="text-gray-400 block">إجمالي المبالغ المحصلة:</span>
                       <p className="text-lg md:text-xl font-black text-green-400 mt-1">
-                        {selectedRepCollections.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0).toLocaleString()} ج.م
+                        {repCollections.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0).toLocaleString()} ج.م
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* جدول المبيعات والمرفوعات */}
                 <div className="glass-card rounded-2xl p-4 overflow-x-auto border border-dark-700">
-                  <h4 className="font-bold text-xs text-gold mb-3">تفاصيل جميع النقلات والمبيعات التي قام بها المندوب:</h4>
                   <table className="w-full text-right text-xs">
                     <thead className="bg-dark-800 text-gold font-bold">
                       <tr>
@@ -1106,7 +1126,7 @@
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-dark-700">
-                      {selectedRepOrders.map(o => (
+                      {repOrders.map(o => (
                         <tr key={o.id} className="hover:bg-dark-800/50">
                           <td className="p-3 text-gray-300">{o.date}</td>
                           <td className="p-3 font-bold text-white">{o.clientName}</td>
@@ -1124,14 +1144,14 @@
 
           </main>
 
-          {/* MODAL: PRINT CLIENT STATEMENT */}
+          {/* 🖨️ MODAL 1: PRINT CLIENT STATEMENT */}
           {activeModal === 'printStatementModal' && (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
               <div className="bg-white text-black p-6 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
                 <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
-                  <h3 className="text-lg font-bold text-black">معاينة كشف حساب العميل</h3>
+                  <h3 className="text-lg font-bold text-black">معاينة كشف حساب العميل للطباعة</h3>
                   <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
-                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة A4
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة الكشف A4
                   </button>
                 </div>
 
@@ -1142,7 +1162,6 @@
                     <p className="text-sm font-bold text-black">كشف حساب مبيعات وتوريدات عميل تفصيلي</p>
                     <div className="flex justify-between text-xs mt-3 text-black font-semibold">
                       <span>المندوب المسؤول: <strong>{currentRep.name}</strong></span>
-                      <span>الفترة من: <strong>{statementFilter.fromDate || 'البداية'}</strong> إلى: <strong>{statementFilter.toDate || 'اليوم'}</strong></span>
                       <span>تاريخ الإصدار: <strong>{new Date().toLocaleDateString('ar-EG')}</strong></span>
                     </div>
                   </div>
@@ -1174,6 +1193,115 @@
                     <span>إجمالي المبيعات (مدين): {clientLedgerCombined.reduce((a, b) => a + b.debit, 0).toLocaleString()} ج.م</span>
                     <span>إجمالي التحصيلات (دائن): {clientLedgerCombined.reduce((a, b) => a + b.credit, 0).toLocaleString()} ج.م</span>
                     <span>الصافي المتبقي: {(clientLedgerCombined.reduce((a, b) => a + b.debit, 0) - clientLedgerCombined.reduce((a, b) => a + b.credit, 0)).toLocaleString()} ج.م</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2 no-print">
+                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-gray-800 text-white text-xs font-bold">إغلاق</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🖨️ MODAL 2: PRINT REP SALES LOG */}
+          {activeModal === 'printRepSalesModal' && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="bg-white text-black p-6 rounded-3xl w-full max-w-3xl max-h-[90vh] overflow-y-auto space-y-6 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-4 no-print">
+                  <h3 className="text-lg font-bold text-black">معاينة سجل مبيعات المندوب للطباعة</h3>
+                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 shadow">
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة السجل A4
+                  </button>
+                </div>
+
+                <div id="print-area">
+                  <div className="text-center border-b-2 border-black pb-3 mb-4">
+                    <img src={LOGO_URL} alt="Logo" className="w-16 h-16 rounded-full mx-auto mb-2 border border-black object-contain" />
+                    <h1 className="text-2xl font-black text-black">مصنع المجد للأعلاف</h1>
+                    <p className="text-sm font-bold text-black">كشف سجل المبيعات والحمولات الشامل للمندوب</p>
+                    <p className="text-xs font-bold text-gray-700 mt-1">اسم المندوب: {currentRep.name} ({currentRep.phone})</p>
+                  </div>
+
+                  <table className="w-full text-right text-xs border-collapse">
+                    <thead>
+                      <tr className="bg-gray-200 text-black border-b">
+                        <th className="p-2 border border-black font-bold">التاريخ</th>
+                        <th className="p-2 border border-black font-bold">اسم العميل</th>
+                        <th className="p-2 border border-black font-bold">السائق</th>
+                        <th className="p-2 border border-black font-bold">الحمولة</th>
+                        <th className="p-2 border border-black font-bold">الكمية (طن)</th>
+                        <th className="p-2 border border-black font-bold">المبلغ</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {repOrders.map((o, idx) => (
+                        <tr key={idx} className="border-b text-black">
+                          <td className="p-2 border border-black">{o.date}</td>
+                          <td className="p-2 border border-black font-bold">{o.clientName}</td>
+                          <td className="p-2 border border-black">{o.driverName || 'سائق'}</td>
+                          <td className="p-2 border border-black">{o.cargoType || 'علف'}</td>
+                          <td className="p-2 border border-black font-bold">{o.quantity} طن</td>
+                          <td className="p-2 border border-black font-bold">{Number(o.totalAmount || 0).toLocaleString()} ج.م</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+
+                  <div className="flex justify-between items-center bg-gray-100 p-3 rounded-xl text-xs font-bold mt-4 text-black border border-black">
+                    <span>إجمالي الحمولات: {repOrders.reduce((sum, o) => sum + (parseFloat(o.quantity) || 0), 0).toFixed(2)} طن</span>
+                    <span>إجمالي المبيعات بالجنيه: {repOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0).toLocaleString()} ج.م</span>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-2 no-print">
+                  <button onClick={() => setActiveModal(null)} className="px-5 py-2 rounded-xl bg-gray-800 text-white text-xs font-bold">إغلاق</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🖨️ MODAL 3: PRINT COLLECTION RECEIPT */}
+          {activeModal === 'printCollectionReceiptModal' && lastSavedCollection && (
+            <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4">
+              <div className="bg-white text-black p-6 rounded-3xl w-full max-w-lg space-y-6 shadow-2xl">
+                <div className="flex justify-between items-center border-b border-gray-200 pb-3 no-print">
+                  <h3 className="text-base font-bold text-black">معاينة إيصال التوريد النقدي</h3>
+                  <button onClick={() => window.print()} className="gold-gradient text-dark-950 font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1 shadow">
+                    <i data-lucide="printer" className="w-4 h-4"></i> طباعة الإيصال
+                  </button>
+                </div>
+
+                <div id="print-area" className="p-4 border-2 border-black rounded-2xl space-y-4">
+                  <div className="flex justify-between items-center border-b-2 border-black pb-3">
+                    <div>
+                      <h1 className="text-lg font-black text-black">مصنع المجد للأعلاف</h1>
+                      <p className="text-xs font-bold text-gray-800">إيصال توريد نقدية وتخصيم مديونية</p>
+                      <p className="text-[10px] text-gray-600">التاريخ: {lastSavedCollection.date}</p>
+                    </div>
+                    <img src={LOGO_URL} alt="Logo" className="w-14 h-14 rounded-full border border-black object-contain" />
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div>وصلنا من السيد العميل: <strong className="text-sm font-black underline">{lastSavedCollection.clientName}</strong></div>
+                    <div>مبلغ وقدره: <strong className="text-base font-black text-black underline">{Number(lastSavedCollection.amount).toLocaleString()} جنيه مصري فقط لا غير</strong></div>
+                    <div>طريقة الدفع: <strong>{lastSavedCollection.method || 'نقدي'}</strong></div>
+                    <div>ملاحظات: <strong>{lastSavedCollection.notes || 'سداد جزء من الحساب'}</strong></div>
+                  </div>
+
+                  <div className="bg-gray-100 p-3 rounded-xl border border-black text-xs space-y-1">
+                    <div className="flex justify-between">
+                      <span>المديونية المترتبة قبل التنزيل:</span>
+                      <strong>{Number(lastSavedCollection.previousDebt || 0).toLocaleString()} ج.م</strong>
+                    </div>
+                    <div className="flex justify-between text-black font-black">
+                      <span>المديونية المتبقية الحالية:</span>
+                      <strong className="underline">{Number(lastSavedCollection.remainingDebt || 0).toLocaleString()} ج.م</strong>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-center text-xs pt-4 border-t border-gray-400 font-bold">
+                    <div>توقيع المندوب المستلم: ..................</div>
+                    <div>توقيع العميل: ..................</div>
                   </div>
                 </div>
 
