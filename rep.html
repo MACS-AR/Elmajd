@@ -198,6 +198,60 @@
         setTimeout(() => setToast(null), 3000);
       };
 
+      // 📲 1. استقبال وتأكيد تسجيل الدخول التلقائي للمندوب من الرابط أو LocalStorage
+      useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const phoneParam = urlParams.get('phone') || localStorage.getItem('userPhone');
+        const savedRepData = localStorage.getItem('repData');
+
+        if (savedRepData) {
+          try {
+            const parsed = JSON.parse(savedRepData);
+            setCurrentRep(parsed);
+          } catch(e) {
+            console.error(e);
+          }
+        } else if (phoneParam) {
+          const cleanPhone = String(phoneParam).replace(/\D/g, '');
+          setCurrentRep({
+            id: 'rep_' + cleanPhone,
+            name: `مندوب (${cleanPhone})`,
+            phone: cleanPhone,
+            region: 'مبيعات عامة'
+          });
+        }
+      }, []);
+
+      // 🔄 2. البحث عن بيانات المندوب الحقيقية ومزامنتها أوتوماتيكياً مع الفايربيس
+      useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const phoneParam = urlParams.get('phone') || localStorage.getItem('userPhone');
+
+        if (!phoneParam) return;
+        const cleanPhone = String(phoneParam).replace(/\D/g, '');
+
+        const checkInterval = setInterval(() => {
+          if (window.rtdbMethods) {
+            clearInterval(checkInterval);
+            const { ref, onValue, db } = window.rtdbMethods;
+
+            onValue(ref(db, 'salesReps'), snapshot => {
+              const data = snapshot.val();
+              if (data) {
+                const list = Object.keys(data).map(k => ({ id: k, ...data[k] }));
+                setSalesReps(list);
+
+                const matched = list.find(r => r.phone && String(r.phone).replace(/\D/g, '') === cleanPhone);
+                if (matched) {
+                  setCurrentRep(matched);
+                  localStorage.setItem('repData', JSON.stringify(matched));
+                }
+              }
+            });
+          }
+        }, 100);
+      }, []);
+
       // Realtime Database Sync
       useEffect(() => {
         const interval = setInterval(() => {
@@ -245,22 +299,23 @@
         if (window.lucide) window.lucide.createIcons();
       }, [activeTab, activeModal, currentRep, cartItems, clientSearch, productSearch, collectionClientId, collectionSearchText]);
 
-      // 📲 الدخول التلقائي للمندوب عبر رقم الهاتف
+      // 📲 الدخول التلقائي واليدوي برقم الهاتف
       const handlePhoneLogin = (e) => {
         e.preventDefault();
-        const cleanPhone = phoneInput.trim();
+        const cleanPhone = phoneInput.trim().replace(/\D/g, '');
         if (!cleanPhone) {
           showToast('يرجى إدخال رقم الهاتف أولاً', 'error');
           return;
         }
 
-        const foundRep = salesReps.find(r => r.phone && r.phone.trim() === cleanPhone);
+        const foundRep = salesReps.find(r => r.phone && String(r.phone).replace(/\D/g, '') === cleanPhone);
 
         if (foundRep) {
           setCurrentRep(foundRep);
+          localStorage.setItem('userPhone', cleanPhone);
+          localStorage.setItem('repData', JSON.stringify(foundRep));
           showToast(`تم التعرف عليك بنجاح: أهلاً بك يا ${foundRep.name}`);
         } else {
-          // فتح حساب للمندوب برقم هاتفه مباشرة إن لم يكن مسجلاً مسبقاً
           const autoRep = {
             id: 'rep_' + cleanPhone,
             name: `مندوب (${cleanPhone})`,
@@ -268,6 +323,8 @@
             region: 'مبيعات عامة'
           };
           setCurrentRep(autoRep);
+          localStorage.setItem('userPhone', cleanPhone);
+          localStorage.setItem('repData', JSON.stringify(autoRep));
           showToast(`تم فتح الواجهة برقم الهاتف: ${cleanPhone}`);
         }
       };
@@ -297,11 +354,9 @@
       const selectedClientAccountInfo = useMemo(() => {
         if (!collectionClientId) return { totalDebits: 0, totalCredits: 0, currentDebt: 0 };
 
-        // المديونيات من الطلبات
         const clientOrders = myOrders.filter(o => o.clientId === collectionClientId && o.status !== 'ملغي');
         const totalDebits = clientOrders.reduce((sum, o) => sum + (parseFloat(o.totalAmount) || 0), 0);
 
-        // التوريدات النقدية الموردة
         const clientCollections = collectionsList.filter(c => c.clientId === collectionClientId);
         const totalCredits = clientCollections.reduce((sum, c) => sum + (parseFloat(c.amount) || 0), 0);
 
@@ -310,7 +365,7 @@
         return { totalDebits, totalCredits, currentDebt };
       }, [collectionClientId, myOrders, collectionsList]);
 
-      // إضافة منتج لسلة الطلب فقط دون الإدراج الفوري بالفاتورة
+      // إضافة منتج لسلة الطلب
       const handleAddToCart = (productParam) => {
         const product = productParam || products.find(p => p.id === selectedProductId);
         if (!product) {
@@ -409,7 +464,7 @@
         });
       };
 
-      // 💵 حفظ التوريد النقدي وعرض بيانات الحساب المحفوظة والمديونية المتبقية
+      // 💵 حفظ التوريد النقدي وعرض بيانات الحساب والمديونية المتبقية
       const handleSaveCollection = (e) => {
         e.preventDefault();
         if (!collectionClientId) {
@@ -454,13 +509,13 @@
       // طلبات المندوب الحالي
       const repOrders = useMemo(() => {
         if (!currentRep) return [];
-        return myOrders.filter(o => o.repId === currentRep.id);
+        return myOrders.filter(o => o.repId === currentRep.id || (o.repPhone && currentRep.phone && String(o.repPhone).replace(/\D/g, '') === String(currentRep.phone).replace(/\D/g, '')));
       }, [myOrders, currentRep]);
 
       // تحصيلات المندوب الحالي
       const repCollections = useMemo(() => {
         if (!currentRep) return [];
-        return collectionsList.filter(c => c.repId === currentRep.id);
+        return collectionsList.filter(c => c.repId === currentRep.id || c.repName === currentRep.name);
       }, [collectionsList, currentRep]);
 
       // تصفية طلبات كشف حساب العملاء
@@ -509,7 +564,7 @@
         return combined.sort((a, b) => new Date(a.date) - new Date(b.date));
       }, [statementOrders, statementCollections]);
 
-      // 📲 شاشة تسجيل الدخول برقم الهاتف تلقائيًا
+      // 📲 شاشة تسجيل الدخول برقم الهاتف تلقائيًا إذا لم يتعرف على الحساب
       if (!currentRep) {
         return (
           <div className="min-h-screen flex items-center justify-center p-4 bg-dark-950">
@@ -564,7 +619,7 @@
                 </div>
               </div>
 
-              <button onClick={() => setCurrentRep(null)} className="md:hidden text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-lg border border-red-500/20">
+              <button onClick={() => { localStorage.removeItem('repData'); setCurrentRep(null); }} className="md:hidden text-xs text-red-400 bg-red-500/10 px-2.5 py-1 rounded-lg border border-red-500/20">
                 خروج
               </button>
             </div>
@@ -588,7 +643,7 @@
               ))}
             </nav>
 
-            <button onClick={() => setCurrentRep(null)} className="hidden md:flex bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-2 rounded-xl text-xs items-center gap-1.5">
+            <button onClick={() => { localStorage.removeItem('repData'); setCurrentRep(null); }} className="hidden md:flex bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/20 px-3 py-2 rounded-xl text-xs items-center gap-1.5">
               <i data-lucide="log-out" className="w-4 h-4"></i> تغيير الحساب
             </button>
           </header>
@@ -596,7 +651,7 @@
           {/* Main Container */}
           <main className="flex-1 max-w-7xl w-full mx-auto px-3 md:px-4 py-4 md:py-8 space-y-6">
 
-            {/* TAB 1: NEW ORDER FORM (اختيار المنتج والكمية بالطن أو الشيكارة ثم الإضافة للسلة) */}
+            {/* TAB 1: NEW ORDER FORM */}
             {activeTab === 'newOrder' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
@@ -675,7 +730,7 @@
                     </div>
                   </div>
 
-                  {/* Step 2: Select Products مع الاختيار والزر للإضافة */}
+                  {/* Step 2: Select Products */}
                   <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
                     <h3 className="text-sm md:text-base font-bold text-gold flex items-center gap-2">
                       <i data-lucide="package" className="w-5 h-5"></i>
@@ -769,7 +824,7 @@
               </div>
             )}
 
-            {/* TAB 2: MY ORDERS & STATUS (بدون طباعة فواتير فردية لطلبات العلف) */}
+            {/* TAB 2: MY ORDERS & STATUS */}
             {activeTab === 'myOrders' && (
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
@@ -827,7 +882,7 @@
               </div>
             )}
 
-            {/* TAB 3: COLLECTIONS (قسم التحصيلات وعرض المديونية والخصم والتوريد) */}
+            {/* TAB 3: COLLECTIONS */}
             {activeTab === 'collections' && (
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 
@@ -884,7 +939,7 @@
                       </select>
                     </div>
 
-                    {/* 📊 عرض كارت مديونية العميل الحالية المحسوبة تلقائياً */}
+                    {/* 📊 عرض كارت مديونية العميل الحالية */}
                     {collectionClientId && (
                       <div className="bg-dark-950 p-3.5 rounded-2xl border border-red-500/40 space-y-2 text-xs">
                         <div className="flex justify-between items-center text-gray-300">
@@ -915,7 +970,7 @@
                       />
                     </div>
 
-                    {/* 💡 معاينة فورية للمبلغ المتبقي بعد التنزيل */}
+                    {/* 💡 معاينة فورية للمبلغ المتبقي */}
                     {collectionAmount && collectionClientId && (
                       <div className="bg-green-950/40 p-3 rounded-xl border border-green-500/40 text-xs space-y-1">
                         <div className="flex justify-between text-green-300 font-bold">
@@ -1010,7 +1065,7 @@
               </div>
             )}
 
-            {/* TAB 4: CLIENT STATEMENT (كشف حساب مفصل مع الطباعة) */}
+            {/* TAB 4: CLIENT STATEMENT */}
             {activeTab === 'clientStatement' && (
               <div className="space-y-6">
                 <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
@@ -1039,7 +1094,6 @@
                   </div>
                 </div>
 
-                {/* ملخص كشف الحساب الحركي المركب */}
                 <div className="glass-card rounded-2xl p-4 overflow-x-auto border border-dark-700">
                   <table className="w-full text-right text-xs min-w-[700px]">
                     <thead className="bg-dark-800 text-gold font-bold">
@@ -1077,7 +1131,7 @@
               </div>
             )}
 
-            {/* TAB 5: REP STATEMENT (سجل كشف المندوبين والعمال مع طباعة السجلات) */}
+            {/* TAB 5: REP STATEMENT */}
             {activeTab === 'repStatement' && (
               <div className="space-y-6">
                 <div className="glass-card p-4 md:p-6 rounded-3xl space-y-4">
