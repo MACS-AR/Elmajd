@@ -25,12 +25,15 @@ const MAPBOX_TOKEN = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ
 // 📦 المتغيرات العامة
 // =============================================
 let currentUser = null;
+let currentUserId = null;
 let userRole = null;
 let userTenantId = null;
 let allVehicles = {};
 let mapInstance = null;
 let mapMarkers = {};
 let liveListeners = [];
+let trackingHistory = {};
+let trackingInterval = null;
 
 // =============================================
 // 🔐 إنشاء حساب أدمن تلقائي (إذا لم يكن موجوداً)
@@ -121,6 +124,7 @@ async function handleLogin(e) {
     try {
         const cred = await auth.signInWithEmailAndPassword(email, password);
         currentUser = cred.user;
+        currentUserId = cred.user.uid;
         
         // جلب دور المستخدم من Firestore
         const userDoc = await dbFS.collection('users').doc(currentUser.uid).get();
@@ -161,6 +165,10 @@ async function handleLogout() {
         if (mapInstance) {
             mapInstance.remove();
             mapInstance = null;
+        }
+        if (trackingInterval) {
+            clearInterval(trackingInterval);
+            trackingInterval = null;
         }
         document.getElementById('dashboardScreen').classList.add('hidden');
         document.getElementById('loginScreen').classList.remove('hidden');
@@ -226,6 +234,7 @@ function showPage(page) {
         case 'dashboard': renderDashboard(); break;
         case 'vehicles': renderVehicles(); break;
         case 'map': renderMap(); break;
+        case 'tracking': renderTracking(); break;
         case 'admin-companies': if (userRole === 'admin') renderCompanies(); break;
         case 'admin-vehicles': if (userRole === 'admin') renderAdminVehicles(); break;
         case 'admin-subscriptions': if (userRole === 'admin') renderSubscriptions(); break;
@@ -241,17 +250,17 @@ async function renderDashboard() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-800">📊 لوحة التحكم</h2>
+            <h2 class="text-2xl font-bold text-amber-700">📊 لوحة التحكم</h2>
             <span class="text-sm text-gray-500">آخر تحديث: ${new Date().toLocaleTimeString('ar')}</span>
         </div>
         <div id="statsContainer" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon bg-blue-100 text-blue-600">🚗</div><div><p class="text-gray-500 text-sm">المركبات</p><p id="stat-total" class="text-2xl font-bold">0</p></div></div></div>
-            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon bg-green-100 text-green-600">📶</div><div><p class="text-gray-500 text-sm">متصل</p><p id="stat-online" class="text-2xl font-bold">0</p></div></div></div>
-            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon bg-blue-100 text-blue-600">🔄</div><div><p class="text-gray-500 text-sm">متحرك</p><p id="stat-moving" class="text-2xl font-bold">0</p></div></div></div>
-            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon bg-red-100 text-red-600">⏸️</div><div><p class="text-gray-500 text-sm">متوقف</p><p id="stat-stopped" class="text-2xl font-bold">0</p></div></div></div>
+            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">🚗</div><div><p class="text-gray-500 text-sm">المركبات</p><p id="stat-total" class="text-2xl font-bold">0</p></div></div></div>
+            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">📶</div><div><p class="text-gray-500 text-sm">متصل</p><p id="stat-online" class="text-2xl font-bold">0</p></div></div></div>
+            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">🔄</div><div><p class="text-gray-500 text-sm">متحرك</p><p id="stat-moving" class="text-2xl font-bold">0</p></div></div></div>
+            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">⏸️</div><div><p class="text-gray-500 text-sm">متوقف</p><p id="stat-stopped" class="text-2xl font-bold">0</p></div></div></div>
         </div>
         <div class="bg-white rounded-xl shadow-sm p-4">
-            <h3 class="font-bold text-gray-700 mb-3">📍 آخر المواقع</h3>
+            <h3 class="font-bold text-amber-700 mb-3">📍 آخر المواقع <span class="text-xs text-gray-400 font-normal">(اضغط لعرض على الخريطة)</span></h3>
             <div id="recentLocations" class="space-y-2 text-sm text-gray-600"></div>
         </div>
     `;
@@ -281,7 +290,8 @@ async function renderDashboard() {
                     lat: v.liveLocation.latitude,
                     lng: v.liveLocation.longitude,
                     speed: v.liveLocation.speed || 0,
-                    time: v.liveLocation.timestamp
+                    time: v.liveLocation.timestamp,
+                    code: code
                 });
             }
         });
@@ -308,12 +318,27 @@ function renderRecent(list) {
         return;
     }
     container.innerHTML = list.slice(0, 10).map(item => `
-        <div class="flex justify-between items-center border-b border-gray-100 py-2">
-            <span>${item.name}</span>
-            <span class="text-xs">${item.speed.toFixed(1)} كم/س</span>
+        <div class="flex justify-between items-center border-b border-gray-100 py-2 cursor-pointer hover:bg-amber-50 px-2 rounded" onclick="focusOnVehicle('${item.code}')">
+            <span class="font-medium text-amber-700">${item.name}</span>
+            <span class="text-xs text-amber-600">${item.speed.toFixed(1)} كم/س</span>
             <span class="text-xs text-gray-400">${item.time ? new Date(item.time).toLocaleTimeString('ar') : '-'}</span>
         </div>
     `).join('');
+}
+
+// دالة للتركيز على سيارة معينة في الخريطة
+function focusOnVehicle(code) {
+    showPage('map');
+    setTimeout(() => {
+        if (mapInstance && mapMarkers[code]) {
+            const marker = mapMarkers[code];
+            const lngLat = marker.getLngLat();
+            mapInstance.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 15 });
+            marker.togglePopup();
+        } else {
+            alert('السيارة غير موجودة على الخريطة حالياً');
+        }
+    }, 500);
 }
 
 // =============================================
@@ -325,7 +350,7 @@ async function renderVehicles() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
-            <h2 class="text-2xl font-bold text-gray-800">🚗 سياراتي</h2>
+            <h2 class="text-2xl font-bold text-amber-700">🚗 سياراتي</h2>
             <button onclick="showAddVehicle()" class="btn-primary">➕ إضافة سيارة</button>
         </div>
         <div id="vehiclesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
@@ -354,22 +379,23 @@ async function renderVehicles() {
             const loc = v.liveLocation || {};
 
             html += `
-                <div class="vehicle-card ${statusClass} rounded-xl p-4 shadow-sm">
+                <div class="vehicle-card ${statusClass} rounded-xl p-4 shadow-sm cursor-pointer" onclick="focusOnVehicle('${code}')">
                     <div class="flex justify-between items-start">
                         <div>
                             <h4 class="font-bold text-gray-800">${v.displayName || code}</h4>
                             <p class="text-sm text-gray-500">كود: ${code}</p>
                             <p class="text-sm text-gray-500">${v.phone || 'لا يوجد هاتف'}</p>
+                            <p class="text-xs text-amber-600">👤 أضيف بواسطة: ${v.createdBy || 'النظام'}</p>
                         </div>
                         <span class="status-dot ${statusClass}"></span>
                     </div>
                     <div class="mt-2 text-sm text-gray-600 grid grid-cols-2 gap-1">
                         <span>🚀 ${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</span>
                         <span>🔋 ${v.deviceHealth?.battery || '?'}%</span>
-                        <span>📍 ${loc.latitude ? loc.latitude.toFixed(4) + ', ' + loc.longitude.toFixed(4) : 'لا يوجد'}</span>
-                        <span class="text-xs text-gray-400">${statusText}</span>
+                        <span class="text-xs text-gray-400 col-span-2">📍 ${loc.latitude ? loc.latitude.toFixed(4) + ', ' + loc.longitude.toFixed(4) : 'لا يوجد'}</span>
+                        <span class="text-xs text-amber-600 col-span-2">${statusText}</span>
                     </div>
-                    ${userRole === 'admin' ? `<div class="mt-2 text-xs text-gray-400">الشركة: ${v.tenantId || 'غير محدد'}</div>` : ''}
+                    ${userRole === 'admin' ? `<div class="mt-2 text-xs text-amber-600">الشركة: ${v.tenantId || 'غير محدد'}</div>` : ''}
                 </div>
             `;
         });
@@ -390,21 +416,21 @@ function showAddVehicle() {
     overlay.innerHTML = `
         <div class="modal-box">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-gray-800">➕ إضافة سيارة جديدة</h3>
+                <h3 class="text-xl font-bold text-amber-700">➕ إضافة سيارة جديدة</h3>
                 <button onclick="document.getElementById('addVehicleModal').remove()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
             </div>
             <form onsubmit="handleAddVehicle(event)">
                 <div class="mb-3">
                     <label class="block text-sm font-bold text-gray-700 mb-1">كود الدخول (4 أرقام)</label>
-                    <input id="newCode" type="number" min="1000" max="9999" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                    <input id="newCode" type="number" min="1000" max="9999" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-bold text-gray-700 mb-1">اسم السائق</label>
-                    <input id="newName" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                    <input id="newName" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-bold text-gray-700 mb-1">رقم الهاتف</label>
-                    <input id="newPhone" type="tel" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input id="newPhone" type="tel" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
                 </div>
                 <button type="submit" class="w-full btn-primary py-2">إضافة</button>
             </form>
@@ -443,6 +469,8 @@ async function handleAddVehicle(e) {
             status: 'offline',
             subscriptionValid: true,
             deviceId: null,
+            createdBy: currentUser?.displayName || currentUser?.email || 'المستخدم',
+            createdByUid: currentUserId || 'unknown',
             lastLogin: Date.now(),
             createdAt: Date.now()
         });
@@ -457,7 +485,7 @@ async function handleAddVehicle(e) {
 }
 
 // =============================================
-// 🗺️ الخريطة المباشرة
+// 🗺️ الخريطة المباشرة (بشكل سيارة)
 // =============================================
 function renderMap() {
     const container = document.getElementById('page-map');
@@ -465,7 +493,7 @@ function renderMap() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-2xl font-bold text-gray-800">🗺️ الخريطة المباشرة</h2>
+            <h2 class="text-2xl font-bold text-amber-700">🗺️ الخريطة المباشرة</h2>
             <span id="mapVehiclesCount" class="text-sm text-gray-500">0 مركبة</span>
         </div>
         <div id="map-container"></div>
@@ -508,12 +536,24 @@ function renderMap() {
             count++;
             const status = v.status || 'offline';
             const statusClass = status === 'online' ? 'online' : status === 'moving' ? 'moving' : 'offline';
+            const carColor = status === 'moving' ? '#d97706' : status === 'online' ? '#22c55e' : '#ef4444';
 
+            // إنشاء عنصر HTML على شكل سيارة
             const el = document.createElement('div');
             el.className = `map-marker ${statusClass}`;
-            el.innerHTML = `<div style="width:100%;height:100%;border-radius:50%;background:inherit;"></div>`;
+            el.innerHTML = `
+                <svg viewBox="0 0 32 32" width="32" height="32">
+                    <path class="car-body" d="M4 10 L6 6 L26 6 L28 10 L28 20 L26 22 L24 22 L24 20 L8 20 L8 22 L6 22 L4 20 Z" 
+                          fill="${carColor}" 
+                          stroke="#333" stroke-width="1"/>
+                    <circle cx="10" cy="22" r="3" fill="#333" stroke="#fff" stroke-width="1"/>
+                    <circle cx="22" cy="22" r="3" fill="#333" stroke="#fff" stroke-width="1"/>
+                    <rect x="12" y="8" width="8" height="6" fill="#333" rx="1"/>
+                    ${status === 'moving' ? `<circle cx="16" cy="14" r="2" fill="#d97706" opacity="0.8"/>` : ''}
+                </svg>
+            `;
 
-            const marker = new mapboxgl.Marker({ element: el })
+            const marker = new mapboxgl.Marker({ element: el, offset: [0, -16] })
                 .setLngLat([loc.longitude, loc.latitude])
                 .setPopup(new mapboxgl.Popup({ offset: 25 })
                     .setHTML(`
@@ -522,7 +562,9 @@ function renderMap() {
                             <div class="detail">🚀 ${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</div>
                             <div class="detail">🔋 ${v.deviceHealth?.battery || '?'}%</div>
                             <div class="detail">${status === 'moving' ? '🟢 متحرك' : status === 'online' ? '📶 متصل' : '🔴 غير متصل'}</div>
+                            <div class="detail gold-text">👤 أضيف بواسطة: ${v.createdBy || 'النظام'}</div>
                             ${userRole === 'admin' ? `<div class="detail text-xs">🏢 ${v.tenantId || '-'}</div>` : ''}
+                            <button onclick="showDriverTracking('${code}')" class="btn-primary text-xs mt-2 w-full">📈 عرض سجل الحركة</button>
                         </div>
                     `)
                 )
@@ -538,6 +580,170 @@ function renderMap() {
 }
 
 // =============================================
+// 📈 سجل حركة السائق
+// =============================================
+function renderTracking() {
+    const container = document.getElementById('page-tracking');
+    if (!container) return;
+
+    container.innerHTML = `
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-amber-700">📈 سجل حركة السائقين</h2>
+            <span class="text-sm text-gray-500">${new Date().toLocaleDateString('ar')}</span>
+        </div>
+        <div class="flex gap-2 mb-4 flex-wrap">
+            <button onclick="loadTracking('today')" class="tab-btn active" data-tab="today">📅 اليوم</button>
+            <button onclick="loadTracking('week')" class="tab-btn" data-tab="week">📆 هذا الأسبوع</button>
+            <button onclick="loadTracking('month')" class="tab-btn" data-tab="month">📆 هذا الشهر</button>
+        </div>
+        <div id="trackingContainer" class="bg-white rounded-xl shadow-sm p-4">
+            <div id="trackingList" class="space-y-3"></div>
+        </div>
+    `;
+
+    // تحميل بيانات اليوم افتراضياً
+    loadTracking('today');
+}
+
+function loadTracking(period) {
+    // تحديث التبويبات
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.tab === period) btn.classList.add('active');
+    });
+
+    const container = document.getElementById('trackingList');
+    if (!container) return;
+
+    // حساب الفترة الزمنية
+    const now = Date.now();
+    let startTime = 0;
+    let periodLabel = '';
+    switch(period) {
+        case 'today':
+            startTime = now - 24 * 60 * 60 * 1000;
+            periodLabel = 'اليوم';
+            break;
+        case 'week':
+            startTime = now - 7 * 24 * 60 * 60 * 1000;
+            periodLabel = 'هذا الأسبوع';
+            break;
+        case 'month':
+            startTime = now - 30 * 24 * 60 * 60 * 1000;
+            periodLabel = 'هذا الشهر';
+            break;
+        default:
+            startTime = now - 24 * 60 * 60 * 1000;
+            periodLabel = 'اليوم';
+    }
+
+    container.innerHTML = '<div class="text-center text-gray-400 py-8"><div class="loading-spinner mx-auto"></div><p class="mt-2">جاري التحميل...</p></div>';
+
+    // جلب بيانات السائقين
+    const ref = dbRT.ref('vehicleDrivers');
+    ref.once('value', (snap) => {
+        const data = snap.val();
+        if (!data) {
+            container.innerHTML = '<div class="text-center text-gray-400 py-8">لا توجد بيانات</div>';
+            return;
+        }
+
+        let html = '';
+        let hasData = false;
+        let totalDrivers = 0;
+        let activeDrivers = 0;
+
+        Object.keys(data).forEach(code => {
+            const v = data[code];
+            if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
+
+            totalDrivers++;
+            const loc = v.liveLocation || {};
+            const lastUpdate = loc.timestamp || v.lastLogin || 0;
+
+            // التحقق من أن آخر تحديث في الفترة المحددة
+            const isActive = lastUpdate >= startTime;
+            if (isActive) activeDrivers++;
+
+            // نعرض فقط السائقين النشطين في الفترة
+            if (!isActive) return;
+
+            hasData = true;
+            const status = v.status || 'offline';
+            const statusText = status === 'moving' ? '🟢 متحرك' : status === 'online' ? '📶 متصل' : '🔴 غير متصل';
+            const statusColor = status === 'moving' ? 'text-green-600' : status === 'online' ? 'text-blue-600' : 'text-gray-400';
+
+            // حساب عدد النقاط المسجلة (تقديري)
+            const pointsCount = Math.floor((lastUpdate - startTime) / 5000) + 1;
+
+            html += `
+                <div class="border-b border-gray-100 pb-3 mb-3 hover:bg-amber-50 p-2 rounded transition">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <h4 class="font-bold text-gray-800">${v.displayName || code}</h4>
+                            <p class="text-sm text-gray-500">كود: <span class="font-mono">${code}</span></p>
+                            <p class="text-xs text-amber-600">👤 أضيف بواسطة: ${v.createdBy || 'النظام'}</p>
+                            <p class="text-xs text-gray-400">📊 عدد النقاط: ${pointsCount}</p>
+                        </div>
+                        <div class="text-left">
+                            <span class="text-sm font-medium ${statusColor}">${statusText}</span>
+                            <p class="text-xs text-gray-400">آخر تحديث: ${lastUpdate ? new Date(lastUpdate).toLocaleString('ar') : '-'}</p>
+                            ${loc.speed ? `<p class="text-xs text-amber-600">🚀 ${loc.speed.toFixed(1)} كم/س</p>` : ''}
+                            ${loc.latitude ? `<p class="text-xs text-gray-400">📍 ${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}</p>` : ''}
+                        </div>
+                    </div>
+                    <div class="mt-2 flex gap-2 flex-wrap">
+                        <button onclick="focusOnVehicle('${code}')" class="btn-outline text-xs">📍 عرض على الخريطة</button>
+                        <button onclick="showDriverTracking('${code}')" class="btn-primary text-xs">📊 تفاصيل السائق</button>
+                    </div>
+                </div>
+            `;
+        });
+
+        // إضافة ملخص
+        const summary = `
+            <div class="bg-amber-50 rounded-lg p-3 mb-4 flex justify-between items-center flex-wrap">
+                <span class="text-sm text-gray-600">📊 <strong>${periodLabel}</strong></span>
+                <span class="text-sm text-gray-600">🚗 إجمالي السائقين: <strong>${totalDrivers}</strong></span>
+                <span class="text-sm text-green-600">🟢 النشطاء: <strong>${activeDrivers}</strong></span>
+                <span class="text-sm text-amber-600">📈 نسبة النشاط: <strong>${totalDrivers > 0 ? Math.round((activeDrivers/totalDrivers)*100) : 0}%</strong></span>
+            </div>
+        `;
+
+        container.innerHTML = hasData ? summary + html : '<div class="text-center text-gray-400 py-8">لا توجد حركة في ' + periodLabel + '</div>';
+    });
+}
+
+function showDriverTracking(code) {
+    // فتح صفحة الخريطة والتركيز على السائق
+    showPage('map');
+    setTimeout(() => {
+        if (mapInstance && mapMarkers[code]) {
+            const marker = mapMarkers[code];
+            const lngLat = marker.getLngLat();
+            mapInstance.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 15 });
+            marker.togglePopup();
+        } else {
+            // إذا لم يكن على الخريطة، نفتح صفحة سجل الحركة
+            showPage('tracking');
+            // نبحث عن السائق في القائمة ونبرزه
+            setTimeout(() => {
+                const items = document.querySelectorAll('#trackingList .border-b');
+                items.forEach(item => {
+                    if (item.textContent.includes(code)) {
+                        item.style.backgroundColor = '#fef3c7';
+                        item.style.borderRight = '4px solid #d97706';
+                        setTimeout(() => {
+                            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
+                    }
+                });
+            }, 500);
+        }
+    }, 500);
+}
+
+// =============================================
 // 🏢 إدارة الشركات (للمشرف فقط)
 // =============================================
 async function renderCompanies() {
@@ -546,7 +752,7 @@ async function renderCompanies() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-gray-800">🏢 الشركات</h2>
+            <h2 class="text-2xl font-bold text-amber-700">🏢 الشركات</h2>
             <button onclick="showAddCompany()" class="btn-primary">➕ إضافة شركة</button>
         </div>
         <div class="table-container">
@@ -607,29 +813,29 @@ function showAddCompany() {
     overlay.innerHTML = `
         <div class="modal-box">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-gray-800">🏢 إضافة شركة جديدة</h3>
+                <h3 class="text-xl font-bold text-amber-700">🏢 إضافة شركة جديدة</h3>
                 <button onclick="document.getElementById('addCompanyModal').remove()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
             </div>
             <form onsubmit="handleAddCompany(event)">
                 <div class="mb-3">
                     <label class="block text-sm font-bold text-gray-700 mb-1">اسم الشركة *</label>
-                    <input id="compName" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                    <input id="compName" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-bold text-gray-700 mb-1">المسؤول *</label>
-                    <input id="compOwner" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                    <input id="compOwner" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-bold text-gray-700 mb-1">البريد الإلكتروني *</label>
-                    <input id="compEmail" type="email" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                    <input id="compEmail" type="email" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-bold text-gray-700 mb-1">كلمة المرور *</label>
-                    <input id="compPassword" type="password" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" required />
+                    <input id="compPassword" type="password" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
                 </div>
                 <div class="mb-3">
                     <label class="block text-sm font-bold text-gray-700 mb-1">الهاتف</label>
-                    <input id="compPhone" type="tel" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                    <input id="compPhone" type="tel" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
                 </div>
                 <button type="submit" class="w-full btn-primary py-2">إضافة الشركة</button>
             </form>
@@ -718,7 +924,7 @@ function renderAdminVehicles() {
     if (!container || userRole !== 'admin') return;
 
     container.innerHTML = `
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">🌍 جميع السيارات</h2>
+        <h2 class="text-2xl font-bold text-amber-700 mb-6">🌍 جميع السيارات</h2>
         <div class="table-container">
             <table>
                 <thead>
@@ -727,6 +933,7 @@ function renderAdminVehicles() {
                         <th>السائق</th>
                         <th>الشركة</th>
                         <th>الهاتف</th>
+                        <th>أضيف بواسطة</th>
                         <th>الحالة</th>
                         <th>السرعة</th>
                         <th>البطارية</th>
@@ -734,7 +941,7 @@ function renderAdminVehicles() {
                     </tr>
                 </thead>
                 <tbody id="adminVehiclesBody">
-                    <tr><td colspan="8" class="text-center text-gray-400">جاري التحميل...</td></tr>
+                    <tr><td colspan="9" class="text-center text-gray-400">جاري التحميل...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -746,7 +953,7 @@ function renderAdminVehicles() {
         if (!tbody) return;
 
         if (!data) {
-            tbody.innerHTML = '<tr><td colspan="8" class="text-center text-gray-400">لا توجد سيارات</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-gray-400">لا توجد سيارات</td></tr>';
             return;
         }
 
@@ -756,14 +963,16 @@ function renderAdminVehicles() {
             const loc = v.liveLocation || {};
             const status = v.status || 'offline';
             const statusText = status === 'moving' ? '🟢 متحرك' : status === 'online' ? '📶 متصل' : '🔴 غير متصل';
+            const statusClass = status === 'moving' ? 'bg-green-100 text-green-700' : status === 'online' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500';
 
             html += `
-                <tr>
+                <tr class="cursor-pointer hover:bg-amber-50" onclick="focusOnVehicle('${code}')">
                     <td class="font-mono font-bold">${code}</td>
                     <td>${v.displayName || '-'}</td>
                     <td class="text-xs">${v.tenantId || '-'}</td>
                     <td>${v.phone || '-'}</td>
-                    <td><span class="px-2 py-1 rounded-full text-xs ${status === 'moving' ? 'bg-blue-100 text-blue-700' : status === 'online' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">${statusText}</span></td>
+                    <td class="text-xs text-amber-600">${v.createdBy || 'النظام'}</td>
+                    <td><span class="px-2 py-1 rounded-full text-xs ${statusClass}">${statusText}</span></td>
                     <td>${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</td>
                     <td>${v.deviceHealth?.battery || '?'}%</td>
                     <td class="text-xs">${loc.timestamp ? new Date(loc.timestamp).toLocaleString('ar') : '-'}</td>
@@ -782,7 +991,7 @@ function renderSubscriptions() {
     if (!container || userRole !== 'admin') return;
 
     container.innerHTML = `
-        <h2 class="text-2xl font-bold text-gray-800 mb-6">📋 إدارة الاشتراكات</h2>
+        <h2 class="text-2xl font-bold text-amber-700 mb-6">📋 إدارة الاشتراكات</h2>
         <div class="table-container">
             <table>
                 <thead>
@@ -885,6 +1094,7 @@ async function suspendSubscription(id) {
 auth.onAuthStateChanged(async (user) => {
     if (user) {
         currentUser = user;
+        currentUserId = user.uid;
         try {
             const doc = await dbFS.collection('users').doc(user.uid).get();
             if (doc.exists) {
