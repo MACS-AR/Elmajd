@@ -13,27 +13,26 @@
 <div id="app">
 
     <!-- شاشة تسجيل الدخول -->
-    <div id="loginScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-700 p-4">
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-700 to-yellow-600 p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
             <div class="text-center mb-8">
                 <div class="text-5xl mb-3">🚗</div>
-                <h1 class="text-3xl font-bold text-blue-600">نظام التتبع</h1>
+                <h1 class="text-3xl font-bold text-amber-600">نظام التتبع</h1>
                 <p class="text-gray-500 text-sm mt-1">تسجيل الدخول إلى لوحة التحكم</p>
             </div>
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <div class="mb-4">
                     <label class="block text-gray-700 text-sm font-bold mb-2">البريد الإلكتروني</label>
-                    <input id="loginEmail" type="email" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="admin@system.com" required />
+                    <input id="loginEmail" type="email" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="admin@system.com" required />
                 </div>
                 <div class="mb-6">
                     <label class="block text-gray-700 text-sm font-bold mb-2">كلمة المرور</label>
-                    <input id="loginPassword" type="password" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" required />
+                    <input id="loginPassword" type="password" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500" placeholder="••••••••" required />
                 </div>
                 <div id="loginError" class="text-red-500 text-sm mb-4 hidden"></div>
-                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-bold text-lg">تسجيل الدخول</button>
+                <button type="submit" class="w-full bg-amber-600 text-white py-3 rounded-xl hover:bg-amber-700 transition font-bold text-lg">تسجيل الدخول</button>
             </form>
-            <!-- زر تسجيل الدخول السريع -->
-            <button onclick="quickLoginAdmin()" class="w-full bg-green-500 text-white py-3 rounded-xl hover:bg-green-600 transition font-bold text-lg mt-3">
+            <button onclick="quickLoginAdmin()" class="w-full bg-yellow-500 text-white py-3 rounded-xl hover:bg-yellow-600 transition font-bold text-lg mt-3">
                 ⚡ دخول سريع (أدمن)
             </button>
             <p class="text-xs text-gray-400 text-center mt-4">الحساب الافتراضي: admin@system.com / 123456</p>
@@ -43,14 +42,14 @@
     <!-- لوحة التحكم -->
     <div id="dashboardScreen" class="hidden min-h-screen bg-gray-100">
         <!-- الشريط العلوي -->
-        <nav class="bg-white shadow-md px-4 md:px-8 py-4 flex flex-wrap justify-between items-center sticky top-0 z-50">
+        <nav class="bg-amber-600 shadow-md px-4 md:px-8 py-4 flex flex-wrap justify-between items-center sticky top-0 z-50">
             <div class="flex items-center gap-2">
                 <span class="text-2xl">🚗</span>
-                <span class="font-bold text-xl text-blue-600">نظام التتبع</span>
+                <span class="font-bold text-xl text-white">نظام التتبع</span>
             </div>
             <div class="flex items-center gap-3">
-                <span id="userName" class="text-gray-700 font-medium text-sm md:text-base">مرحباً، Admin</span>
-                <span id="userRole" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">مدير</span>
+                <span id="userName" class="text-white font-medium text-sm md:text-base">مرحباً، Admin</span>
+                <span id="userRole" class="bg-yellow-300 text-amber-800 px-3 py-1 rounded-full text-xs font-bold">مدير</span>
                 <button onclick="handleLogout()" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600 transition">خروج</button>
             </div>
         </nav>
@@ -60,26 +59,29 @@
             <!-- الشريط الجانبي -->
             <aside class="w-64 bg-white shadow-md min-h-[calc(100vh-73px)] p-4 hidden md:block">
                 <nav class="space-y-1">
-                    <button onclick="showPage('dashboard')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="dashboard">
+                    <button onclick="showPage('dashboard')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-amber-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="dashboard">
                         <span class="text-xl">📊</span> لوحة التحكم
                     </button>
-                    <button onclick="showPage('vehicles')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="vehicles">
+                    <button onclick="showPage('vehicles')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-amber-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="vehicles">
                         <span class="text-xl">🚗</span> سياراتي
                     </button>
-                    <button onclick="showPage('map')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="map">
+                    <button onclick="showPage('map')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-amber-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="map">
                         <span class="text-xl">🗺️</span> الخريطة المباشرة
                     </button>
+                    <button onclick="showPage('tracking')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-amber-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="tracking">
+                        <span class="text-xl">📈</span> سجل الحركة
+                    </button>
                     
-                    <!-- قائمة الأدمن (تظهر فقط للمشرفين) -->
+                    <!-- قائمة الأدمن -->
                     <div id="adminMenu" class="hidden mt-4 pt-4 border-t">
                         <p class="text-xs text-gray-400 px-4 mb-2">🔒 إدارة النظام</p>
-                        <button onclick="showPage('admin-companies')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-companies">
+                        <button onclick="showPage('admin-companies')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-amber-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-companies">
                             <span class="text-xl">🏢</span> الشركات
                         </button>
-                        <button onclick="showPage('admin-vehicles')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-vehicles">
+                        <button onclick="showPage('admin-vehicles')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-amber-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-vehicles">
                             <span class="text-xl">🌍</span> جميع السيارات
                         </button>
-                        <button onclick="showPage('admin-subscriptions')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-subscriptions">
+                        <button onclick="showPage('admin-subscriptions')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-amber-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-subscriptions">
                             <span class="text-xl">📋</span> الاشتراكات
                         </button>
                     </div>
@@ -91,6 +93,7 @@
                 <div id="page-dashboard" class="page-content">جاري التحميل...</div>
                 <div id="page-vehicles" class="page-content hidden">جاري التحميل...</div>
                 <div id="page-map" class="page-content hidden">جاري التحميل...</div>
+                <div id="page-tracking" class="page-content hidden">جاري التحميل...</div>
                 <div id="page-admin-companies" class="page-content hidden">جاري التحميل...</div>
                 <div id="page-admin-vehicles" class="page-content hidden">جاري التحميل...</div>
                 <div id="page-admin-subscriptions" class="page-content hidden">جاري التحميل...</div>
