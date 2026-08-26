@@ -11,6 +11,7 @@ const firebaseConfig = {
     appId: "1:658396508062:web:c56cd84f93daa2e176308f"
 };
 
+// تهيئة Firebase
 firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const dbRT = firebase.database();
@@ -32,7 +33,7 @@ let mapInstance = null;
 let mapMarkers = {};
 let liveListeners = [];
 let currentMapStyle = 'mapbox://styles/mapbox/streets-v12';
-let selectedDriverCode = null;
+let isInitialized = false;
 
 // =============================================
 // 🔐 إنشاء حساب أدمن تلقائي
@@ -43,14 +44,17 @@ async function ensureAdminAccount() {
     const adminName = 'المدير العام';
 
     try {
+        // محاولة تسجيل الدخول أولاً
         await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
         console.log('✅ تم تسجيل الدخول بحساب الأدمن الموجود');
         return true;
     } catch (err) {
         if (err.code === 'auth/user-not-found') {
             try {
+                // إنشاء حساب جديد
                 const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
                 const uid = userCred.user.uid;
+
                 await userCred.user.updateProfile({ displayName: adminName });
 
                 await dbFS.collection('users').doc(uid).set({
@@ -83,19 +87,78 @@ async function ensureAdminAccount() {
                 return true;
             } catch (createErr) {
                 console.error('❌ فشل إنشاء حساب الأدمن:', createErr.message);
+                showGlobalError('فشل إنشاء حساب الأدمن التلقائي: ' + createErr.message);
                 return false;
             }
         } else {
             console.error('❌ خطأ في تسجيل الدخول:', err.message);
+            showGlobalError('خطأ في تسجيل الدخول: ' + err.message);
             return false;
         }
     }
 }
 
 // =============================================
-// 🔐 المصادقة
+// 🔐 إنشاء حساب تجريبي
 // =============================================
+async function createDemoAccount() {
+    const demoEmail = 'demo_' + Date.now() + '@gmail.com';
+    const demoPassword = '123456';
+    const demoName = 'عميل تجريبي';
 
+    try {
+        const userCred = await auth.createUserWithEmailAndPassword(demoEmail, demoPassword);
+        const uid = userCred.user.uid;
+
+        await userCred.user.updateProfile({ displayName: demoName });
+
+        const tenantId = 'demo_' + Date.now();
+        await dbFS.collection('tenants').doc(tenantId).set({
+            name: 'شركة تجريبية',
+            ownerName: demoName,
+            email: demoEmail,
+            phone: '0100000000',
+            status: 'active',
+            subscriptionStatus: 'active',
+            vehiclesCount: 0,
+            createdAt: Date.now()
+        });
+
+        await dbFS.collection('users').doc(uid).set({
+            tenantId: tenantId,
+            email: demoEmail,
+            name: demoName,
+            phone: '0100000000',
+            role: 'customer',
+            status: 'active',
+            createdAt: Date.now()
+        });
+
+        alert('✅ تم إنشاء الحساب التجريبي بنجاح!\nالبريد: ' + demoEmail + '\nكلمة المرور: ' + demoPassword);
+        
+        // تسجيل الدخول تلقائياً
+        await auth.signInWithEmailAndPassword(demoEmail, demoPassword);
+        
+    } catch (err) {
+        alert('❌ فشل إنشاء الحساب التجريبي: ' + err.message);
+    }
+}
+
+// =============================================
+// 🔐 عرض رسائل الخطأ العامة
+// =============================================
+function showGlobalError(message) {
+    const errorEl = document.getElementById('globalError');
+    if (errorEl) {
+        errorEl.textContent = message;
+        errorEl.classList.remove('hidden');
+        setTimeout(() => errorEl.classList.add('hidden'), 8000);
+    }
+}
+
+// =============================================
+// 🔐 المصادقة - تسجيل الدخول
+// =============================================
 async function handleLogin(e) {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value.trim();
@@ -115,12 +178,14 @@ async function handleLogin(e) {
         currentUser = cred.user;
         currentUserId = cred.user.uid;
         
+        // جلب دور المستخدم من Firestore
         const userDoc = await dbFS.collection('users').doc(currentUser.uid).get();
         if (userDoc.exists) {
             const data = userDoc.data();
             userRole = data.role || 'customer';
             userTenantId = data.tenantId || null;
         } else {
+            // إذا لم توجد وثيقة، ننشئها كعميل افتراضي
             userRole = 'customer';
             userTenantId = 'default';
             await dbFS.collection('users').doc(currentUser.uid).set({
@@ -133,14 +198,19 @@ async function handleLogin(e) {
             });
         }
 
+        // إظهار لوحة التحكم
         showDashboard();
 
     } catch (err) {
         errorEl.textContent = err.message || 'فشل تسجيل الدخول';
         errorEl.classList.remove('hidden');
+        console.error('❌ خطأ في تسجيل الدخول:', err);
     }
 }
 
+// =============================================
+// 🔐 تسجيل الخروج
+// =============================================
 async function handleLogout() {
     try {
         await auth.signOut();
@@ -159,6 +229,9 @@ async function handleLogout() {
     }
 }
 
+// =============================================
+// 🔐 تسجيل الدخول السريع (أدمن)
+// =============================================
 async function quickLoginAdmin() {
     document.getElementById('loginEmail').value = 'admin@system.com';
     document.getElementById('loginPassword').value = '123456';
@@ -176,6 +249,9 @@ async function quickLoginAdmin() {
     }
 }
 
+// =============================================
+// 🔐 عرض لوحة التحكم
+// =============================================
 function showDashboard() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('dashboardScreen').classList.remove('hidden');
@@ -189,6 +265,7 @@ function showDashboard() {
         document.getElementById('adminMenu').classList.add('hidden');
     }
 
+    // تحميل الصفحة الافتراضية
     showPage('dashboard');
 }
 
@@ -240,6 +317,7 @@ async function renderDashboard() {
         </div>
     `;
 
+    // جلب البيانات من Realtime Database
     const ref = dbRT.ref('vehicleDrivers');
     ref.off();
     ref.on('value', (snap) => {
@@ -252,12 +330,12 @@ async function renderDashboard() {
 
         Object.keys(data).forEach(code => {
             const v = data[code];
+            // تصفية حسب tenantId للعميل
             if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
             
             total++;
-            // تحديد الحالة الفعلية بناءً على آخر تحديث (10 ثوانٍ)
             const lastUpdate = v.liveLocation?.timestamp || 0;
-            const isOnline = (now - lastUpdate) < 10000; // 10 ثوانٍ
+            const isOnline = (now - lastUpdate) < 10000;
             const status = v.status || 'offline';
             
             if (isOnline && status === 'moving') { moving++; online++; }
@@ -351,6 +429,7 @@ async function renderVehicles() {
         let html = '';
         Object.keys(data).forEach(code => {
             const v = data[code];
+            // تصفية حسب tenantId
             if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
 
             const lastUpdate = v.liveLocation?.timestamp || 0;
@@ -496,7 +575,7 @@ function showEditVehicle(code) {
                 </div>
                 <form onsubmit="handleEditVehicle(event, '${code}')">
                     <div class="mb-3">
-                        <label class="block text-sm font-bold text-gray-300 mb-1">كود الدخول (4 أرقام)</label>
+                        <label class="block text-sm font-bold text-gray-300 mb-1">كود الدخول</label>
                         <input id="editCode" type="number" min="1000" max="9999" class="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500 text-white" value="${code}" required readonly />
                     </div>
                     <div class="mb-3">
@@ -621,17 +700,15 @@ function loadDriverHistory(code) {
     const ref = dbRT.ref(`vehicleDrivers/${code}/liveLocation`);
     const historyRef = dbRT.ref(`vehicleDrivers/${code}/offlineHistory`);
 
-    // جلب آخر 20 موقع من liveLocation (التحديثات الأخيرة)
+    // جلب آخر 20 موقع من liveLocation
     ref.limitToLast(20).once('value', (snap) => {
         const data = snap.val();
         let history = [];
         
         if (data) {
-            // إذا كانت البيانات كائن واحد
             if (data.latitude) {
                 history.push(data);
             } else {
-                // إذا كانت مجموعة من المواقع
                 Object.values(data).forEach(item => {
                     if (item && item.latitude) history.push(item);
                 });
@@ -667,7 +744,7 @@ function loadDriverHistory(code) {
 }
 
 // =============================================
-// 🗺️ الخريطة المباشرة مع اختيار النمط
+// 🗺️ الخريطة المباشرة
 // =============================================
 function renderMap() {
     const container = document.getElementById('page-map');
@@ -707,7 +784,6 @@ function renderMap() {
     mapInstance.addControl(new mapboxgl.NavigationControl());
     mapInstance.addControl(new mapboxgl.FullscreenControl());
 
-    // تعيين القيمة المختارة في الـ select
     document.getElementById('mapStyleSelect').value = currentMapStyle;
 
     const ref = dbRT.ref('vehicleDrivers');
@@ -736,30 +812,22 @@ function renderMap() {
             const statusClass = status === 'online' ? 'online' : status === 'moving' ? 'moving' : 'offline';
             const carColor = status === 'moving' ? '#fbbf24' : status === 'online' ? '#22c55e' : '#6b7280';
 
-            // شكل سيارة محسّن
             const el = document.createElement('div');
             el.className = `map-marker ${statusClass}`;
             el.innerHTML = `
                 <svg viewBox="0 0 40 40" width="40" height="40">
-                    <!-- ظل -->
                     <ellipse cx="20" cy="36" rx="14" ry="3" fill="rgba(0,0,0,0.3)"/>
-                    <!-- جسم السيارة -->
                     <path d="M5 14 L8 8 L32 8 L35 14 L35 26 L32 28 L28 28 L28 26 L12 26 L12 28 L8 28 L5 26 Z" 
                           fill="${carColor}" stroke="#1a1a1a" stroke-width="1.5"/>
-                    <!-- سقف السيارة -->
                     <path d="M12 8 L14 4 L26 4 L28 8 Z" fill="${carColor}" stroke="#1a1a1a" stroke-width="1.5"/>
-                    <!-- النوافذ -->
                     <rect x="14" y="6" width="5" height="4" rx="1" fill="#4a9eff" opacity="0.7"/>
                     <rect x="21" y="6" width="5" height="4" rx="1" fill="#4a9eff" opacity="0.7"/>
-                    <!-- العجلات -->
                     <circle cx="11" cy="28" r="4" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
                     <circle cx="11" cy="28" r="2" fill="#444"/>
                     <circle cx="29" cy="28" r="4" fill="#1a1a1a" stroke="#333" stroke-width="1"/>
                     <circle cx="29" cy="28" r="2" fill="#444"/>
-                    <!-- الأضواء الأمامية -->
                     <rect x="34" y="14" width="2" height="4" rx="0.5" fill="#ffdd44" opacity="${status === 'moving' ? '1' : '0.5'}"/>
                     <rect x="34" y="20" width="2" height="4" rx="0.5" fill="#ff4444" opacity="0.8"/>
-                    <!-- الأضواء الخلفية -->
                     <rect x="4" y="14" width="2" height="4" rx="0.5" fill="#ff4444"/>
                     <rect x="4" y="20" width="2" height="4" rx="0.5" fill="#ff4444"/>
                     ${status === 'moving' ? `<circle cx="20" cy="12" r="2" fill="#fbbf24" opacity="0.8"><animate attributeName="opacity" values="0.3;1;0.3" dur="0.8s" repeatCount="indefinite"/></circle>` : ''}
@@ -884,8 +952,8 @@ function loadTracking(period) {
 
             hasData = true;
             const status = v.status || 'offline';
-            const statusText = status === 'moving' ? '🟢 متحرك' : '📶 متصل' : '🔴 غير متصل';
-            const statusColor = status === 'moving' ? 'text-yellow-400' : 'text-green-400' : 'text-gray-500';
+            const statusText = status === 'moving' ? '🟢 متحرك' : status === 'online' ? '📶 متصل' : '🔴 غير متصل';
+            const statusColor = status === 'moving' ? 'text-yellow-400' : status === 'online' ? 'text-green-400' : 'text-gray-500';
 
             html += `
                 <div class="border-b border-gray-700 pb-3 mb-3 hover:bg-gray-700 p-2 rounded transition">
@@ -1275,6 +1343,8 @@ async function suspendSubscription(id) {
 // 🚀 بدء التطبيق
 // =============================================
 auth.onAuthStateChanged(async (user) => {
+    console.log('🔄 onAuthStateChanged:', user ? 'مستخدم موجود' : 'لا يوجد مستخدم');
+    
     if (user) {
         currentUser = user;
         currentUserId = user.uid;
@@ -1284,21 +1354,36 @@ auth.onAuthStateChanged(async (user) => {
                 const data = doc.data();
                 userRole = data.role || 'customer';
                 userTenantId = data.tenantId || null;
+                console.log('✅ تم تحميل بيانات المستخدم:', { userRole, userTenantId });
             } else {
                 userRole = 'customer';
                 userTenantId = 'default';
+                console.log('⚠️ لم يتم العثور على وثيقة المستخدم، إنشاء وثيقة افتراضية');
+                await dbFS.collection('users').doc(user.uid).set({
+                    tenantId: 'default',
+                    email: user.email,
+                    name: user.displayName || 'مستخدم',
+                    role: 'customer',
+                    status: 'active',
+                    createdAt: Date.now()
+                });
             }
         } catch (e) {
+            console.error('❌ خطأ في جلب بيانات المستخدم:', e);
             userRole = 'customer';
             userTenantId = 'default';
         }
 
         showDashboard();
     } else {
+        console.log('👤 لا يوجد مستخدم، محاولة إنشاء حساب أدمن...');
+        // محاولة إنشاء حساب الأدمن تلقائياً
         const success = await ensureAdminAccount();
         if (!success) {
+            // إذا فشل، نعرض شاشة تسجيل الدخول
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('dashboardScreen').classList.add('hidden');
+            showGlobalError('تعذر إنشاء حساب الأدمن التلقائي. يرجى تسجيل الدخول يدوياً أو إنشاء حساب تجريبي.');
         }
     }
 });
