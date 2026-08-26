@@ -20,6 +20,10 @@
                 <h1 class="text-3xl font-bold text-yellow-500">نظام التتبع</h1>
                 <p class="text-gray-400 text-sm mt-1">تسجيل الدخول إلى لوحة التحكم</p>
             </div>
+
+            <!-- رسائل الخطأ العامة -->
+            <div id="globalError" class="hidden bg-red-900/50 border border-red-600 text-red-300 p-3 rounded-lg text-sm mb-4"></div>
+
             <form id="loginForm" onsubmit="handleLogin(event)">
                 <div class="mb-4">
                     <label class="block text-gray-300 text-sm font-bold mb-2">البريد الإلكتروني</label>
@@ -32,9 +36,15 @@
                 <div id="loginError" class="text-red-400 text-sm mb-4 hidden"></div>
                 <button type="submit" class="w-full bg-yellow-600 text-gray-900 py-3 rounded-xl hover:bg-yellow-500 transition font-bold text-lg">تسجيل الدخول</button>
             </form>
+
             <button onclick="quickLoginAdmin()" class="w-full bg-yellow-500 text-gray-900 py-3 rounded-xl hover:bg-yellow-400 transition font-bold text-lg mt-3">
                 ⚡ دخول سريع (أدمن)
             </button>
+
+            <button onclick="createDemoAccount()" class="w-full bg-green-600 text-white py-3 rounded-xl hover:bg-green-500 transition font-bold text-lg mt-3">
+                🆕 إنشاء حساب تجريبي
+            </button>
+
             <p class="text-xs text-gray-500 text-center mt-4">الحساب الافتراضي: admin@system.com / 123456</p>
         </div>
     </div>
@@ -72,7 +82,7 @@
                         <span class="text-xl">📈</span> سجل الحركة
                     </button>
                     
-                    <!-- قائمة الأدمن -->
+                    <!-- قائمة الأدمن (تظهر فقط للمشرفين) -->
                     <div id="adminMenu" class="hidden mt-4 pt-4 border-t border-gray-700">
                         <p class="text-xs text-gray-500 px-4 mb-2">🔒 إدارة النظام</p>
                         <button onclick="showPage('admin-companies')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-gray-700 text-gray-300 font-medium flex items-center gap-3 transition" data-page="admin-companies">
