@@ -4,9 +4,33 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>نظام تتبع المركبات</title>
+    
+    <!-- Tailwind CSS -->
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
-    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.0/mapbox-gl.css" rel="stylesheet" />
+    
+    <!-- مكتبة Leaflet المجانية (بديلة Mapbox) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <!-- ملف التنسيقات الخاص بك -->
     <link rel="stylesheet" href="style.css" />
+
+    <!-- تنسيقات إضافية لتحسين شكل النوافذ المنبثقة على الخريطة -->
+    <style>
+        .leaflet-popup-content-wrapper {
+            background-color: #ffffff; /* خلفية النافذة */
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+            padding: 2px;
+        }
+        .leaflet-popup-tip {
+            background-color: #ffffff;
+        }
+        /* إخفاء خلفية أيقونة الخريطة الافتراضية للسيارات */
+        .custom-leaflet-marker {
+            background: transparent;
+            border: none;
+        }
+    </style>
 </head>
 <body>
 
@@ -113,11 +137,16 @@
 </div>
 
 <!-- المكتبات الخارجية -->
-<script src="https://api.mapbox.com/mapbox-gl-js/v3.1.0/mapbox-gl.js"></script>
+<!-- مكتبة Leaflet للخرائط بدلاً من Mapbox -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<!-- مكتبات Firebase -->
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+
+<!-- ملف الجافاسكريبت الخاص بك -->
 <script src="app.js"></script>
 </body>
 </html>
