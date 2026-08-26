@@ -1,418 +1,110 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>مصنع المجد للأعلاف - بوابة الدخول الموحدة</title>
-
-  <!-- Tailwind CSS -->
-  <script src="https://cdn.tailwindcss.com"></script>
-
-  <!-- Lucide Icons -->
-  <script src="https://unpkg.com/lucide@latest"></script>
-
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            gold: {
-              light: '#F5E0A3',
-              DEFAULT: '#D4AF37',
-              dark: '#AA820A',
-            },
-            dark: {
-              950: '#050608',
-              900: '#090A0F',
-              800: '#12141D',
-              700: '#1D202F',
-            }
-          }
-        }
-      }
-    }
-  </script>
-
-  <style>
-    body {
-      background-color: #090A0F;
-      color: #ffffff;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      overflow-x: hidden;
-    }
-
-    .gold-gradient {
-      background: linear-gradient(135deg, #F5E0A3 0%, #D4AF37 50%, #AA820A 100%);
-    }
-
-    .gold-text {
-      background: linear-gradient(135deg, #F5E0A3 0%, #D4AF37 50%, #AA820A 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-    }
-
-    .glass-card {
-      background: rgba(18, 20, 29, 0.88);
-      backdrop-filter: blur(20px);
-      border: 1px solid rgba(212, 175, 55, 0.3);
-    }
-
-    .gold-glow {
-      box-shadow: 0 0 40px rgba(212, 175, 55, 0.22);
-    }
-
-    /* 🐓 أنيميشن الديك فوق خانة الرقم */
-    @keyframes roosterTrack {
-      0% { transform: translateX(120%) scaleX(-1); }
-      48% { transform: translateX(-120%) scaleX(-1); }
-      50% { transform: translateX(-120%) scaleX(1); }
-      98% { transform: translateX(120%) scaleX(1); }
-      100% { transform: translateX(120%) scaleX(-1); }
-    }
-
-    @keyframes roosterHop {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-7px); }
-    }
-
-    .rooster-runner {
-      animation: roosterTrack 7s infinite ease-in-out;
-    }
-
-    .rooster-hop {
-      animation: roosterHop 0.3s infinite ease-in-out;
-    }
-
-    /* 🐥 أنيميشن الكتاكيت في الخلفية */
-    .bg-animation-container {
-      position: fixed;
-      inset: 0;
-      pointer-events: none;
-      z-index: 0;
-      overflow: hidden;
-    }
-
-    @keyframes chickFloatLeft {
-      0% { transform: translateX(100vw) translateY(0) scaleX(1); opacity: 0.15; }
-      50% { transform: translateX(50vw) translateY(-20px) scaleX(1); opacity: 0.35; }
-      100% { transform: translateX(-15vw) translateY(10px) scaleX(1); opacity: 0.05; }
-    }
-
-    @keyframes chickFloatRight {
-      0% { transform: translateX(-15vw) translateY(0) scaleX(-1); opacity: 0.15; }
-      50% { transform: translateX(45vw) translateY(-25px) scaleX(-1); opacity: 0.35; }
-      100% { transform: translateX(115vw) translateY(15px) scaleX(-1); opacity: 0.05; }
-    }
-
-    .chick-bg-1 {
-      position: absolute;
-      top: 18%;
-      animation: chickFloatLeft 16s infinite linear;
-    }
-
-    .chick-bg-2 {
-      position: absolute;
-      top: 62%;
-      animation: chickFloatRight 20s infinite linear;
-      animation-delay: 4s;
-    }
-
-    .chick-bg-3 {
-      position: absolute;
-      top: 82%;
-      animation: chickFloatLeft 24s infinite linear;
-      animation-delay: 9s;
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>نظام تتبع المركبات</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet" />
+    <link href="https://api.mapbox.com/mapbox-gl-js/v3.1.0/mapbox-gl.css" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
 </head>
-<body class="min-h-screen flex items-center justify-center p-4 relative">
+<body>
 
-  <!-- 🐥 خلفية الكتاكيت المتحركة -->
-  <div class="bg-animation-container">
-    <div class="chick-bg-1 text-gold/30 flex gap-4 items-center">
-      <svg class="w-12 h-12" viewBox="0 0 64 64" fill="currentColor">
-        <path d="M32 12c-6.6 0-12 5.4-12 12 0 3 1.1 5.7 3 7.8L18 36c-2 2-3 4.5-3 7.2 0 5.4 4.3 9.8 9.7 9.8h14.6c5.4 0 9.7-4.4 9.7-9.8 0-2.7-1-5.2-3-7.2l-5-4.2c1.9-2.1 3-4.8 3-7.8 0-6.6-5.4-12-12-12zM42 24c0 1-.8 2-2 2s-2-1-2-2 .8-2 2-2 2 1 2 2z"/>
-      </svg>
-      <svg class="w-8 h-8" viewBox="0 0 64 64" fill="currentColor">
-        <path d="M32 12c-6.6 0-12 5.4-12 12 0 3 1.1 5.7 3 7.8L18 36c-2 2-3 4.5-3 7.2 0 5.4 4.3 9.8 9.7 9.8h14.6c5.4 0 9.7-4.4 9.7-9.8 0-2.7-1-5.2-3-7.2l-5-4.2c1.9-2.1 3-4.8 3-7.8 0-6.6-5.4-12-12-12z"/>
-      </svg>
-    </div>
+<div id="app">
 
-    <div class="chick-bg-2 text-gold/25 flex gap-6 items-center">
-      <svg class="w-14 h-14" viewBox="0 0 64 64" fill="currentColor">
-        <path d="M32 12c-6.6 0-12 5.4-12 12 0 3 1.1 5.7 3 7.8L18 36c-2 2-3 4.5-3 7.2 0 5.4 4.3 9.8 9.7 9.8h14.6c5.4 0 9.7-4.4 9.7-9.8 0-2.7-1-5.2-3-7.2l-5-4.2c1.9-2.1 3-4.8 3-7.8 0-6.6-5.4-12-12-12z"/>
-      </svg>
-    </div>
-
-    <div class="chick-bg-3 text-gold/30 flex gap-3 items-center">
-      <svg class="w-10 h-10" viewBox="0 0 64 64" fill="currentColor">
-        <path d="M32 12c-6.6 0-12 5.4-12 12 0 3 1.1 5.7 3 7.8L18 36c-2 2-3 4.5-3 7.2 0 5.4 4.3 9.8 9.7 9.8h14.6c5.4 0 9.7-4.4 9.7-9.8 0-2.7-1-5.2-3-7.2l-5-4.2c1.9-2.1 3-4.8 3-7.8 0-6.6-5.4-12-12-12z"/>
-      </svg>
-    </div>
-  </div>
-
-  <!-- الكارت الرئيسي -->
-  <div class="w-full max-w-md relative z-10">
-
-    <!-- شريط التنبيهات Toast -->
-    <div id="toast" class="hidden fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold border transition-all flex items-center gap-2">
-      <i id="toast-icon" data-lucide="info" class="w-4 h-4"></i>
-      <span id="toast-msg"></span>
-    </div>
-
-    <div class="glass-card p-6 sm:p-8 rounded-3xl space-y-6 gold-glow relative border border-gold/40">
-      
-      <!-- اللوجو واسم المصنع -->
-      <div class="text-center space-y-2">
-        <div class="relative inline-block">
-          <img 
-            src="https://raw.githubusercontent.com/MACS-AR/Elmajd/refs/heads/main/logo.png" 
-            alt="شعار مصنع المجد" 
-            class="w-20 h-20 rounded-full mx-auto border-2 border-gold p-1 bg-dark-900 object-contain shadow-xl" 
-          />
-        </div>
-        <h1 class="text-2xl font-black text-white tracking-wide">
-          مصنع <span class="gold-text">المجد للأعلاف</span>
-        </h1>
-        <p class="text-xs text-gray-300 font-semibold">بوابة الدخول الذكية الموحدة للنظام</p>
-      </div>
-
-      <!-- 🐓 مضمار الديك يجري فوق خانة الرقم -->
-      <div class="relative w-full h-14 overflow-hidden rounded-2xl bg-dark-950/90 border border-gold/30 flex items-center justify-center shadow-inner">
-        <div class="absolute inset-0 flex items-center justify-between px-4 text-[10px] text-gold/50 font-bold select-none">
-          <span>🌾 جودة تميزنا</span>
-          <span>🐔 مصنع المجد للأعلاف</span>
-        </div>
-
-        <div class="rooster-runner absolute">
-          <div class="rooster-hop flex items-center">
-            <svg class="w-10 h-10 text-gold drop-shadow-[0_0_10px_rgba(212,175,55,0.9)]" viewBox="0 0 64 64" fill="currentColor">
-              <path d="M28 8c-2 0-3 2-2 4 1 1 3 1 3 0 1 2 3 2 4 0 1 2 3 2 4 0 0-3-2-4-5-2z" fill="#EF4444"/>
-              <path d="M36 18c-4 0-8 3-9 7l-5-2c-3 0-5 3-4 6 2 4 6 6 10 6 1 0 2 0 3-1l1 4c-3 2-6 5-6 9 0 5 4 9 9 9h6c4 0 7-3 7-7 0-4-3-8-7-9l-1-4c3-1 5-4 5-8 0-5-4-10-9-10z"/>
-              <polygon points="23,22 17,25 23,28" fill="#F59E0B"/>
-              <path d="M44 26c3-3 7-3 10 0 1-4 0-8-3-10-3 2-5 6-7 10z" fill="#D4AF37"/>
-            </svg>
-          </div>
-        </div>
-      </div>
-
-      <!-- نموذج أدخل رقم الهاتف -->
-      <form id="loginForm" onsubmit="handleLogin(event)" class="space-y-5">
-        
-        <div class="space-y-2">
-          <label class="text-xs text-gray-200 font-bold flex items-center justify-between">
-            <span class="flex items-center gap-1.5">
-              <i data-lucide="phone" class="w-4 h-4 text-gold"></i>
-              أدخل رقم الهاتف المسجل:
-            </span>
-            <span class="text-[10px] text-gold font-normal">01xxxxxxxx</span>
-          </label>
-
-          <div class="relative">
-            <input
-              type="tel"
-              id="phoneInput"
-              required
-              placeholder="أدخل رقم التليفون..."
-              class="w-full bg-dark-800 border-2 border-dark-700 rounded-2xl py-4 px-12 text-center font-mono text-base font-bold text-white outline-none focus:border-gold focus:ring-2 focus:ring-gold/30 transition-all shadow-inner tracking-wider"
-              dir="ltr"
-              autocomplete="tel"
-            />
-            <div class="absolute right-4 top-1/2 -translate-y-1/2 text-gold">
-              <i data-lucide="smartphone" class="w-5 h-5"></i>
+    <!-- شاشة تسجيل الدخول -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-700 p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+            <div class="text-center mb-8">
+                <div class="text-5xl mb-3">🚗</div>
+                <h1 class="text-3xl font-bold text-blue-600">نظام التتبع</h1>
+                <p class="text-gray-500 text-sm mt-1">تسجيل الدخول إلى لوحة التحكم</p>
             </div>
-          </div>
+            <form id="loginForm" onsubmit="handleLogin(event)">
+                <div class="mb-4">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">البريد الإلكتروني</label>
+                    <input id="loginEmail" type="email" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="admin@system.com" required />
+                </div>
+                <div class="mb-6">
+                    <label class="block text-gray-700 text-sm font-bold mb-2">كلمة المرور</label>
+                    <input id="loginPassword" type="password" class="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="••••••••" required />
+                </div>
+                <div id="loginError" class="text-red-500 text-sm mb-4 hidden"></div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-xl hover:bg-blue-700 transition font-bold text-lg">تسجيل الدخول</button>
+            </form>
+            <!-- زر تسجيل الدخول السريع -->
+            <button onclick="quickLoginAdmin()" class="w-full bg-green-500 text-white py-3 rounded-xl hover:bg-green-600 transition font-bold text-lg mt-3">
+                ⚡ دخول سريع (أدمن)
+            </button>
+            <p class="text-xs text-gray-400 text-center mt-4">الحساب الافتراضي: admin@system.com / 123456</p>
         </div>
-
-        <!-- زر تسجيل الدخول -->
-        <button
-          type="submit"
-          id="submitBtn"
-          class="w-full gold-gradient text-dark-950 font-black py-4 rounded-2xl text-sm transition-all hover:brightness-110 shadow-xl flex items-center justify-center gap-2 group cursor-pointer"
-        >
-          <span id="btnText">تسجيل الدخول والنظام</span>
-          <i id="btnIcon" data-lucide="arrow-left" class="w-5 h-5 group-hover:-translate-x-1 transition-transform"></i>
-        </button>
-
-      </form>
-
-      <div class="text-center pt-2 border-t border-dark-700/60">
-        <p class="text-[11px] text-gray-400">
-          مصنع المجد للأعلاف &copy; 2026 - جميع الحقوق محفوظة
-        </p>
-      </div>
-
     </div>
-  </div>
 
-  <!-- Firebase Integration Script -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-app.js";
-    import { getDatabase, ref, get } from "https://www.gstatic.com/firebasejs/10.9.0/firebase-database.js";
+    <!-- لوحة التحكم -->
+    <div id="dashboardScreen" class="hidden min-h-screen bg-gray-100">
+        <!-- الشريط العلوي -->
+        <nav class="bg-white shadow-md px-4 md:px-8 py-4 flex flex-wrap justify-between items-center sticky top-0 z-50">
+            <div class="flex items-center gap-2">
+                <span class="text-2xl">🚗</span>
+                <span class="font-bold text-xl text-blue-600">نظام التتبع</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="userName" class="text-gray-700 font-medium text-sm md:text-base">مرحباً، Admin</span>
+                <span id="userRole" class="bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold">مدير</span>
+                <button onclick="handleLogout()" class="bg-red-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-red-600 transition">خروج</button>
+            </div>
+        </nav>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyBgRkceRq7FRbhCevLlULYNy-A5Tl_cr0w",
-      authDomain: "sr-test-c9e06.firebaseapp.com",
-      databaseURL: "https://sr-test-c9e06-default-rtdb.firebaseio.com",
-      projectId: "sr-test-c9e06",
-      storageBucket: "sr-test-c9e06.firebasestorage.app",
-      messagingSenderId: "658396508062",
-      appId: "1:658396508062:web:c56cd84f93daa2e176308f",
-      measurementId: "G-3ZZV344NDK"
-    };
+        <!-- الشريط الجانبي + المحتوى -->
+        <div class="flex">
+            <!-- الشريط الجانبي -->
+            <aside class="w-64 bg-white shadow-md min-h-[calc(100vh-73px)] p-4 hidden md:block">
+                <nav class="space-y-1">
+                    <button onclick="showPage('dashboard')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="dashboard">
+                        <span class="text-xl">📊</span> لوحة التحكم
+                    </button>
+                    <button onclick="showPage('vehicles')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="vehicles">
+                        <span class="text-xl">🚗</span> سياراتي
+                    </button>
+                    <button onclick="showPage('map')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="map">
+                        <span class="text-xl">🗺️</span> الخريطة المباشرة
+                    </button>
+                    
+                    <!-- قائمة الأدمن (تظهر فقط للمشرفين) -->
+                    <div id="adminMenu" class="hidden mt-4 pt-4 border-t">
+                        <p class="text-xs text-gray-400 px-4 mb-2">🔒 إدارة النظام</p>
+                        <button onclick="showPage('admin-companies')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-companies">
+                            <span class="text-xl">🏢</span> الشركات
+                        </button>
+                        <button onclick="showPage('admin-vehicles')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-vehicles">
+                            <span class="text-xl">🌍</span> جميع السيارات
+                        </button>
+                        <button onclick="showPage('admin-subscriptions')" class="nav-btn w-full text-right px-4 py-3 rounded-lg hover:bg-blue-50 text-gray-700 font-medium flex items-center gap-3 transition" data-page="admin-subscriptions">
+                            <span class="text-xl">📋</span> الاشتراكات
+                        </button>
+                    </div>
+                </nav>
+            </aside>
 
-    const app = initializeApp(firebaseConfig);
-    const rtdb = getDatabase(app);
+            <!-- المحتوى -->
+            <main class="flex-1 p-4 md:p-6">
+                <div id="page-dashboard" class="page-content">جاري التحميل...</div>
+                <div id="page-vehicles" class="page-content hidden">جاري التحميل...</div>
+                <div id="page-map" class="page-content hidden">جاري التحميل...</div>
+                <div id="page-admin-companies" class="page-content hidden">جاري التحميل...</div>
+                <div id="page-admin-vehicles" class="page-content hidden">جاري التحميل...</div>
+                <div id="page-admin-subscriptions" class="page-content hidden">جاري التحميل...</div>
+            </main>
+        </div>
+    </div>
+</div>
 
-    window.db = rtdb;
-    window.dbRef = ref;
-    window.dbGet = get;
-
-    if (window.lucide) window.lucide.createIcons();
-  </script>
-
-  <!-- كود التوجيه المحدث والرافض لأي رقم غير مسجل -->
-  <script>
-    function showToast(message, type = 'info') {
-      const toast = document.getElementById('toast');
-      const msg = document.getElementById('toast-msg');
-
-      msg.innerText = message;
-      toast.className = `fixed top-5 left-1/2 -translate-x-1/2 z-50 px-5 py-3 rounded-2xl shadow-2xl text-xs font-bold border transition-all flex items-center gap-2 ${
-        type === 'error' ? 'bg-red-950 text-red-300 border-red-800' :
-        type === 'success' ? 'bg-green-950 text-green-300 border-green-800' :
-        'bg-dark-800 text-gold border-gold/40'
-      }`;
-
-      toast.classList.remove('hidden');
-      setTimeout(() => {
-        if (toast) toast.classList.add('hidden');
-      }, 4000);
-    }
-
-    // دالة تنظيف وتوحيد الأرقام
-    function normalizePhone(phone) {
-      if (!phone) return '';
-      return String(phone)
-        .replace(/[٠-٩]/g, d => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
-        .replace(/\D/g, '');
-    }
-
-    async function handleLogin(e) {
-      e.preventDefault();
-
-      const phoneInput = document.getElementById('phoneInput');
-      const submitBtn = document.getElementById('submitBtn');
-      const btnText = document.getElementById('btnText');
-      const rawPhone = phoneInput.value.trim();
-
-      const cleanPhone = normalizePhone(rawPhone);
-
-      if (!cleanPhone) {
-        showToast('يرجى إدخال رقم هاتف صحيح', 'error');
-        return;
-      }
-
-      submitBtn.disabled = true;
-      btnText.innerText = 'جاري التحقق من قاعدة البيانات...';
-      showToast('جاري الفحص ومطابقة بيانات الحساب...', 'info');
-
-      try {
-        if (!window.db) {
-          await new Promise(resolve => setTimeout(resolve, 600));
-        }
-
-        const { db, dbRef, dbGet } = window;
-        let matchedUser = null;
-        let redirectTarget = '';
-
-        // 1. فحص جدول الموظفين والإدارة والمناديب والمعرض (salesReps)
-        const repsSnapshot = await dbGet(dbRef(db, 'salesReps'));
-        if (repsSnapshot.exists()) {
-          const repsData = repsSnapshot.val();
-          const repsList = Object.keys(repsData).map(k => ({ id: k, ...repsData[k] }));
-
-          matchedUser = repsList.find(r => normalizePhone(r.phone) === cleanPhone);
-
-          if (matchedUser) {
-            localStorage.setItem('userPhone', cleanPhone);
-            localStorage.setItem('repData', JSON.stringify(matchedUser));
-
-            const role = String(matchedUser.role || '').toLowerCase();
-
-            if (role === 'admin') {
-              redirectTarget = `admin.html?phone=${encodeURIComponent(cleanPhone)}`;
-              showToast(`أهلاً بك الإداري (${matchedUser.name}).. جاري الفتح`, 'success');
-            } else if (role === 'sales' || role === 'pay' || role === 'store' || role === 'معرض') {
-              redirectTarget = `pay.html?phone=${encodeURIComponent(cleanPhone)}`;
-              showToast(`أهلاً بك موظف المعرض (${matchedUser.name}).. جاري فتح المعرض`, 'success');
-            } else {
-              redirectTarget = `rep.html?phone=${encodeURIComponent(cleanPhone)}`;
-              showToast(`أهلاً بك المندوب (${matchedUser.name}).. جاري الفتح`, 'success');
-            }
-          }
-        }
-
-        // 2. فحص جدول السائقين (drivers) -> car.html
-        if (!matchedUser) {
-          const driversSnapshot = await dbGet(dbRef(db, 'drivers'));
-          if (driversSnapshot.exists()) {
-            const driversData = driversSnapshot.val();
-            const driversList = Object.keys(driversData).map(k => ({ id: k, ...driversData[k] }));
-
-            const matchedDriver = driversList.find(d => normalizePhone(d.phone) === cleanPhone);
-
-            if (matchedDriver) {
-              matchedUser = matchedDriver;
-              localStorage.setItem('userPhone', cleanPhone);
-              localStorage.setItem('driverData', JSON.stringify(matchedDriver));
-
-              redirectTarget = `car.html?phone=${encodeURIComponent(cleanPhone)}`;
-              showToast(`أهلاً بك السائق (${matchedDriver.name}).. جاري الفتح`, 'success');
-            }
-          }
-        }
-
-        // 3. فحص جدول العملاء (clients) -> client.html
-        if (!matchedUser) {
-          const clientsSnapshot = await dbGet(dbRef(db, 'clients'));
-
-          if (clientsSnapshot.exists()) {
-            const clientsData = clientsSnapshot.val();
-            const clientsList = Object.keys(clientsData).map(k => ({ id: k, ...clientsData[k] }));
-
-            const matchedClient = clientsList.find(c => normalizePhone(c.phone) === cleanPhone);
-
-            if (matchedClient) {
-              matchedUser = matchedClient;
-              localStorage.setItem('userPhone', cleanPhone);
-              localStorage.setItem('clientData', JSON.stringify(matchedClient));
-
-              redirectTarget = `client.html?phone=${encodeURIComponent(cleanPhone)}`;
-              showToast(`أهلاً بك العميل العزيز (${matchedClient.name}).. جاري الفتح`, 'success');
-            }
-          }
-        }
-
-        // 4. التوجيه أو الرفض النهائي لو البيانات غير موجودة تماماً
-        if (redirectTarget) {
-          setTimeout(() => {
-            window.location.href = redirectTarget;
-          }, 800);
-        } else {
-          // تم الإلغاء تماماً لفتح صفحة العملاء بأرقام وهمية -> الآن يرفض نهائياً
-          showToast('عذراً، رقم الهاتف غير مسجل في قاعدة البيانات. يرجى مراجعة الإدارة.', 'error');
-          submitBtn.disabled = false;
-          btnText.innerText = 'تسجيل الدخول والنظام';
-        }
-
-      } catch (error) {
-        console.error("Login Error:", error);
-        showToast('حدث خطأ أثناء الاتصال بقاعدة البيانات. حاول مرة أخرى.', 'error');
-        submitBtn.disabled = false;
-        btnText.innerText = 'تسجيل الدخول والنظام';
-      }
-    }
-  </script>
+<!-- المكتبات الخارجية -->
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.1.0/mapbox-gl.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.0/firebase-database-compat.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
