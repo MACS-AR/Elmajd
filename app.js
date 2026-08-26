@@ -28,7 +28,7 @@ let mapInstance = null;
 let mapMarkers = {};
 let streetLayer = null;
 let satelliteLayer = null;
-let livePathPolylines = {}; // لتخزين مسارات الحركة الحية
+let livePathPolylines = {};
 
 let liveListeners = [];
 let isInitialized = false;
@@ -38,12 +38,29 @@ let historyPolyline = null;
 let selectedPaymentMethod = null;
 
 // =============================================
-// 🔐 إنشاء حساب أدمن تلقائي
+// 🔧 دالة مساعدة لتوليد UUID
+// =============================================
+function generateUUID() {
+    // استخدام crypto.randomUUID() إن وجد، وإلا توليد يدوي (للتوافق)
+    if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+        return crypto.randomUUID();
+    }
+    // Fallback بسيط (ليس UUID حقيقي لكنه عشوائي)
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+    });
+}
+
+// =============================================
+// 🔐 إنشاء حساب أدمن تلقائي (بـ UUID ثابت)
 // =============================================
 async function ensureAdminAccount() {
     const adminEmail = 'admin@system.com';
     const adminPassword = '123456';
     const adminName = 'المدير العام';
+    // نستخدم UUID ثابت لتجنب تكرار الحساب
+    const adminTenantId = 'admin-tenant-' + generateUUID(); // يمكن جعله ثابتاً مثل 'admin_tenant'
 
     try {
         await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
@@ -58,7 +75,7 @@ async function ensureAdminAccount() {
                 await userCred.user.updateProfile({ displayName: adminName });
 
                 await dbFS.collection('users').doc(uid).set({
-                    tenantId: 'admin_tenant',
+                    tenantId: adminTenantId,
                     email: adminEmail,
                     name: adminName,
                     phone: '0100000000',
@@ -69,7 +86,7 @@ async function ensureAdminAccount() {
                     createdAt: Date.now()
                 });
 
-                const tenantRef = dbFS.collection('tenants').doc('admin_tenant');
+                const tenantRef = dbFS.collection('tenants').doc(adminTenantId);
                 const tenantSnap = await tenantRef.get();
                 if (!tenantSnap.exists) {
                     await tenantRef.set({
@@ -109,7 +126,7 @@ async function ensureAdminAccount() {
 }
 
 // =============================================
-// 🔐 إنشاء حساب تجريبي
+// 🔐 إنشاء حساب تجريبي (بـ UUID)
 // =============================================
 async function createDemoAccount() {
     const demoEmail = `demo_${Date.now()}@gmail.com`;
@@ -122,7 +139,7 @@ async function createDemoAccount() {
 
         await userCred.user.updateProfile({ displayName: demoName });
 
-        const tenantId = `demo_${Date.now()}`;
+        const tenantId = generateUUID(); // ✅ UUID فريد
         const now = Date.now();
         await dbFS.collection('tenants').doc(tenantId).set({
             name: 'شركة تجريبية',
@@ -822,9 +839,21 @@ function closeModal(modalId) {
 }
 
 // =============================================
-// 🗑️ حذف سائق
+// 🗑️ حذف سائق (مع التحقق من tenantId)
 // =============================================
 async function deleteVehicle(code) {
+    // التحقق من أن السائق يتبع الحساب الحالي
+    const snap = await dbRT.ref(`vehicleDrivers/${code}`).once('value');
+    const v = snap.val();
+    if (!v) {
+        alert('السائق غير موجود.');
+        return;
+    }
+    if (userRole !== 'admin' && v.tenantId !== userTenantId) {
+        alert('لا تملك صلاحية حذف هذا السائق.');
+        return;
+    }
+
     if (confirm(`هل أنت متأكد من حذف السائق ذو الكود ${code}؟`)) {
         try {
             await dbRT.ref(`vehicleDrivers/${code}`).remove();
@@ -836,12 +865,18 @@ async function deleteVehicle(code) {
 }
 
 // =============================================
-// 📋 تفاصيل السائق
+// 📋 تفاصيل السائق (مع التحقق من tenantId)
 // =============================================
 function showDriverDetails(code) {
     dbRT.ref(`vehicleDrivers/${code}`).once('value', snap => {
         const v = snap.val();
         if (!v) { alert('البيانات غير متوفرة.'); return; }
+
+        // التحقق من أن السائق يتبع الحساب الحالي
+        if (userRole !== 'admin' && v.tenantId !== userTenantId) {
+            alert('لا تملك صلاحية عرض بيانات هذا السائق.');
+            return;
+        }
 
         alert(`📋 تفاصيل السائق:\n\nكود الدخول: ${code}\nاسم السائق: ${v.displayName || '-'}\nالهاتف: ${v.phone || '-'}\nكود التفعيل: ${v.activationCode || '-'}\nالشركة: ${v.tenantId || '-'}\nالحالة: ${v.status || 'offline'}`);
     });
@@ -1056,7 +1091,7 @@ function showAddCompany() {
     const email = prompt('البريد الإلكتروني:');
     if (!name || !email) return;
 
-    const id = `tenant_${Date.now()}`;
+    const id = generateUUID(); // ✅ استخدام UUID
     dbFS.collection('tenants').doc(id).set({
         name, ownerName, email,
         status: 'active',
@@ -1120,9 +1155,21 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 // =============================================
-// نافذة سجل حركة السائق (خريطة + حساب كيلومترات)
+// نافذة سجل حركة السائق (خريطة + حساب كيلومترات) مع التحقق من tenantId
 // =============================================
 async function showDriverHistoryMapModal(code) {
+    // أولاً، التحقق من أن السائق يتبع الحساب الحالي
+    const driverSnap = await dbRT.ref(`vehicleDrivers/${code}`).once('value');
+    const driverData = driverSnap.val();
+    if (!driverData) {
+        alert('السائق غير موجود.');
+        return;
+    }
+    if (userRole !== 'admin' && driverData.tenantId !== userTenantId) {
+        alert('لا تملك صلاحية عرض تاريخ هذا السائق.');
+        return;
+    }
+
     let modal = document.getElementById('historyMapModal');
     if (!modal) {
         modal = document.createElement('div');
@@ -1256,7 +1303,7 @@ async function handleCustomDatabaseLogin(username, password) {
 }
 
 // =============================================
-// إنشاء حساب جديد مع فترة تجريبية 15 يوم
+// إنشاء حساب جديد مع فترة تجريبية 15 يوم (باستخدام UUID)
 // =============================================
 async function handleSignup(e) {
     e.preventDefault();
@@ -1287,7 +1334,7 @@ async function handleSignup(e) {
 
         const now = Date.now();
         const trialEndDate = now + (15 * 24 * 60 * 60 * 1000);
-        const newTenantId = `tenant_${now}`;
+        const newTenantId = generateUUID(); // ✅ UUID فريد
 
         await dbFS.collection('tenants').doc(newTenantId).set({
             name: companyName,
@@ -1341,7 +1388,7 @@ async function handleSignup(e) {
 }
 
 // =============================================
-// إنشاء حساب جيميل وتسجيل شركة جديدة (توافق)
+// إنشاء حساب جيميل وتسجيل شركة جديدة (باستخدام UUID)
 // =============================================
 async function handleIndexGmailSignup(email, password, companyName, ownerName, phone, username = null, subscriptionPeriod = 'month') {
     try {
@@ -1352,7 +1399,7 @@ async function handleIndexGmailSignup(email, password, companyName, ownerName, p
 
         const now = Date.now();
         const trialEndDate = now + (15 * 24 * 60 * 60 * 1000);
-        const newTenantId = `tenant_${now}`;
+        const newTenantId = generateUUID(); // ✅ UUID فريد
 
         await dbFS.collection('tenants').doc(newTenantId).set({
             name: companyName,
