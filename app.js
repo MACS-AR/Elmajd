@@ -202,10 +202,8 @@ async function handleLogin(e) {
     }
 
     if (loginType === 'custom') {
-        // تسجيل دخول مخصص (اسم المستخدم والباسورد) مع التحقق من الاشتراك
         await handleCustomDatabaseLogin(loginInput, password);
     } else {
-        // تسجيل الدخول العادي عبر Firebase Auth
         try {
             const cred = await auth.signInWithEmailAndPassword(loginInput, password);
             currentUser = cred.user;
@@ -229,7 +227,6 @@ async function handleLogin(e) {
                 });
             }
 
-            // التحقق من حالة الاشتراك قبل الدخول (باستثناء الأدمن)
             if (userRole !== 'admin' && userTenantId) {
                 const check = await checkSubscriptionStatus(userTenantId);
                 if (!check.valid) {
@@ -261,7 +258,6 @@ async function checkSubscriptionStatus(tenantId) {
         const tenantData = tenantDoc.data();
         const now = Date.now();
 
-        // التحقق من الفترة التجريبية
         if (tenantData.subscriptionStatus === 'trial') {
             if (now > tenantData.trialEndDate) {
                 return { valid: false, reason: 'trial_expired', tenantData };
@@ -274,7 +270,6 @@ async function checkSubscriptionStatus(tenantId) {
             };
         }
 
-        // التحقق من الاشتراك الفعلي
         if (tenantData.subscriptionStatus === 'active') {
             if (now > tenantData.subscriptionEndDate) {
                 return { valid: false, reason: 'subscription_expired', tenantData };
@@ -287,7 +282,6 @@ async function checkSubscriptionStatus(tenantId) {
             };
         }
 
-        // أي حالة أخرى (مثل suspended)
         return { valid: false, reason: 'subscription_inactive', tenantData };
 
     } catch (error) {
@@ -375,7 +369,6 @@ async function submitPaymentRequest() {
     }
 
     try {
-        // تحديث حالة الدفع في قاعدة البيانات
         await dbFS.collection('tenants').doc(userTenantId).update({
             paymentMethod: selectedPaymentMethod,
             paymentStatus: 'pending',
@@ -383,7 +376,6 @@ async function submitPaymentRequest() {
             lastPaymentRequestDate: Date.now()
         });
 
-        // إرسال إشعار للأدمن
         await dbFS.collection('adminNotifications').add({
             type: 'payment_request',
             tenantId: userTenantId,
@@ -396,7 +388,6 @@ async function submitPaymentRequest() {
         });
 
         alert('✅ تم إرسال طلب الدفع بنجاح!\nسيتم تفعيل اشتراكك بعد تأكيد الإدارة.');
-        // إخفاء شاشة الدفع والعودة لتسجيل الدخول
         document.getElementById('subscriptionExpiredScreen').classList.add('hidden');
         document.getElementById('loginScreen').classList.remove('hidden');
 
@@ -410,14 +401,10 @@ async function submitPaymentRequest() {
 // 💰 حساب قيمة الاشتراك
 // =============================================
 function getSubscriptionAmount() {
-    // يمكن تعديل الأسعار حسب الحاجة
     const prices = {
-        month: 500, // جنيه مصري
-        year: 5000  // جنيه مصري
+        month: 500,
+        year: 5000
     };
-
-    // محاولة جلب فترة الاشتراك من قاعدة البيانات
-    // لكن للأمان نعيد شهر كمبدئي
     return prices.month;
 }
 
@@ -1140,7 +1127,6 @@ async function handleCustomDatabaseLogin(username, password) {
 
         const tenantData = tenantRef.data();
         
-        // التحقق من حالة الاشتراك قبل السماح بالدخول
         const subscriptionCheck = await checkSubscriptionStatus(userData.tenantId);
         if (!subscriptionCheck.valid) {
             showSubscriptionExpiredScreen(subscriptionCheck.tenantData || tenantData);
@@ -1164,7 +1150,90 @@ async function handleCustomDatabaseLogin(username, password) {
 // =============================================
 // 4️⃣ إنشاء حساب جديد مع فترة تجريبية 15 يوم
 // =============================================
-async function handleIndexGmailSignup(email, password, companyName, ownerName, phone) {
+async function handleSignup(e) {
+    e.preventDefault();
+    
+    const fullName = document.getElementById('signupFullName').value.trim();
+    const companyName = document.getElementById('signupCompanyName').value.trim();
+    const phone = document.getElementById('signupPhone').value.trim();
+    const username = document.getElementById('signupUsername').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const password = document.getElementById('signupPassword').value.trim();
+    const subscriptionPeriod = document.getElementById('signupSubscriptionPeriod').value;
+    const errorEl = document.getElementById('signupError');
+
+    if (errorEl) errorEl.classList.add('hidden');
+
+    if (!fullName || !companyName || !phone || !username || !email || !password) {
+        if (errorEl) {
+            errorEl.textContent = 'الرجاء إدخال جميع البيانات المطلوبة';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    try {
+        const userCred = await auth.createUserWithEmailAndPassword(email, password);
+        const uid = userCred.user.uid;
+        await userCred.user.updateProfile({ displayName: fullName });
+
+        const now = Date.now();
+        const trialEndDate = now + (15 * 24 * 60 * 60 * 1000);
+        const newTenantId = `tenant_${now}`;
+
+        await dbFS.collection('tenants').doc(newTenantId).set({
+            name: companyName,
+            ownerName: fullName,
+            email: email,
+            phone: phone,
+            username: username,
+            password: password,
+            status: 'active',
+            subscriptionStatus: 'trial',
+            subscriptionPeriod: subscriptionPeriod,
+            trialEndDate: trialEndDate,
+            subscriptionEndDate: trialEndDate,
+            paymentMethod: null,
+            paymentStatus: 'none',
+            lastPaymentDate: null,
+            vehiclesCount: 0,
+            createdAt: now
+        });
+
+        await dbFS.collection('users').doc(uid).set({
+            tenantId: newTenantId,
+            email: email,
+            name: fullName,
+            phone: phone,
+            username: username,
+            password: password,
+            role: 'company_admin',
+            status: 'active',
+            createdAt: now
+        });
+
+        alert('✅ تم إنشاء الحساب بنجاح!\nلديك فترة تجريبية لمدة 15 يوم.');
+
+        currentUser = userCred.user;
+        currentUserId = uid;
+        userRole = 'company_admin';
+        userTenantId = newTenantId;
+        
+        showDashboard();
+
+    } catch (err) {
+        console.error('❌ فشل إنشاء الحساب:', err);
+        if (errorEl) {
+            errorEl.textContent = err.message || 'فشل إنشاء الحساب';
+            errorEl.classList.remove('hidden');
+        }
+    }
+}
+
+// =============================================
+// 5️⃣ إنشاء حساب جيميل وتسجيل شركة جديدة (للتوافق مع أي استدعاء سابق)
+// =============================================
+async function handleIndexGmailSignup(email, password, companyName, ownerName, phone, username = null, subscriptionPeriod = 'month') {
     try {
         const userCred = await auth.createUserWithEmailAndPassword(email, password);
         const uid = userCred.user.uid;
@@ -1172,7 +1241,7 @@ async function handleIndexGmailSignup(email, password, companyName, ownerName, p
         await userCred.user.updateProfile({ displayName: ownerName });
 
         const now = Date.now();
-        const trialEndDate = now + (15 * 24 * 60 * 60 * 1000); // 15 يوم
+        const trialEndDate = now + (15 * 24 * 60 * 60 * 1000);
         const newTenantId = `tenant_${now}`;
         
         await dbFS.collection('tenants').doc(newTenantId).set({
@@ -1180,13 +1249,13 @@ async function handleIndexGmailSignup(email, password, companyName, ownerName, p
             ownerName: ownerName,
             email: email,
             phone: phone || '',
-            username: email, // استخدام البريد كاسم مستخدم افتراضي
+            username: username || email,
             password: password,
             status: 'active',
-            subscriptionStatus: 'trial', // فترة تجريبية
-            subscriptionPeriod: 'month', // افتراضي شهر ويمكن تغييره لاحقاً
+            subscriptionStatus: 'trial',
+            subscriptionPeriod: subscriptionPeriod,
             trialEndDate: trialEndDate,
-            subscriptionEndDate: trialEndDate, // يبدأ الاشتراك الفعلي بعد التجربة
+            subscriptionEndDate: trialEndDate,
             paymentMethod: null,
             paymentStatus: 'none',
             lastPaymentDate: null,
@@ -1199,7 +1268,7 @@ async function handleIndexGmailSignup(email, password, companyName, ownerName, p
             email: email,
             name: ownerName,
             phone: phone || '',
-            username: email,
+            username: username || email,
             password: password,
             role: 'company_admin',
             status: 'active',
@@ -1208,7 +1277,6 @@ async function handleIndexGmailSignup(email, password, companyName, ownerName, p
 
         alert('✅ تم إنشاء الحساب بنجاح!\nلديك فترة تجريبية لمدة 15 يوم.');
         
-        // تسجيل الدخول تلقائياً
         currentUser = userCred.user;
         currentUserId = uid;
         userRole = 'company_admin';
@@ -1250,7 +1318,6 @@ auth.onAuthStateChanged(async (user) => {
                 });
             }
 
-            // التحقق من الاشتراك (ما عدا الأدمن)
             if (userRole !== 'admin' && userTenantId) {
                 const check = await checkSubscriptionStatus(userTenantId);
                 if (!check.valid) {
