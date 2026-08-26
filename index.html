@@ -17,6 +17,9 @@
         .custom-leaflet-marker { background: transparent; border: none; }
         .page-content { display: block; }
         .hidden { display: none !important; }
+        /* تحسين المظهر */
+        input, select { direction: ltr; text-align: right; }
+        input[type="tel"], input[type="email"], input[type="text"] { direction: ltr; text-align: right; }
     </style>
 </head>
 <body class="bg-gray-900 text-gray-100 min-h-screen">
@@ -54,8 +57,8 @@
                     <input type="password" id="loginPassword" placeholder="********" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-500">
                 </div>
                 <div id="loginError" class="hidden bg-red-900/50 text-red-300 p-3 rounded-lg mb-4 text-sm"></div>
-                <button onclick="handleLogin(event)" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-lg transition">دخول</button>
-                <button onclick="quickLoginAdmin()" class="w-full mt-3 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm transition">دخول سريع كأدمن</button>
+                <button type="button" onclick="handleLogin(event)" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-lg transition">دخول</button>
+                <button type="button" onclick="quickLoginAdmin()" class="w-full mt-3 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm transition">دخول سريع كأدمن</button>
             </div>
 
             <!-- نموذج إنشاء حساب -->
@@ -93,7 +96,7 @@
                         </select>
                     </div>
                     <div id="signupError" class="hidden bg-red-900/50 text-red-300 p-3 rounded-lg text-sm"></div>
-                    <button onclick="handleSignup(event)" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition">إنشاء الحساب</button>
+                    <button type="button" onclick="handleSignup(event)" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition">إنشاء الحساب</button>
                     <p class="text-xs text-gray-500 text-center">سيتم منحك فترة تجريبية مجانية لمدة 15 يوم</p>
                 </div>
             </div>
@@ -120,7 +123,7 @@
                 <div id="paymentMethodsContainer"></div>
             </div>
             
-            <button onclick="handleLogout()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg">
+            <button type="button" onclick="handleLogout()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg">
                 تسجيل الخروج
             </button>
         </div>
@@ -140,20 +143,20 @@
                 </div>
                 <div class="flex items-center gap-3">
                     <span id="userRole" class="text-xs bg-gray-700 px-3 py-1 rounded-full"></span>
-                    <button onclick="handleLogout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition">تسجيل الخروج</button>
+                    <button type="button" onclick="handleLogout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition">تسجيل الخروج</button>
                 </div>
             </div>
             <!-- أزرار التنقل -->
             <div class="bg-gray-800 border-t border-gray-700 overflow-x-auto">
                 <div class="max-w-7xl mx-auto flex gap-1 px-2 py-2">
-                    <button class="nav-btn active bg-gray-700 text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="dashboard" onclick="showPage('dashboard')">📊 لوحة التحكم</button>
-                    <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="vehicles" onclick="showPage('vehicles')">🚗 سياراتي</button>
-                    <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="map" onclick="showPage('map')">🗺️ الخريطة</button>
-                    <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="tracking" onclick="showPage('tracking')">📈 التقارير</button>
+                    <button type="button" class="nav-btn active bg-gray-700 text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="dashboard" onclick="showPage('dashboard')">📊 لوحة التحكم</button>
+                    <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="vehicles" onclick="showPage('vehicles')">🚗 سياراتي</button>
+                    <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="map" onclick="showPage('map')">🗺️ الخريطة</button>
+                    <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="tracking" onclick="showPage('tracking')">📈 التقارير</button>
                     <div class="admin-only hidden">
-                        <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-companies" onclick="showPage('admin-companies')">🏢 الشركات</button>
-                        <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-vehicles" onclick="showPage('admin-vehicles')">👑 المركبات</button>
-                        <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-subscriptions" onclick="showPage('admin-subscriptions')">💳 الاشتراكات</button>
+                        <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-companies" onclick="showPage('admin-companies')">🏢 الشركات</button>
+                        <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-vehicles" onclick="showPage('admin-vehicles')">👑 المركبات</button>
+                        <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-subscriptions" onclick="showPage('admin-subscriptions')">💳 الاشتراكات</button>
                     </div>
                 </div>
             </div>
@@ -175,7 +178,7 @@
     <div id="globalError" class="hidden fixed bottom-4 left-4 right-4 md:left-auto bg-red-600 text-white p-4 rounded-lg shadow-lg z-[100] max-w-md mx-auto"></div>
 
     <!-- ==================== المودالات ==================== -->
-    <!-- مودال سجل الرحلة سيتم إنشاؤه ديناميكياً -->
+    <!-- سيتم إنشاء مودال الخريطة التاريخية ديناميكياً -->
 
     <!-- ==================== السكربتات ==================== -->
     <!-- Firebase -->
@@ -208,6 +211,14 @@
                 tabSignup.className = 'flex-1 py-2 px-4 rounded-lg font-bold bg-yellow-500 text-black transition';
             }
         }
+
+        // في حال فشل تحميل app.js، نعرض رسالة واضحة
+        window.addEventListener('load', function() {
+            if (typeof handleLogin === 'undefined') {
+                document.getElementById('globalError').textContent = '⚠️ فشل تحميل ملف app.js، تأكد من وجوده في نفس المجلد.';
+                document.getElementById('globalError').classList.remove('hidden');
+            }
+        });
     </script>
 </body>
 </html>
