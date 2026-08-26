@@ -7,44 +7,32 @@
 body {
     margin: 0;
     padding: 0;
-    background: #0f0f1a;
-    color: #f5c842;
-}
-
-/* ===== الألوان الأساسية ===== */
-:root {
-    --dark-bg: #0f0f1a;
-    --dark-card: #1a1a2e;
-    --dark-input: #252540;
-    --gold: #d4a017;
-    --gold-hover: #f5c842;
-    --gold-light: #f5c842;
-    --gold-border: rgba(212, 160, 23, 0.3);
+    background: #111827;
+    color: #e5e7eb;
 }
 
 /* ===== الشريط الجانبي ===== */
 .nav-btn.active {
-    background-color: rgba(212, 160, 23, 0.15);
-    color: #f5c842;
+    background-color: #374151;
+    color: #fbbf24;
     font-weight: 700;
 }
 .nav-btn.active span:first-child {
-    color: #f5c842;
+    color: #fbbf24;
 }
-
-.nav-btn-mobile.active {
-    color: #f5c842 !important;
+.nav-btn:hover {
+    background-color: #1f2937;
 }
 
 /* ===== بطاقات الإحصائيات ===== */
 .stat-card {
     transition: transform 0.2s, box-shadow 0.2s;
-    border: 1px solid rgba(212, 160, 23, 0.15);
-    background: #1a1a2e;
+    border: 1px solid #374151;
+    background: #1f2937;
 }
 .stat-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(212, 160, 23, 0.1);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
 }
 .stat-card .icon {
     width: 48px;
@@ -54,31 +42,30 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 24px;
-    background: rgba(212, 160, 23, 0.1);
-    color: #f5c842;
 }
 .stat-card .icon.gold {
-    background: rgba(212, 160, 23, 0.15);
-    color: #f5c842;
-}
-.stat-card .stat-label {
-    color: #a0a0b8;
+    background: #374151;
+    color: #fbbf24;
 }
 .stat-card .stat-value {
-    color: #f5c842;
+    color: #fbbf24;
+}
+.stat-card .stat-label {
+    color: #9ca3af;
 }
 
 /* ===== بطاقة السيارة ===== */
 .vehicle-card {
-    border-right: 4px solid #d4a017;
+    border-right: 4px solid #fbbf24;
     transition: all 0.3s;
-    background: #1a1a2e;
+    background: #1f2937;
     cursor: pointer;
-    border: 1px solid rgba(212, 160, 23, 0.1);
+    border: 1px solid #374151;
 }
 .vehicle-card:hover {
     transform: translateX(-4px);
-    box-shadow: 0 4px 12px rgba(212, 160, 23, 0.1);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    border-color: #fbbf24;
 }
 .vehicle-card.offline {
     border-right-color: #ef4444;
@@ -95,13 +82,7 @@ body {
 }
 .vehicle-card .status-dot.online { background: #22c55e; }
 .vehicle-card .status-dot.offline { background: #ef4444; }
-.vehicle-card .status-dot.moving { background: #d4a017; animation: pulse-dot 1.5s infinite; }
-.vehicle-card .vehicle-name {
-    color: #f5c842;
-}
-.vehicle-card .vehicle-info {
-    color: #a0a0b8;
-}
+.vehicle-card .status-dot.moving { background: #fbbf24; animation: pulse-dot 1.5s infinite; }
 
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; transform: scale(1); }
@@ -114,40 +95,48 @@ body {
     height: 550px;
     border-radius: 12px;
     overflow: hidden;
-    border: 1px solid rgba(212, 160, 23, 0.15);
+    border: 1px solid #374151;
 }
 
-/* ===== علامة الخريطة - شكل سيارة ===== */
+/* ===== علامة الخريطة - شكل سيارة محسّن ===== */
 .map-marker {
-    width: 32px;
-    height: 32px;
+    width: 36px;
+    height: 36px;
     cursor: pointer;
     transition: transform 0.2s;
     background: transparent;
     border: none;
 }
 .map-marker:hover {
-    transform: scale(1.2);
+    transform: scale(1.15);
 }
 .map-marker svg {
-    width: 32px;
-    height: 32px;
-    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+    width: 36px;
+    height: 36px;
+    filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
 }
 .map-marker.online svg .car-body {
     fill: #22c55e;
 }
 .map-marker.offline svg .car-body {
-    fill: #ef4444;
+    fill: #6b7280;
 }
 .map-marker.moving svg .car-body {
-    fill: #d4a017;
+    fill: #fbbf24;
     animation: pulse-car 1.5s infinite;
+}
+.map-marker.moving svg .car-light {
+    fill: #fbbf24;
+    animation: blink-light 0.8s infinite;
 }
 
 @keyframes pulse-car {
     0%, 100% { transform: scale(1); }
     50% { transform: scale(1.08); }
+}
+@keyframes blink-light {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }
 
 /* ===== نافذة المعلومات المنبثقة ===== */
@@ -155,88 +144,94 @@ body {
     padding: 8px 12px;
     font-size: 13px;
     max-width: 220px;
-    background: #1a1a2e;
-    color: #f5c842;
+    background: #1f2937;
+    color: #e5e7eb;
     border-radius: 8px;
-    border: 1px solid rgba(212, 160, 23, 0.2);
+    border: 1px solid #fbbf24;
 }
 .map-popup .name {
     font-weight: 700;
     font-size: 15px;
-    color: #f5c842;
+    color: #fbbf24;
 }
 .map-popup .detail {
-    color: #a0a0b8;
+    color: #9ca3af;
     font-size: 12px;
 }
 .map-popup .gold-text {
-    color: #d4a017;
+    color: #fbbf24;
     font-weight: 600;
 }
-
-.mapboxgl-popup-content {
-    background: transparent !important;
-    padding: 0 !important;
-}
-.mapboxgl-popup-tip {
-    border-top-color: #1a1a2e !important;
-}
+.map-popup .online-text { color: #22c55e; }
+.map-popup .offline-text { color: #6b7280; }
+.map-popup .moving-text { color: #fbbf24; }
 
 /* ===== أزرار ===== */
 .btn-primary {
-    background: #d4a017;
-    color: #0f0f1a;
+    background: #fbbf24;
+    color: #111827;
     padding: 8px 20px;
     border-radius: 8px;
     transition: background 0.2s;
     border: none;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
 }
-.btn-primary:hover { background: #f5c842; }
+.btn-primary:hover { background: #f59e0b; }
 
 .btn-danger {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
+    background: #ef4444;
+    color: white;
     padding: 4px 14px;
     border-radius: 6px;
     transition: background 0.2s;
-    border: 1px solid rgba(239, 68, 68, 0.3);
+    border: none;
     cursor: pointer;
     font-size: 13px;
 }
-.btn-danger:hover { background: rgba(239, 68, 68, 0.3); }
+.btn-danger:hover { background: #dc2626; }
 
 .btn-success {
-    background: rgba(34, 197, 94, 0.2);
-    color: #22c55e;
+    background: #22c55e;
+    color: white;
     padding: 4px 14px;
     border-radius: 6px;
     transition: background 0.2s;
-    border: 1px solid rgba(34, 197, 94, 0.3);
+    border: none;
     cursor: pointer;
     font-size: 13px;
 }
-.btn-success:hover { background: rgba(34, 197, 94, 0.3); }
+.btn-success:hover { background: #16a34a; }
 
 .btn-outline {
     background: transparent;
-    color: #d4a017;
+    color: #fbbf24;
     padding: 6px 16px;
     border-radius: 6px;
-    border: 1.5px solid #d4a017;
+    border: 1.5px solid #fbbf24;
     cursor: pointer;
     transition: all 0.2s;
     font-weight: 600;
 }
-.btn-outline:hover { background: #d4a017; color: #0f0f1a; }
+.btn-outline:hover { background: #fbbf24; color: #111827; }
+
+.btn-edit {
+    background: #3b82f6;
+    color: white;
+    padding: 4px 14px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+}
+.btn-edit:hover { background: #2563eb; }
 
 /* ===== الجداول ===== */
 .table-container {
     overflow-x: auto;
     border-radius: 12px;
-    border: 1px solid rgba(212, 160, 23, 0.15);
-    background: #1a1a2e;
+    border: 1px solid #374151;
 }
 table {
     width: 100%;
@@ -244,20 +239,23 @@ table {
     font-size: 14px;
 }
 table th {
-    background: rgba(212, 160, 23, 0.1);
+    background: #1f2937;
     text-align: right;
     padding: 12px 16px;
     font-weight: 700;
-    color: #f5c842;
-    border-bottom: 2px solid rgba(212, 160, 23, 0.2);
+    color: #fbbf24;
+    border-bottom: 2px solid #fbbf24;
 }
 table td {
     padding: 10px 16px;
-    border-bottom: 1px solid rgba(212, 160, 23, 0.05);
-    color: #c8c8d8;
+    border-bottom: 1px solid #374151;
+    color: #e5e7eb;
 }
 table tr:hover td {
-    background: rgba(212, 160, 23, 0.05);
+    background: #1f2937;
+}
+table .text-gold {
+    color: #fbbf24;
 }
 
 /* ===== مودال ===== */
@@ -272,7 +270,7 @@ table tr:hover td {
     padding: 16px;
 }
 .modal-box {
-    background: #1a1a2e;
+    background: #1f2937;
     border-radius: 16px;
     max-width: 500px;
     width: 100%;
@@ -280,27 +278,25 @@ table tr:hover td {
     max-height: 90vh;
     overflow-y: auto;
     animation: modalIn 0.25s ease;
-    border: 1px solid rgba(212, 160, 23, 0.15);
+    border: 1px solid #fbbf24;
+}
+.modal-box h3 {
+    color: #fbbf24;
 }
 .modal-box label {
-    color: #f5c842;
+    color: #9ca3af;
 }
-.modal-box input {
-    background: #252540;
-    border: 1px solid rgba(212, 160, 23, 0.2);
-    color: #f5c842;
-    border-radius: 8px;
-    padding: 10px 14px;
-    width: 100%;
+.modal-box input, .modal-box select {
+    background: #111827;
+    border: 1px solid #374151;
+    color: #e5e7eb;
 }
-.modal-box input:focus {
+.modal-box input:focus, .modal-box select:focus {
+    border-color: #fbbf24;
     outline: none;
-    border-color: #d4a017;
-    box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2);
+    ring: 2px solid #fbbf24;
 }
-.modal-box input::placeholder {
-    color: #666680;
-}
+
 @keyframes modalIn {
     from { opacity: 0; transform: scale(0.95) translateY(20px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
@@ -310,36 +306,38 @@ table tr:hover td {
 .tab-btn {
     padding: 8px 20px;
     border-radius: 8px;
-    border: 2px solid rgba(212, 160, 23, 0.2);
-    background: transparent;
+    border: 2px solid #374151;
+    background: #1f2937;
     cursor: pointer;
     transition: all 0.2s;
     font-weight: 600;
-    color: #a0a0b8;
+    color: #9ca3af;
 }
 .tab-btn.active {
-    border-color: #d4a017;
-    background: rgba(212, 160, 23, 0.1);
-    color: #f5c842;
+    border-color: #fbbf24;
+    background: #fbbf24;
+    color: #111827;
 }
 .tab-btn:hover {
-    border-color: #d4a017;
-    color: #f5c842;
+    border-color: #fbbf24;
+    color: #fbbf24;
+}
+.tab-btn.active:hover {
+    color: #111827;
 }
 
-/* ===== ألوان النصوص ===== */
-.text-gold { color: #d4a017; }
-.text-gold-light { color: #f5c842; }
-.bg-dark-bg { background: #0f0f1a; }
-.bg-dark-card { background: #1a1a2e; }
-.bg-dark-input { background: #252540; }
-.border-gold-border { border-color: rgba(212, 160, 23, 0.2); }
-
-/* ===== حالة الاتصال ===== */
-#onlineStatus.offline {
-    background: rgba(239, 68, 68, 0.2) !important;
-    color: #ef4444 !important;
-    border-color: rgba(239, 68, 68, 0.3) !important;
+/* ===== خيارات الخريطة ===== */
+.map-style-select {
+    background: #1f2937;
+    border: 1px solid #fbbf24;
+    color: #fbbf24;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.map-style-select option {
+    background: #1f2937;
+    color: #e5e7eb;
 }
 
 /* ===== استجابة ===== */
@@ -348,24 +346,21 @@ table tr:hover td {
     #map-container { height: 350px; }
     table { font-size: 12px; }
     table th, table td { padding: 6px 10px; }
-    .map-marker { width: 24px; height: 24px; }
-    .map-marker svg { width: 24px; height: 24px; }
-    .modal-box { margin: 16px; padding: 16px; }
+    .map-marker { width: 28px; height: 28px; }
+    .map-marker svg { width: 28px; height: 28px; }
 }
 
-/* ===== شريط التمرير ===== */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #1a1a2e; border-radius: 10px; }
-::-webkit-scrollbar-thumb { background: #d4a017; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #f5c842; }
+::-webkit-scrollbar-track { background: #1f2937; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #fbbf24; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
 
-/* ===== تحميل ===== */
 .loading-spinner {
     display: inline-block;
     width: 30px;
     height: 30px;
-    border: 3px solid rgba(212, 160, 23, 0.1);
-    border-top-color: #d4a017;
+    border: 3px solid #374151;
+    border-top-color: #fbbf24;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
@@ -373,15 +368,20 @@ table tr:hover td {
     to { transform: rotate(360deg); }
 }
 
-/* ===== الخلفية المظلمة للخرائط ===== */
-.mapboxgl-ctrl-group {
-    background: #1a1a2e !important;
-    border-color: rgba(212, 160, 23, 0.2) !important;
+/* ===== نافذة بيانات السائق ===== */
+.driver-detail {
+    background: #1f2937;
+    border: 1px solid #fbbf24;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
 }
-.mapboxgl-ctrl-group button {
-    background: #1a1a2e !important;
-    color: #f5c842 !important;
+.driver-detail .label {
+    color: #9ca3af;
+    font-size: 12px;
 }
-.mapboxgl-ctrl-group button:hover {
-    background: rgba(212, 160, 23, 0.1) !important;
+.driver-detail .value {
+    color: #fbbf24;
+    font-weight: 600;
+    font-size: 14px;
 }
