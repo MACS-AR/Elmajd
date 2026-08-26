@@ -17,9 +17,9 @@ const dbRT = firebase.database();
 const dbFS = firebase.firestore();
 
 // =============================================
-// 🗺️ Mapbox Token (ضع توكنك هنا)
+// 🗺️ Mapbox Token
 // =============================================
-const MAPBOX_TOKEN = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw'; // استبدل بتوكنك
+const MAPBOX_TOKEN = 'pk.eyJ1IjoibWFwYm94IiwiYSI6ImNpejY4NXVycTA2emYycXBndHRqcmZ3N3gifQ.rJcFIG214AriISLbB6B5aw';
 
 // =============================================
 // 📦 المتغيرات العامة
@@ -28,15 +28,38 @@ let currentUser = null;
 let currentUserId = null;
 let userRole = null;
 let userTenantId = null;
-let allVehicles = {};
 let mapInstance = null;
 let mapMarkers = {};
 let liveListeners = [];
-let trackingHistory = {};
 let trackingInterval = null;
+let isOnline = navigator.onLine;
 
 // =============================================
-// 🔐 إنشاء حساب أدمن تلقائي (إذا لم يكن موجوداً)
+// 📡 حالة الاتصال المباشر
+// =============================================
+function updateOnlineStatus() {
+    isOnline = navigator.onLine;
+    const statusEl = document.getElementById('onlineStatus');
+    if (statusEl) {
+        if (isOnline) {
+            statusEl.className = 'text-xs px-2 py-1 rounded-full bg-green-500/20 text-green-400 border border-green-500/30';
+            statusEl.textContent = '🟢 متصل';
+        } else {
+            statusEl.className = 'text-xs px-2 py-1 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 offline';
+            statusEl.textContent = '🔴 غير متصل';
+        }
+    }
+    // تخزين الحالة في localStorage لكل عميل
+    if (currentUserId) {
+        localStorage.setItem(`online_${currentUserId}`, isOnline ? 'true' : 'false');
+    }
+}
+
+window.addEventListener('online', updateOnlineStatus);
+window.addEventListener('offline', updateOnlineStatus);
+
+// =============================================
+// 🔐 إنشاء حساب أدمن تلقائي
 // =============================================
 async function ensureAdminAccount() {
     const adminEmail = 'admin@system.com';
@@ -44,22 +67,16 @@ async function ensureAdminAccount() {
     const adminName = 'المدير العام';
 
     try {
-        // محاولة تسجيل الدخول بحساب الأدمن أولاً
         await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
         console.log('✅ تم تسجيل الدخول بحساب الأدمن الموجود');
         return true;
     } catch (err) {
-        // إذا لم يكن الحساب موجوداً، نقوم بإنشائه
         if (err.code === 'auth/user-not-found') {
             try {
-                // إنشاء المستخدم في Firebase Auth
                 const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
                 const uid = userCred.user.uid;
-
-                // تحديث اسم المستخدم
                 await userCred.user.updateProfile({ displayName: adminName });
 
-                // إنشاء وثيقة المستخدم في Firestore
                 await dbFS.collection('users').doc(uid).set({
                     tenantId: 'admin_tenant',
                     email: adminEmail,
@@ -70,7 +87,6 @@ async function ensureAdminAccount() {
                     createdAt: Date.now()
                 });
 
-                // إنشاء وثيقة تينانت للأدمن (إذا لم تكن موجودة)
                 const tenantRef = dbFS.collection('tenants').doc('admin_tenant');
                 const tenantSnap = await tenantRef.get();
                 if (!tenantSnap.exists) {
@@ -87,8 +103,6 @@ async function ensureAdminAccount() {
                 }
 
                 console.log('✅ تم إنشاء حساب الأدمن التلقائي');
-                
-                // تسجيل الدخول تلقائياً
                 await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
                 return true;
             } catch (createErr) {
@@ -106,7 +120,6 @@ async function ensureAdminAccount() {
 // 🔐 المصادقة
 // =============================================
 
-// تسجيل الدخول (يُستدعى من النموذج)
 async function handleLogin(e) {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value.trim();
@@ -126,14 +139,12 @@ async function handleLogin(e) {
         currentUser = cred.user;
         currentUserId = cred.user.uid;
         
-        // جلب دور المستخدم من Firestore
         const userDoc = await dbFS.collection('users').doc(currentUser.uid).get();
         if (userDoc.exists) {
             const data = userDoc.data();
             userRole = data.role || 'customer';
             userTenantId = data.tenantId || null;
         } else {
-            // إذا لم توجد وثيقة، ننشئها كعميل افتراضي
             userRole = 'customer';
             userTenantId = 'default';
             await dbFS.collection('users').doc(currentUser.uid).set({
@@ -146,7 +157,7 @@ async function handleLogin(e) {
             });
         }
 
-        // إظهار لوحة التحكم
+        updateOnlineStatus();
         showDashboard();
 
     } catch (err) {
@@ -155,11 +166,9 @@ async function handleLogin(e) {
     }
 }
 
-// تسجيل الخروج
 async function handleLogout() {
     try {
         await auth.signOut();
-        // إيقاف المستمعين
         liveListeners.forEach(ref => ref.off && ref.off());
         liveListeners = [];
         if (mapInstance) {
@@ -179,7 +188,6 @@ async function handleLogout() {
     }
 }
 
-// تسجيل الدخول السريع بحساب الأدمن
 async function quickLoginAdmin() {
     document.getElementById('loginEmail').value = 'admin@system.com';
     document.getElementById('loginPassword').value = '123456';
@@ -187,11 +195,8 @@ async function quickLoginAdmin() {
     
     try {
         await auth.signInWithEmailAndPassword('admin@system.com', '123456');
-        // الباقي يتم في onAuthStateChanged
     } catch (err) {
-        // إذا فشل، نحاول إنشاء الحساب أولاً
         await ensureAdminAccount();
-        // ثم نحاول مرة أخرى
         try {
             await auth.signInWithEmailAndPassword('admin@system.com', '123456');
         } catch (e) {
@@ -200,7 +205,6 @@ async function quickLoginAdmin() {
     }
 }
 
-// عرض لوحة التحكم بعد تسجيل الدخول
 function showDashboard() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('dashboardScreen').classList.remove('hidden');
@@ -228,7 +232,12 @@ function showPage(page) {
         target.classList.remove('hidden');
         document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
         document.querySelectorAll(`.nav-btn[data-page="${page}"]`).forEach(b => b.classList.add('active'));
+        document.querySelectorAll('.nav-btn-mobile').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll(`.nav-btn-mobile[data-page="${page}"]`).forEach(b => b.classList.add('active'));
     }
+
+    // إخفاء القائمة المنسدلة للجوال
+    document.getElementById('mobileMenuDropdown')?.classList.add('hidden');
 
     switch(page) {
         case 'dashboard': renderDashboard(); break;
@@ -250,21 +259,25 @@ async function renderDashboard() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-amber-700">📊 لوحة التحكم</h2>
-            <span class="text-sm text-gray-500">آخر تحديث: ${new Date().toLocaleTimeString('ar')}</span>
+            <h2 class="text-2xl font-bold text-gold">📊 لوحة التحكم</h2>
+            <span class="text-sm text-gold-light/50">آخر تحديث: ${new Date().toLocaleTimeString('ar')}</span>
         </div>
         <div id="statsContainer" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">🚗</div><div><p class="text-gray-500 text-sm">المركبات</p><p id="stat-total" class="text-2xl font-bold">0</p></div></div></div>
-            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">📶</div><div><p class="text-gray-500 text-sm">متصل</p><p id="stat-online" class="text-2xl font-bold">0</p></div></div></div>
-            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">🔄</div><div><p class="text-gray-500 text-sm">متحرك</p><p id="stat-moving" class="text-2xl font-bold">0</p></div></div></div>
-            <div class="stat-card bg-white rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">⏸️</div><div><p class="text-gray-500 text-sm">متوقف</p><p id="stat-stopped" class="text-2xl font-bold">0</p></div></div></div>
+            <div class="stat-card rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">🚗</div><div><p class="stat-label text-sm">المركبات</p><p id="stat-total" class="stat-value text-2xl font-bold">0</p></div></div></div>
+            <div class="stat-card rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">📶</div><div><p class="stat-label text-sm">متصل</p><p id="stat-online" class="stat-value text-2xl font-bold">0</p></div></div></div>
+            <div class="stat-card rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">🔄</div><div><p class="stat-label text-sm">متحرك</p><p id="stat-moving" class="stat-value text-2xl font-bold">0</p></div></div></div>
+            <div class="stat-card rounded-xl p-4 shadow-sm"><div class="flex items-center gap-3"><div class="icon gold">⏸️</div><div><p class="stat-label text-sm">متوقف</p><p id="stat-stopped" class="stat-value text-2xl font-bold">0</p></div></div></div>
         </div>
-        <div class="bg-white rounded-xl shadow-sm p-4">
-            <h3 class="font-bold text-amber-700 mb-3">📍 آخر المواقع <span class="text-xs text-gray-400 font-normal">(اضغط لعرض على الخريطة)</span></h3>
-            <div id="recentLocations" class="space-y-2 text-sm text-gray-600"></div>
+        <div class="bg-dark-card rounded-xl shadow-sm p-4 border border-gold-border/20">
+            <h3 class="font-bold text-gold mb-3">📍 آخر المواقع <span class="text-xs text-gold-light/50 font-normal">(اضغط لعرض على الخريطة)</span></h3>
+            <div id="recentLocations" class="space-y-2 text-sm text-gold-light/70"></div>
         </div>
     `;
 
+    loadDashboardData();
+}
+
+function loadDashboardData() {
     const ref = dbRT.ref('vehicleDrivers');
     ref.off();
     ref.on('value', (snap) => {
@@ -276,7 +289,12 @@ async function renderDashboard() {
 
         Object.keys(data).forEach(code => {
             const v = data[code];
-            if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
+            // تصفية حسب المستخدم الحالي
+            if (userRole !== 'admin') {
+                // العميل يرى فقط سياراته التي أضافها أو التابعة لشركته
+                if (v.createdByUid && v.createdByUid !== currentUserId) return;
+                if (v.tenantId && v.tenantId !== userTenantId) return;
+            }
             
             total++;
             const status = v.status || 'offline';
@@ -314,19 +332,18 @@ function renderRecent(list) {
     const container = document.getElementById('recentLocations');
     if (!container) return;
     if (list.length === 0) {
-        container.innerHTML = '<p class="text-gray-400">لا توجد مواقع حالية</p>';
+        container.innerHTML = '<p class="text-gold-light/40">لا توجد مواقع حالية</p>';
         return;
     }
     container.innerHTML = list.slice(0, 10).map(item => `
-        <div class="flex justify-between items-center border-b border-gray-100 py-2 cursor-pointer hover:bg-amber-50 px-2 rounded" onclick="focusOnVehicle('${item.code}')">
-            <span class="font-medium text-amber-700">${item.name}</span>
-            <span class="text-xs text-amber-600">${item.speed.toFixed(1)} كم/س</span>
-            <span class="text-xs text-gray-400">${item.time ? new Date(item.time).toLocaleTimeString('ar') : '-'}</span>
+        <div class="flex justify-between items-center border-b border-gold-border/10 py-2 cursor-pointer hover:bg-gold/5 px-2 rounded transition" onclick="focusOnVehicle('${item.code}')">
+            <span class="font-medium text-gold-light">${item.name}</span>
+            <span class="text-xs text-gold">${item.speed.toFixed(1)} كم/س</span>
+            <span class="text-xs text-gold-light/40">${item.time ? new Date(item.time).toLocaleTimeString('ar') : '-'}</span>
         </div>
     `).join('');
 }
 
-// دالة للتركيز على سيارة معينة في الخريطة
 function focusOnVehicle(code) {
     showPage('map');
     setTimeout(() => {
@@ -336,13 +353,26 @@ function focusOnVehicle(code) {
             mapInstance.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 15 });
             marker.togglePopup();
         } else {
-            alert('السيارة غير موجودة على الخريطة حالياً');
+            // محاولة البحث عن السائق في سجل الحركة
+            showPage('tracking');
+            setTimeout(() => {
+                const items = document.querySelectorAll('#trackingList .border-b');
+                items.forEach(item => {
+                    if (item.textContent.includes(code)) {
+                        item.style.backgroundColor = 'rgba(212, 160, 23, 0.1)';
+                        item.style.borderRight = '4px solid #d4a017';
+                        setTimeout(() => {
+                            item.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }, 300);
+                    }
+                });
+            }, 500);
         }
     }, 500);
 }
 
 // =============================================
-// 🚗 سياراتي (للعميل)
+// 🚗 سياراتي
 // =============================================
 async function renderVehicles() {
     const container = document.getElementById('page-vehicles');
@@ -350,12 +380,16 @@ async function renderVehicles() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
-            <h2 class="text-2xl font-bold text-amber-700">🚗 سياراتي</h2>
+            <h2 class="text-2xl font-bold text-gold">🚗 سياراتي</h2>
             <button onclick="showAddVehicle()" class="btn-primary">➕ إضافة سيارة</button>
         </div>
         <div id="vehiclesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     `;
 
+    loadVehiclesData();
+}
+
+function loadVehiclesData() {
     const ref = dbRT.ref('vehicleDrivers');
     ref.off();
     ref.on('value', (snap) => {
@@ -364,14 +398,18 @@ async function renderVehicles() {
         if (!list) return;
 
         if (!data) {
-            list.innerHTML = '<p class="text-gray-400 col-span-full text-center py-8">لا توجد سيارات مسجلة</p>';
+            list.innerHTML = '<p class="text-gold-light/40 col-span-full text-center py-8">لا توجد سيارات مسجلة</p>';
             return;
         }
 
         let html = '';
         Object.keys(data).forEach(code => {
             const v = data[code];
-            if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
+            // تصفية حسب المستخدم الحالي
+            if (userRole !== 'admin') {
+                if (v.createdByUid && v.createdByUid !== currentUserId) return;
+                if (v.tenantId && v.tenantId !== userTenantId) return;
+            }
 
             const status = v.status || 'offline';
             const statusClass = status === 'online' ? 'online' : status === 'moving' ? 'moving' : 'offline';
@@ -382,32 +420,32 @@ async function renderVehicles() {
                 <div class="vehicle-card ${statusClass} rounded-xl p-4 shadow-sm cursor-pointer" onclick="focusOnVehicle('${code}')">
                     <div class="flex justify-between items-start">
                         <div>
-                            <h4 class="font-bold text-gray-800">${v.displayName || code}</h4>
-                            <p class="text-sm text-gray-500">كود: ${code}</p>
-                            <p class="text-sm text-gray-500">${v.phone || 'لا يوجد هاتف'}</p>
-                            <p class="text-xs text-amber-600">👤 أضيف بواسطة: ${v.createdBy || 'النظام'}</p>
+                            <h4 class="font-bold text-gold-light">${v.displayName || code}</h4>
+                            <p class="text-sm text-gold-light/50">كود: <span class="font-mono">${code}</span></p>
+                            <p class="text-sm text-gold-light/50">${v.phone || 'لا يوجد هاتف'}</p>
+                            <p class="text-xs text-gold/70">👤 أضيف بواسطة: ${v.createdBy || 'النظام'}</p>
                         </div>
                         <span class="status-dot ${statusClass}"></span>
                     </div>
-                    <div class="mt-2 text-sm text-gray-600 grid grid-cols-2 gap-1">
+                    <div class="mt-2 text-sm text-gold-light/60 grid grid-cols-2 gap-1">
                         <span>🚀 ${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</span>
                         <span>🔋 ${v.deviceHealth?.battery || '?'}%</span>
-                        <span class="text-xs text-gray-400 col-span-2">📍 ${loc.latitude ? loc.latitude.toFixed(4) + ', ' + loc.longitude.toFixed(4) : 'لا يوجد'}</span>
-                        <span class="text-xs text-amber-600 col-span-2">${statusText}</span>
+                        <span class="text-xs text-gold-light/40 col-span-2">📍 ${loc.latitude ? loc.latitude.toFixed(4) + ', ' + loc.longitude.toFixed(4) : 'لا يوجد'}</span>
+                        <span class="text-xs text-gold col-span-2">${statusText}</span>
                     </div>
-                    ${userRole === 'admin' ? `<div class="mt-2 text-xs text-amber-600">الشركة: ${v.tenantId || 'غير محدد'}</div>` : ''}
+                    ${userRole === 'admin' ? `<div class="mt-2 text-xs text-gold/50">الشركة: ${v.tenantId || 'غير محدد'}</div>` : ''}
                 </div>
             `;
         });
 
-        list.innerHTML = html || '<p class="text-gray-400 col-span-full text-center py-8">لا توجد سيارات مسجلة</p>';
+        list.innerHTML = html || '<p class="text-gold-light/40 col-span-full text-center py-8">لا توجد سيارات مسجلة</p>';
     });
 
     liveListeners.push(ref);
 }
 
 // =============================================
-// ➕ إضافة سيارة (مودال)
+// ➕ إضافة سيارة
 // =============================================
 function showAddVehicle() {
     const overlay = document.createElement('div');
@@ -416,21 +454,21 @@ function showAddVehicle() {
     overlay.innerHTML = `
         <div class="modal-box">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-amber-700">➕ إضافة سيارة جديدة</h3>
-                <button onclick="document.getElementById('addVehicleModal').remove()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                <h3 class="text-xl font-bold text-gold">➕ إضافة سيارة جديدة</h3>
+                <button onclick="document.getElementById('addVehicleModal').remove()" class="text-gold-light/40 hover:text-gold-light text-2xl">×</button>
             </div>
             <form onsubmit="handleAddVehicle(event)">
                 <div class="mb-3">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">كود الدخول (4 أرقام)</label>
-                    <input id="newCode" type="number" min="1000" max="9999" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
+                    <label class="block text-sm font-bold text-gold mb-1">كود الدخول (4 أرقام)</label>
+                    <input id="newCode" type="number" min="1000" max="9999" class="w-full px-3 py-2 border border-gold-border/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold bg-dark-input text-gold-light" required />
                 </div>
                 <div class="mb-3">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">اسم السائق</label>
-                    <input id="newName" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
+                    <label class="block text-sm font-bold text-gold mb-1">اسم السائق</label>
+                    <input id="newName" type="text" class="w-full px-3 py-2 border border-gold-border/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold bg-dark-input text-gold-light" required />
                 </div>
                 <div class="mb-3">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">رقم الهاتف</label>
-                    <input id="newPhone" type="tel" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    <label class="block text-sm font-bold text-gold mb-1">رقم الهاتف</label>
+                    <input id="newPhone" type="tel" class="w-full px-3 py-2 border border-gold-border/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold bg-dark-input text-gold-light" />
                 </div>
                 <button type="submit" class="w-full btn-primary py-2">إضافة</button>
             </form>
@@ -485,7 +523,7 @@ async function handleAddVehicle(e) {
 }
 
 // =============================================
-// 🗺️ الخريطة المباشرة (بشكل سيارة)
+// 🗺️ الخريطة المباشرة
 // =============================================
 function renderMap() {
     const container = document.getElementById('page-map');
@@ -493,8 +531,8 @@ function renderMap() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4">
-            <h2 class="text-2xl font-bold text-amber-700">🗺️ الخريطة المباشرة</h2>
-            <span id="mapVehiclesCount" class="text-sm text-gray-500">0 مركبة</span>
+            <h2 class="text-2xl font-bold text-gold">🗺️ الخريطة المباشرة</h2>
+            <span id="mapVehiclesCount" class="text-sm text-gold-light/50">0 مركبة</span>
         </div>
         <div id="map-container"></div>
     `;
@@ -507,7 +545,7 @@ function renderMap() {
     mapboxgl.accessToken = MAPBOX_TOKEN;
     mapInstance = new mapboxgl.Map({
         container: 'map-container',
-        style: 'mapbox://styles/mapbox/streets-v12',
+        style: 'mapbox://styles/mapbox/dark-v11',
         center: [31.2357, 30.0444],
         zoom: 10,
         attributionControl: false
@@ -528,7 +566,11 @@ function renderMap() {
         let count = 0;
         Object.keys(data).forEach(code => {
             const v = data[code];
-            if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
+            // تصفية حسب المستخدم الحالي
+            if (userRole !== 'admin') {
+                if (v.createdByUid && v.createdByUid !== currentUserId) return;
+                if (v.tenantId && v.tenantId !== userTenantId) return;
+            }
 
             const loc = v.liveLocation;
             if (!loc || !loc.latitude || !loc.longitude) return;
@@ -536,20 +578,19 @@ function renderMap() {
             count++;
             const status = v.status || 'offline';
             const statusClass = status === 'online' ? 'online' : status === 'moving' ? 'moving' : 'offline';
-            const carColor = status === 'moving' ? '#d97706' : status === 'online' ? '#22c55e' : '#ef4444';
+            const carColor = status === 'moving' ? '#d4a017' : status === 'online' ? '#22c55e' : '#ef4444';
 
-            // إنشاء عنصر HTML على شكل سيارة
             const el = document.createElement('div');
             el.className = `map-marker ${statusClass}`;
             el.innerHTML = `
                 <svg viewBox="0 0 32 32" width="32" height="32">
                     <path class="car-body" d="M4 10 L6 6 L26 6 L28 10 L28 20 L26 22 L24 22 L24 20 L8 20 L8 22 L6 22 L4 20 Z" 
                           fill="${carColor}" 
-                          stroke="#333" stroke-width="1"/>
-                    <circle cx="10" cy="22" r="3" fill="#333" stroke="#fff" stroke-width="1"/>
-                    <circle cx="22" cy="22" r="3" fill="#333" stroke="#fff" stroke-width="1"/>
-                    <rect x="12" y="8" width="8" height="6" fill="#333" rx="1"/>
-                    ${status === 'moving' ? `<circle cx="16" cy="14" r="2" fill="#d97706" opacity="0.8"/>` : ''}
+                          stroke="#1a1a2e" stroke-width="1.5"/>
+                    <circle cx="10" cy="22" r="3" fill="#1a1a2e" stroke="#f5c842" stroke-width="1"/>
+                    <circle cx="22" cy="22" r="3" fill="#1a1a2e" stroke="#f5c842" stroke-width="1"/>
+                    <rect x="12" y="8" width="8" height="6" fill="#1a1a2e" rx="1" stroke="#f5c842" stroke-width="0.5"/>
+                    ${status === 'moving' ? `<circle cx="16" cy="14" r="2" fill="#d4a017" opacity="0.8"/>` : ''}
                 </svg>
             `;
 
@@ -588,25 +629,23 @@ function renderTracking() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-amber-700">📈 سجل حركة السائقين</h2>
-            <span class="text-sm text-gray-500">${new Date().toLocaleDateString('ar')}</span>
+            <h2 class="text-2xl font-bold text-gold">📈 سجل حركة السائقين</h2>
+            <span class="text-sm text-gold-light/50">${new Date().toLocaleDateString('ar')}</span>
         </div>
         <div class="flex gap-2 mb-4 flex-wrap">
             <button onclick="loadTracking('today')" class="tab-btn active" data-tab="today">📅 اليوم</button>
             <button onclick="loadTracking('week')" class="tab-btn" data-tab="week">📆 هذا الأسبوع</button>
             <button onclick="loadTracking('month')" class="tab-btn" data-tab="month">📆 هذا الشهر</button>
         </div>
-        <div id="trackingContainer" class="bg-white rounded-xl shadow-sm p-4">
+        <div id="trackingContainer" class="bg-dark-card rounded-xl shadow-sm p-4 border border-gold-border/20">
             <div id="trackingList" class="space-y-3"></div>
         </div>
     `;
 
-    // تحميل بيانات اليوم افتراضياً
     loadTracking('today');
 }
 
 function loadTracking(period) {
-    // تحديث التبويبات
     document.querySelectorAll('.tab-btn').forEach(btn => {
         btn.classList.remove('active');
         if (btn.dataset.tab === period) btn.classList.add('active');
@@ -615,7 +654,6 @@ function loadTracking(period) {
     const container = document.getElementById('trackingList');
     if (!container) return;
 
-    // حساب الفترة الزمنية
     const now = Date.now();
     let startTime = 0;
     let periodLabel = '';
@@ -637,14 +675,13 @@ function loadTracking(period) {
             periodLabel = 'اليوم';
     }
 
-    container.innerHTML = '<div class="text-center text-gray-400 py-8"><div class="loading-spinner mx-auto"></div><p class="mt-2">جاري التحميل...</p></div>';
+    container.innerHTML = '<div class="text-center text-gold-light/40 py-8"><div class="loading-spinner mx-auto"></div><p class="mt-2">جاري التحميل...</p></div>';
 
-    // جلب بيانات السائقين
     const ref = dbRT.ref('vehicleDrivers');
     ref.once('value', (snap) => {
         const data = snap.val();
         if (!data) {
-            container.innerHTML = '<div class="text-center text-gray-400 py-8">لا توجد بيانات</div>';
+            container.innerHTML = '<div class="text-center text-gold-light/40 py-8">لا توجد بيانات</div>';
             return;
         }
 
@@ -655,41 +692,42 @@ function loadTracking(period) {
 
         Object.keys(data).forEach(code => {
             const v = data[code];
-            if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
+            // تصفية حسب المستخدم الحالي
+            if (userRole !== 'admin') {
+                if (v.createdByUid && v.createdByUid !== currentUserId) return;
+                if (v.tenantId && v.tenantId !== userTenantId) return;
+            }
 
             totalDrivers++;
             const loc = v.liveLocation || {};
             const lastUpdate = loc.timestamp || v.lastLogin || 0;
 
-            // التحقق من أن آخر تحديث في الفترة المحددة
             const isActive = lastUpdate >= startTime;
             if (isActive) activeDrivers++;
 
-            // نعرض فقط السائقين النشطين في الفترة
             if (!isActive) return;
 
             hasData = true;
             const status = v.status || 'offline';
             const statusText = status === 'moving' ? '🟢 متحرك' : status === 'online' ? '📶 متصل' : '🔴 غير متصل';
-            const statusColor = status === 'moving' ? 'text-green-600' : status === 'online' ? 'text-blue-600' : 'text-gray-400';
+            const statusColor = status === 'moving' ? 'text-green-400' : status === 'online' ? 'text-blue-400' : 'text-gray-500';
 
-            // حساب عدد النقاط المسجلة (تقديري)
             const pointsCount = Math.floor((lastUpdate - startTime) / 5000) + 1;
 
             html += `
-                <div class="border-b border-gray-100 pb-3 mb-3 hover:bg-amber-50 p-2 rounded transition">
-                    <div class="flex justify-between items-center">
+                <div class="border-b border-gold-border/10 pb-3 mb-3 hover:bg-gold/5 p-2 rounded transition">
+                    <div class="flex justify-between items-center flex-wrap gap-2">
                         <div>
-                            <h4 class="font-bold text-gray-800">${v.displayName || code}</h4>
-                            <p class="text-sm text-gray-500">كود: <span class="font-mono">${code}</span></p>
-                            <p class="text-xs text-amber-600">👤 أضيف بواسطة: ${v.createdBy || 'النظام'}</p>
-                            <p class="text-xs text-gray-400">📊 عدد النقاط: ${pointsCount}</p>
+                            <h4 class="font-bold text-gold-light">${v.displayName || code}</h4>
+                            <p class="text-sm text-gold-light/50">كود: <span class="font-mono">${code}</span></p>
+                            <p class="text-xs text-gold/70">👤 أضيف بواسطة: ${v.createdBy || 'النظام'}</p>
+                            <p class="text-xs text-gold-light/40">📊 عدد النقاط: ${pointsCount}</p>
                         </div>
                         <div class="text-left">
                             <span class="text-sm font-medium ${statusColor}">${statusText}</span>
-                            <p class="text-xs text-gray-400">آخر تحديث: ${lastUpdate ? new Date(lastUpdate).toLocaleString('ar') : '-'}</p>
-                            ${loc.speed ? `<p class="text-xs text-amber-600">🚀 ${loc.speed.toFixed(1)} كم/س</p>` : ''}
-                            ${loc.latitude ? `<p class="text-xs text-gray-400">📍 ${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}</p>` : ''}
+                            <p class="text-xs text-gold-light/40">آخر تحديث: ${lastUpdate ? new Date(lastUpdate).toLocaleString('ar') : '-'}</p>
+                            ${loc.speed ? `<p class="text-xs text-gold">🚀 ${loc.speed.toFixed(1)} كم/س</p>` : ''}
+                            ${loc.latitude ? `<p class="text-xs text-gold-light/40">📍 ${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}</p>` : ''}
                         </div>
                     </div>
                     <div class="mt-2 flex gap-2 flex-wrap">
@@ -700,22 +738,20 @@ function loadTracking(period) {
             `;
         });
 
-        // إضافة ملخص
         const summary = `
-            <div class="bg-amber-50 rounded-lg p-3 mb-4 flex justify-between items-center flex-wrap">
-                <span class="text-sm text-gray-600">📊 <strong>${periodLabel}</strong></span>
-                <span class="text-sm text-gray-600">🚗 إجمالي السائقين: <strong>${totalDrivers}</strong></span>
-                <span class="text-sm text-green-600">🟢 النشطاء: <strong>${activeDrivers}</strong></span>
-                <span class="text-sm text-amber-600">📈 نسبة النشاط: <strong>${totalDrivers > 0 ? Math.round((activeDrivers/totalDrivers)*100) : 0}%</strong></span>
+            <div class="bg-gold/10 rounded-lg p-3 mb-4 flex justify-between items-center flex-wrap border border-gold-border/20">
+                <span class="text-sm text-gold-light/70">📊 <strong>${periodLabel}</strong></span>
+                <span class="text-sm text-gold-light/70">🚗 إجمالي السائقين: <strong>${totalDrivers}</strong></span>
+                <span class="text-sm text-green-400">🟢 النشطاء: <strong>${activeDrivers}</strong></span>
+                <span class="text-sm text-gold">📈 نسبة النشاط: <strong>${totalDrivers > 0 ? Math.round((activeDrivers/totalDrivers)*100) : 0}%</strong></span>
             </div>
         `;
 
-        container.innerHTML = hasData ? summary + html : '<div class="text-center text-gray-400 py-8">لا توجد حركة في ' + periodLabel + '</div>';
+        container.innerHTML = hasData ? summary + html : '<div class="text-center text-gold-light/40 py-8">لا توجد حركة في ' + periodLabel + '</div>';
     });
 }
 
 function showDriverTracking(code) {
-    // فتح صفحة الخريطة والتركيز على السائق
     showPage('map');
     setTimeout(() => {
         if (mapInstance && mapMarkers[code]) {
@@ -724,15 +760,13 @@ function showDriverTracking(code) {
             mapInstance.flyTo({ center: [lngLat.lng, lngLat.lat], zoom: 15 });
             marker.togglePopup();
         } else {
-            // إذا لم يكن على الخريطة، نفتح صفحة سجل الحركة
             showPage('tracking');
-            // نبحث عن السائق في القائمة ونبرزه
             setTimeout(() => {
                 const items = document.querySelectorAll('#trackingList .border-b');
                 items.forEach(item => {
                     if (item.textContent.includes(code)) {
-                        item.style.backgroundColor = '#fef3c7';
-                        item.style.borderRight = '4px solid #d97706';
+                        item.style.backgroundColor = 'rgba(212, 160, 23, 0.1)';
+                        item.style.borderRight = '4px solid #d4a017';
                         setTimeout(() => {
                             item.scrollIntoView({ behavior: 'smooth', block: 'center' });
                         }, 300);
@@ -752,7 +786,7 @@ async function renderCompanies() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-amber-700">🏢 الشركات</h2>
+            <h2 class="text-2xl font-bold text-gold">🏢 الشركات</h2>
             <button onclick="showAddCompany()" class="btn-primary">➕ إضافة شركة</button>
         </div>
         <div class="table-container">
@@ -769,7 +803,7 @@ async function renderCompanies() {
                     </tr>
                 </thead>
                 <tbody id="companiesTableBody">
-                    <tr><td colspan="7" class="text-center text-gray-400">جاري التحميل...</td></tr>
+                    <tr><td colspan="7" class="text-center text-gold-light/40">جاري التحميل...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -780,7 +814,7 @@ async function renderCompanies() {
         if (!tbody) return;
 
         if (snap.empty) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400">لا توجد شركات</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gold-light/40">لا توجد شركات</td></tr>';
             return;
         }
 
@@ -789,12 +823,12 @@ async function renderCompanies() {
             const data = doc.data();
             html += `
                 <tr>
-                    <td class="font-medium">${data.name || 'غير مسمى'}</td>
-                    <td>${data.ownerName || '-'}</td>
-                    <td>${data.phone || '-'}</td>
-                    <td>${data.vehiclesCount || 0}</td>
-                    <td><span class="px-2 py-1 rounded-full text-xs ${data.subscriptionStatus === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">${data.subscriptionStatus === 'active' ? 'نشط' : 'منتهي'}</span></td>
-                    <td><span class="px-2 py-1 rounded-full text-xs ${data.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-700'}">${data.status === 'active' ? 'نشطة' : 'موقفة'}</span></td>
+                    <td class="font-medium text-gold-light">${data.name || 'غير مسمى'}</td>
+                    <td class="text-gold-light/70">${data.ownerName || '-'}</td>
+                    <td class="text-gold-light/70">${data.phone || '-'}</td>
+                    <td class="text-gold-light/70">${data.vehiclesCount || 0}</td>
+                    <td><span class="px-2 py-1 rounded-full text-xs ${data.subscriptionStatus === 'active' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}">${data.subscriptionStatus === 'active' ? 'نشط' : 'منتهي'}</span></td>
+                    <td><span class="px-2 py-1 rounded-full text-xs ${data.status === 'active' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30'}">${data.status === 'active' ? 'نشطة' : 'موقفة'}</span></td>
                     <td>
                         <button onclick="toggleCompany('${doc.id}')" class="btn-success text-xs">${data.status === 'active' ? 'تعطيل' : 'تفعيل'}</button>
                         <button onclick="deleteCompany('${doc.id}')" class="btn-danger text-xs">حذف</button>
@@ -813,29 +847,29 @@ function showAddCompany() {
     overlay.innerHTML = `
         <div class="modal-box">
             <div class="flex justify-between items-center mb-4">
-                <h3 class="text-xl font-bold text-amber-700">🏢 إضافة شركة جديدة</h3>
-                <button onclick="document.getElementById('addCompanyModal').remove()" class="text-gray-400 hover:text-gray-600 text-2xl">×</button>
+                <h3 class="text-xl font-bold text-gold">🏢 إضافة شركة جديدة</h3>
+                <button onclick="document.getElementById('addCompanyModal').remove()" class="text-gold-light/40 hover:text-gold-light text-2xl">×</button>
             </div>
             <form onsubmit="handleAddCompany(event)">
                 <div class="mb-3">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">اسم الشركة *</label>
-                    <input id="compName" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
+                    <label class="block text-sm font-bold text-gold mb-1">اسم الشركة *</label>
+                    <input id="compName" type="text" class="w-full px-3 py-2 border border-gold-border/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold bg-dark-input text-gold-light" required />
                 </div>
                 <div class="mb-3">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">المسؤول *</label>
-                    <input id="compOwner" type="text" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
+                    <label class="block text-sm font-bold text-gold mb-1">المسؤول *</label>
+                    <input id="compOwner" type="text" class="w-full px-3 py-2 border border-gold-border/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold bg-dark-input text-gold-light" required />
                 </div>
                 <div class="mb-3">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">البريد الإلكتروني *</label>
-                    <input id="compEmail" type="email" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
+                    <label class="block text-sm font-bold text-gold mb-1">البريد الإلكتروني *</label>
+                    <input id="compEmail" type="email" class="w-full px-3 py-2 border border-gold-border/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold bg-dark-input text-gold-light" required />
                 </div>
                 <div class="mb-3">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">كلمة المرور *</label>
-                    <input id="compPassword" type="password" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" required />
+                    <label class="block text-sm font-bold text-gold mb-1">كلمة المرور *</label>
+                    <input id="compPassword" type="password" class="w-full px-3 py-2 border border-gold-border/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold bg-dark-input text-gold-light" required />
                 </div>
                 <div class="mb-3">
-                    <label class="block text-sm font-bold text-gray-700 mb-1">الهاتف</label>
-                    <input id="compPhone" type="tel" class="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500" />
+                    <label class="block text-sm font-bold text-gold mb-1">الهاتف</label>
+                    <input id="compPhone" type="tel" class="w-full px-3 py-2 border border-gold-border/20 rounded-lg focus:outline-none focus:ring-2 focus:ring-gold bg-dark-input text-gold-light" />
                 </div>
                 <button type="submit" class="w-full btn-primary py-2">إضافة الشركة</button>
             </form>
@@ -924,7 +958,7 @@ function renderAdminVehicles() {
     if (!container || userRole !== 'admin') return;
 
     container.innerHTML = `
-        <h2 class="text-2xl font-bold text-amber-700 mb-6">🌍 جميع السيارات</h2>
+        <h2 class="text-2xl font-bold text-gold mb-6">🌍 جميع السيارات</h2>
         <div class="table-container">
             <table>
                 <thead>
@@ -941,7 +975,7 @@ function renderAdminVehicles() {
                     </tr>
                 </thead>
                 <tbody id="adminVehiclesBody">
-                    <tr><td colspan="9" class="text-center text-gray-400">جاري التحميل...</td></tr>
+                    <tr><td colspan="9" class="text-center text-gold-light/40">جاري التحميل...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -953,7 +987,7 @@ function renderAdminVehicles() {
         if (!tbody) return;
 
         if (!data) {
-            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-gray-400">لا توجد سيارات</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="9" class="text-center text-gold-light/40">لا توجد سيارات</td></tr>';
             return;
         }
 
@@ -963,19 +997,19 @@ function renderAdminVehicles() {
             const loc = v.liveLocation || {};
             const status = v.status || 'offline';
             const statusText = status === 'moving' ? '🟢 متحرك' : status === 'online' ? '📶 متصل' : '🔴 غير متصل';
-            const statusClass = status === 'moving' ? 'bg-green-100 text-green-700' : status === 'online' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500';
+            const statusClass = status === 'moving' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : status === 'online' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' : 'bg-gray-500/20 text-gray-400 border border-gray-500/30';
 
             html += `
-                <tr class="cursor-pointer hover:bg-amber-50" onclick="focusOnVehicle('${code}')">
-                    <td class="font-mono font-bold">${code}</td>
-                    <td>${v.displayName || '-'}</td>
-                    <td class="text-xs">${v.tenantId || '-'}</td>
-                    <td>${v.phone || '-'}</td>
-                    <td class="text-xs text-amber-600">${v.createdBy || 'النظام'}</td>
+                <tr class="cursor-pointer hover:bg-gold/5 transition" onclick="focusOnVehicle('${code}')">
+                    <td class="font-mono font-bold text-gold-light">${code}</td>
+                    <td class="text-gold-light/80">${v.displayName || '-'}</td>
+                    <td class="text-xs text-gold-light/50">${v.tenantId || '-'}</td>
+                    <td class="text-gold-light/70">${v.phone || '-'}</td>
+                    <td class="text-xs text-gold/70">${v.createdBy || 'النظام'}</td>
                     <td><span class="px-2 py-1 rounded-full text-xs ${statusClass}">${statusText}</span></td>
-                    <td>${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</td>
-                    <td>${v.deviceHealth?.battery || '?'}%</td>
-                    <td class="text-xs">${loc.timestamp ? new Date(loc.timestamp).toLocaleString('ar') : '-'}</td>
+                    <td class="text-gold-light/70">${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</td>
+                    <td class="text-gold-light/70">${v.deviceHealth?.battery || '?'}%</td>
+                    <td class="text-xs text-gold-light/40">${loc.timestamp ? new Date(loc.timestamp).toLocaleString('ar') : '-'}</td>
                 </tr>
             `;
         });
@@ -991,7 +1025,7 @@ function renderSubscriptions() {
     if (!container || userRole !== 'admin') return;
 
     container.innerHTML = `
-        <h2 class="text-2xl font-bold text-amber-700 mb-6">📋 إدارة الاشتراكات</h2>
+        <h2 class="text-2xl font-bold text-gold mb-6">📋 إدارة الاشتراكات</h2>
         <div class="table-container">
             <table>
                 <thead>
@@ -1006,7 +1040,7 @@ function renderSubscriptions() {
                     </tr>
                 </thead>
                 <tbody id="subscriptionsBody">
-                    <tr><td colspan="7" class="text-center text-gray-400">جاري التحميل...</td></tr>
+                    <tr><td colspan="7" class="text-center text-gold-light/40">جاري التحميل...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -1017,7 +1051,7 @@ function renderSubscriptions() {
         if (!tbody) return;
 
         if (snap.empty) {
-            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gray-400">لا توجد اشتراكات</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="7" class="text-center text-gold-light/40">لا توجد اشتراكات</td></tr>';
             return;
         }
 
@@ -1032,16 +1066,16 @@ function renderSubscriptions() {
 
             const status = data.status || 'expired';
             const statusText = status === 'active' ? 'نشط' : status === 'trial' ? 'تجريبي' : 'منتهي';
-            const statusClass = status === 'active' ? 'bg-green-100 text-green-700' : status === 'trial' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700';
+            const statusClass = status === 'active' ? 'bg-green-500/20 text-green-400 border border-green-500/30' : status === 'trial' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30';
 
             html += `
                 <tr>
-                    <td class="font-medium">${tenantName}</td>
-                    <td>${data.planName || 'قياسي'}</td>
-                    <td class="text-sm">${data.startDate ? new Date(data.startDate).toLocaleDateString('ar') : '-'}</td>
-                    <td class="text-sm">${data.endDate ? new Date(data.endDate).toLocaleDateString('ar') : '-'}</td>
+                    <td class="font-medium text-gold-light">${tenantName}</td>
+                    <td class="text-gold-light/70">${data.planName || 'قياسي'}</td>
+                    <td class="text-sm text-gold-light/50">${data.startDate ? new Date(data.startDate).toLocaleDateString('ar') : '-'}</td>
+                    <td class="text-sm text-gold-light/50">${data.endDate ? new Date(data.endDate).toLocaleDateString('ar') : '-'}</td>
                     <td><span class="px-2 py-1 rounded-full text-xs ${statusClass}">${statusText}</span></td>
-                    <td>${data.amount || 0} ج.م</td>
+                    <td class="text-gold-light/70">${data.amount || 0} ج.م</td>
                     <td>
                         <button onclick="extendSubscription('${doc.id}')" class="btn-success text-xs">تمديد</button>
                         <button onclick="suspendSubscription('${doc.id}')" class="btn-danger text-xs">تعليق</button>
@@ -1110,16 +1144,14 @@ auth.onAuthStateChanged(async (user) => {
             userTenantId = 'default';
         }
 
+        updateOnlineStatus();
         showDashboard();
     } else {
-        // محاولة إنشاء حساب الأدمن تلقائياً ثم تسجيل الدخول
         const success = await ensureAdminAccount();
         if (!success) {
-            // إذا فشل، نعرض شاشة تسجيل الدخول مع زر سريع
             document.getElementById('loginScreen').classList.remove('hidden');
             document.getElementById('dashboardScreen').classList.add('hidden');
         }
-        // إذا نجح، سيعيد تشغيل onAuthStateChanged مع المستخدم
     }
 });
 
