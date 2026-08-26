@@ -38,6 +38,9 @@ let isInitialized = false;
 let historyMapInstance = null;
 let historyPolyline = null;
 
+// متغيرات الدفع
+let selectedPaymentMethod = null;
+
 // =============================================
 // 🔐 إنشاء حساب أدمن تلقائي (للحالات الطارئة)
 // =============================================
@@ -63,6 +66,8 @@ async function ensureAdminAccount() {
                     email: adminEmail,
                     name: adminName,
                     phone: '0100000000',
+                    username: 'admin',
+                    password: adminPassword,
                     role: 'admin',
                     status: 'active',
                     createdAt: Date.now()
@@ -76,8 +81,16 @@ async function ensureAdminAccount() {
                         ownerName: adminName,
                         email: adminEmail,
                         phone: '0100000000',
+                        username: 'admin',
+                        password: adminPassword,
                         status: 'active',
                         subscriptionStatus: 'active',
+                        subscriptionPeriod: 'year',
+                        trialEndDate: 0,
+                        subscriptionEndDate: Date.now() + (365 * 24 * 60 * 60 * 1000),
+                        paymentMethod: null,
+                        paymentStatus: 'paid',
+                        lastPaymentDate: Date.now(),
                         vehiclesCount: 0,
                         createdAt: Date.now()
                     });
@@ -100,7 +113,7 @@ async function ensureAdminAccount() {
 }
 
 // =============================================
-// 🔐 إنشاء حساب تجريبي
+// 🔐 إنشاء حساب تجريبي (بدون فترة تجريبية إضافية)
 // =============================================
 async function createDemoAccount() {
     const demoEmail = `demo_${Date.now()}@gmail.com`;
@@ -114,15 +127,24 @@ async function createDemoAccount() {
         await userCred.user.updateProfile({ displayName: demoName });
 
         const tenantId = `demo_${Date.now()}`;
+        const now = Date.now();
         await dbFS.collection('tenants').doc(tenantId).set({
             name: 'شركة تجريبية',
             ownerName: demoName,
             email: demoEmail,
             phone: '0100000000',
+            username: demoEmail,
+            password: demoPassword,
             status: 'active',
             subscriptionStatus: 'active',
+            subscriptionPeriod: 'month',
+            trialEndDate: 0,
+            subscriptionEndDate: now + (30 * 24 * 60 * 60 * 1000),
+            paymentMethod: null,
+            paymentStatus: 'paid',
+            lastPaymentDate: now,
             vehiclesCount: 0,
-            createdAt: Date.now()
+            createdAt: now
         });
 
         await dbFS.collection('users').doc(uid).set({
@@ -130,9 +152,11 @@ async function createDemoAccount() {
             email: demoEmail,
             name: demoName,
             phone: '0100000000',
+            username: demoEmail,
+            password: demoPassword,
             role: 'customer',
             status: 'active',
-            createdAt: Date.now()
+            createdAt: now
         });
 
         alert(`✅ تم إنشاء الحساب التجريبي بنجاح!\nالبريد: ${demoEmail}\nكلمة المرور: ${demoPassword}`);
@@ -158,19 +182,19 @@ function showGlobalError(message) {
 }
 
 // =============================================
-// 🔐 المصادقة - تسجيل الدخول
+// 🔐 المصادقة - تسجيل الدخول (مع التحقق من الاشتراك)
 // =============================================
 async function handleLogin(e) {
     e.preventDefault();
     const loginType = document.getElementById('loginType')?.value || 'firebase';
-    const emailInput = document.getElementById('loginEmail').value.trim();
+    const loginInput = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value.trim();
     const errorEl = document.getElementById('loginError');
 
-    if(errorEl) errorEl.classList.add('hidden');
+    if (errorEl) errorEl.classList.add('hidden');
 
-    if (!emailInput || !password) {
-        if(errorEl) {
+    if (!loginInput || !password) {
+        if (errorEl) {
             errorEl.textContent = 'الرجاء إدخال البيانات المطلوب إكمالها';
             errorEl.classList.remove('hidden');
         }
@@ -178,12 +202,12 @@ async function handleLogin(e) {
     }
 
     if (loginType === 'custom') {
-        // تسجيل دخول العمال والشركات بـ Firestore (اسم المستخدم والباسورد)
-        await handleCustomDatabaseLogin(emailInput, password);
+        // تسجيل دخول مخصص (اسم المستخدم والباسورد) مع التحقق من الاشتراك
+        await handleCustomDatabaseLogin(loginInput, password);
     } else {
         // تسجيل الدخول العادي عبر Firebase Auth
         try {
-            const cred = await auth.signInWithEmailAndPassword(emailInput, password);
+            const cred = await auth.signInWithEmailAndPassword(loginInput, password);
             currentUser = cred.user;
             currentUserId = cred.user.uid;
             
@@ -204,14 +228,197 @@ async function handleLogin(e) {
                     createdAt: Date.now()
                 });
             }
+
+            // التحقق من حالة الاشتراك قبل الدخول (باستثناء الأدمن)
+            if (userRole !== 'admin' && userTenantId) {
+                const check = await checkSubscriptionStatus(userTenantId);
+                if (!check.valid) {
+                    showSubscriptionExpiredScreen(check.tenantData);
+                    return;
+                }
+            }
+
             showDashboard();
         } catch (err) {
-            if(errorEl) {
+            if (errorEl) {
                 errorEl.textContent = err.message || 'فشل تسجيل الدخول';
                 errorEl.classList.remove('hidden');
             }
         }
     }
+}
+
+// =============================================
+// 🔍 التحقق من حالة الاشتراك
+// =============================================
+async function checkSubscriptionStatus(tenantId) {
+    try {
+        const tenantDoc = await dbFS.collection('tenants').doc(tenantId).get();
+        if (!tenantDoc.exists) {
+            return { valid: false, reason: 'tenant_not_found' };
+        }
+
+        const tenantData = tenantDoc.data();
+        const now = Date.now();
+
+        // التحقق من الفترة التجريبية
+        if (tenantData.subscriptionStatus === 'trial') {
+            if (now > tenantData.trialEndDate) {
+                return { valid: false, reason: 'trial_expired', tenantData };
+            }
+            return {
+                valid: true,
+                reason: 'trial_active',
+                tenantData,
+                daysRemaining: Math.ceil((tenantData.trialEndDate - now) / (24 * 60 * 60 * 1000))
+            };
+        }
+
+        // التحقق من الاشتراك الفعلي
+        if (tenantData.subscriptionStatus === 'active') {
+            if (now > tenantData.subscriptionEndDate) {
+                return { valid: false, reason: 'subscription_expired', tenantData };
+            }
+            return {
+                valid: true,
+                reason: 'subscription_active',
+                tenantData,
+                daysRemaining: Math.ceil((tenantData.subscriptionEndDate - now) / (24 * 60 * 60 * 1000))
+            };
+        }
+
+        // أي حالة أخرى (مثل suspended)
+        return { valid: false, reason: 'subscription_inactive', tenantData };
+
+    } catch (error) {
+        console.error('❌ خطأ في التحقق من الاشتراك:', error);
+        return { valid: false, reason: 'error' };
+    }
+}
+
+// =============================================
+// 💳 عرض شاشة انتهاء الاشتراك
+// =============================================
+function showSubscriptionExpiredScreen(tenantData) {
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('dashboardScreen').classList.add('hidden');
+    document.getElementById('subscriptionExpiredScreen').classList.remove('hidden');
+
+    document.getElementById('subscriptionCompanyName').textContent = tenantData?.name || '';
+    document.getElementById('subscriptionStatus').textContent =
+        tenantData?.subscriptionStatus === 'trial' ? 'انتهت الفترة التجريبية' : 'انتهى الاشتراك';
+
+    const paymentMethodsHTML = `
+        <div class="grid grid-cols-2 gap-4 mt-4">
+            <button onclick="selectPaymentMethod('vodafone_cash')" class="bg-red-600 hover:bg-red-700 text-white p-4 rounded-xl">
+                📱 فودافون كاش
+            </button>
+            <button onclick="selectPaymentMethod('instapay')" class="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-xl">
+                🏦 انستا باي
+            </button>
+        </div>
+        <div id="paymentDetails" class="mt-4 hidden">
+            <h4 class="font-bold text-yellow-500 mb-2">بيانات الدفع:</h4>
+            <div id="paymentAccountDetails" class="bg-gray-900 p-3 rounded"></div>
+            <input type="text" id="transactionNumber" placeholder="رقم التحويل" class="w-full mt-3 p-2 rounded bg-gray-700 text-white">
+            <button onclick="submitPaymentRequest()" class="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded">
+                ✅ تأكيد الدفع
+            </button>
+        </div>
+    `;
+
+    document.getElementById('paymentMethodsContainer').innerHTML = paymentMethodsHTML;
+}
+
+// =============================================
+// 💳 اختيار طريقة الدفع
+// =============================================
+function selectPaymentMethod(method) {
+    selectedPaymentMethod = method;
+    const paymentDetails = document.getElementById('paymentDetails');
+    const paymentAccountDetails = document.getElementById('paymentAccountDetails');
+
+    paymentDetails.classList.remove('hidden');
+
+    if (method === 'vodafone_cash') {
+        paymentAccountDetails.innerHTML = `
+            <p>رقم فودافون كاش: <strong>01000000000</strong></p>
+            <p class="text-sm text-gray-400">يرجى التحويل ثم إدخال رقم التحويل</p>
+        `;
+    } else if (method === 'instapay') {
+        paymentAccountDetails.innerHTML = `
+            <p>حساب انستا باي: <strong>tracking@instapay.com</strong></p>
+            <p class="text-sm text-gray-400">يرجى التحويل ثم إدخال رقم التحويل</p>
+        `;
+    }
+}
+
+// =============================================
+// 💳 إرسال طلب الدفع للأدمن
+// =============================================
+async function submitPaymentRequest() {
+    const transactionNumber = document.getElementById('transactionNumber').value.trim();
+
+    if (!transactionNumber) {
+        alert('الرجاء إدخال رقم التحويل');
+        return;
+    }
+
+    if (!selectedPaymentMethod) {
+        alert('الرجاء اختيار طريقة الدفع أولاً');
+        return;
+    }
+
+    if (!userTenantId) {
+        alert('لا يمكن تحديد الاشتراك الحالي');
+        return;
+    }
+
+    try {
+        // تحديث حالة الدفع في قاعدة البيانات
+        await dbFS.collection('tenants').doc(userTenantId).update({
+            paymentMethod: selectedPaymentMethod,
+            paymentStatus: 'pending',
+            lastTransactionNumber: transactionNumber,
+            lastPaymentRequestDate: Date.now()
+        });
+
+        // إرسال إشعار للأدمن
+        await dbFS.collection('adminNotifications').add({
+            type: 'payment_request',
+            tenantId: userTenantId,
+            tenantName: document.getElementById('subscriptionCompanyName').textContent,
+            amount: getSubscriptionAmount(),
+            paymentMethod: selectedPaymentMethod,
+            transactionNumber: transactionNumber,
+            status: 'pending',
+            createdAt: Date.now()
+        });
+
+        alert('✅ تم إرسال طلب الدفع بنجاح!\nسيتم تفعيل اشتراكك بعد تأكيد الإدارة.');
+        // إخفاء شاشة الدفع والعودة لتسجيل الدخول
+        document.getElementById('subscriptionExpiredScreen').classList.add('hidden');
+        document.getElementById('loginScreen').classList.remove('hidden');
+
+    } catch (error) {
+        console.error('❌ فشل إرسال طلب الدفع:', error);
+        alert('فشل إرسال طلب الدفع: ' + error.message);
+    }
+}
+
+// =============================================
+// 💰 حساب قيمة الاشتراك
+// =============================================
+function getSubscriptionAmount() {
+    // يمكن تعديل الأسعار حسب الحاجة
+    const prices = {
+        month: 500, // جنيه مصري
+        year: 5000  // جنيه مصري
+    };
+
+    // محاولة جلب فترة الاشتراك من قاعدة البيانات
+    // لكن للأمان نعيد شهر كمبدئي
+    return prices.month;
 }
 
 // =============================================
@@ -234,9 +441,10 @@ async function handleLogout() {
         userTenantId = null;
 
         document.getElementById('dashboardScreen').classList.add('hidden');
+        document.getElementById('subscriptionExpiredScreen').classList.add('hidden');
         document.getElementById('loginScreen').classList.remove('hidden');
-        if(document.getElementById('loginEmail')) document.getElementById('loginEmail').value = '';
-        if(document.getElementById('loginPassword')) document.getElementById('loginPassword').value = '';
+        if (document.getElementById('loginEmail')) document.getElementById('loginEmail').value = '';
+        if (document.getElementById('loginPassword')) document.getElementById('loginPassword').value = '';
     } catch (err) {
         alert('خطأ في الخروج: ' + err.message);
     }
@@ -246,10 +454,10 @@ async function handleLogout() {
 // 🔐 تسجيل الدخول السريع (أدمن)
 // =============================================
 async function quickLoginAdmin() {
-    if(document.getElementById('loginEmail')) document.getElementById('loginEmail').value = 'admin@system.com';
-    if(document.getElementById('loginPassword')) document.getElementById('loginPassword').value = '123456';
+    if (document.getElementById('loginEmail')) document.getElementById('loginEmail').value = 'admin@system.com';
+    if (document.getElementById('loginPassword')) document.getElementById('loginPassword').value = '123456';
     const errorEl = document.getElementById('loginError');
-    if(errorEl) errorEl.classList.add('hidden');
+    if (errorEl) errorEl.classList.add('hidden');
     
     try {
         await auth.signInWithEmailAndPassword('admin@system.com', '123456');
@@ -268,14 +476,15 @@ async function quickLoginAdmin() {
 // =============================================
 function showDashboard() {
     document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('subscriptionExpiredScreen').classList.add('hidden');
     document.getElementById('dashboardScreen').classList.remove('hidden');
 
     document.getElementById('userName').textContent = `مرحباً، ${currentUser?.displayName || 'المستخدم'}`;
     
     let roleText = 'عميل';
-    if(userRole === 'admin') roleText = 'مدير عام';
-    else if(userRole === 'company_admin') roleText = 'مدير شركة';
-    else if(userRole === 'worker') roleText = 'موظف/عامل';
+    if (userRole === 'admin') roleText = 'مدير عام';
+    else if (userRole === 'company_admin') roleText = 'مدير شركة';
+    else if (userRole === 'worker') roleText = 'موظف/عامل';
     
     document.getElementById('userRole').textContent = roleText;
 
@@ -805,7 +1014,7 @@ function renderSubscriptions() {
 // 1️⃣ حساب المسافة بالكيلومترات (معادلة Haversine)
 // =============================================
 function calculateDistance(lat1, lon1, lat2, lon2) {
-    const R = 6371; // نصف قطر الأرض بالكيلومتر
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
@@ -930,8 +1139,12 @@ async function handleCustomDatabaseLogin(username, password) {
         }
 
         const tenantData = tenantRef.data();
-        if (tenantData.subscriptionStatus !== 'active') {
-            throw new Error("اشتراك الشركة منتهي أو متوقف، يرجى التواصل مع الإدارة.");
+        
+        // التحقق من حالة الاشتراك قبل السماح بالدخول
+        const subscriptionCheck = await checkSubscriptionStatus(userData.tenantId);
+        if (!subscriptionCheck.valid) {
+            showSubscriptionExpiredScreen(subscriptionCheck.tenantData || tenantData);
+            return;
         }
 
         currentUser = { uid: userId, displayName: userData.name, email: userData.email || username };
@@ -949,7 +1162,7 @@ async function handleCustomDatabaseLogin(username, password) {
 }
 
 // =============================================
-// 4️⃣ إنشاء حساب جيميل وتسجيل شركة جديدة (الصفحة الرئيسية)
+// 4️⃣ إنشاء حساب جديد مع فترة تجريبية 15 يوم
 // =============================================
 async function handleIndexGmailSignup(email, password, companyName, ownerName, phone) {
     try {
@@ -958,16 +1171,27 @@ async function handleIndexGmailSignup(email, password, companyName, ownerName, p
 
         await userCred.user.updateProfile({ displayName: ownerName });
 
-        const newTenantId = `tenant_${Date.now()}`;
+        const now = Date.now();
+        const trialEndDate = now + (15 * 24 * 60 * 60 * 1000); // 15 يوم
+        const newTenantId = `tenant_${now}`;
+        
         await dbFS.collection('tenants').doc(newTenantId).set({
             name: companyName,
             ownerName: ownerName,
             email: email,
             phone: phone || '',
+            username: email, // استخدام البريد كاسم مستخدم افتراضي
+            password: password,
             status: 'active',
-            subscriptionStatus: 'active', 
+            subscriptionStatus: 'trial', // فترة تجريبية
+            subscriptionPeriod: 'month', // افتراضي شهر ويمكن تغييره لاحقاً
+            trialEndDate: trialEndDate,
+            subscriptionEndDate: trialEndDate, // يبدأ الاشتراك الفعلي بعد التجربة
+            paymentMethod: null,
+            paymentStatus: 'none',
+            lastPaymentDate: null,
             vehiclesCount: 0,
-            createdAt: Date.now()
+            createdAt: now
         });
 
         await dbFS.collection('users').doc(uid).set({
@@ -975,12 +1199,22 @@ async function handleIndexGmailSignup(email, password, companyName, ownerName, p
             email: email,
             name: ownerName,
             phone: phone || '',
+            username: email,
+            password: password,
             role: 'company_admin',
             status: 'active',
-            createdAt: Date.now()
+            createdAt: now
         });
 
-        alert('✅ تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول.');
+        alert('✅ تم إنشاء الحساب بنجاح!\nلديك فترة تجريبية لمدة 15 يوم.');
+        
+        // تسجيل الدخول تلقائياً
+        currentUser = userCred.user;
+        currentUserId = uid;
+        userRole = 'company_admin';
+        userTenantId = newTenantId;
+        
+        showDashboard();
         
     } catch (error) {
         console.error('❌ فشل إنشاء الحساب:', error.message);
@@ -1015,20 +1249,30 @@ auth.onAuthStateChanged(async (user) => {
                     createdAt: Date.now()
                 });
             }
+
+            // التحقق من الاشتراك (ما عدا الأدمن)
+            if (userRole !== 'admin' && userTenantId) {
+                const check = await checkSubscriptionStatus(userTenantId);
+                if (!check.valid) {
+                    showSubscriptionExpiredScreen(check.tenantData);
+                    return;
+                }
+            }
+
+            showDashboard();
         } catch (e) {
             console.error('❌ خطأ في جلب بيانات المستخدم:', e);
             userRole = 'customer';
             userTenantId = 'default';
+            showDashboard();
         }
-
-        showDashboard();
     } else {
         const success = await ensureAdminAccount();
         if (!success) {
             const loginScreen = document.getElementById('loginScreen');
             const dashboardScreen = document.getElementById('dashboardScreen');
-            if(loginScreen) loginScreen.classList.remove('hidden');
-            if(dashboardScreen) dashboardScreen.classList.add('hidden');
+            if (loginScreen) loginScreen.classList.remove('hidden');
+            if (dashboardScreen) dashboardScreen.classList.add('hidden');
         }
     }
 });
