@@ -4,125 +4,74 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نظام تتبع المركبات الذكي | المنصة</title>
+    
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Leaflet CSS -->
+    
+    <!-- Leaflet CSS للخريطة -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- FontAwesome -->
+    
+    <!-- FontAwesome للأيقونات -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- SweetAlert2 للتنبيهات الاحترافية -->
+    
+    <!-- SweetAlert2 للتنبيهات -->
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="style.css">
+
+    <!-- Custom CSS لتنسيق الواجهة -->
+    <style>
+        .page-content { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .nav-btn.active { background-color: #374151; border-right: 4px solid #fbbf24; color: #fbbf24; }
+        .vehicle-card { transition: all 0.2s; border: 1px solid #374151; background: #1f2937; }
+        .vehicle-card:hover { transform: translateY(-2px); border-color: #fbbf24; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .status-dot.online { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; }
+        .status-dot.moving { background-color: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
+        .status-dot.offline { background-color: #ef4444; }
+        .btn-primary { background-color: #fbbf24; color: #111827; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: bold; transition: all 0.2s; }
+        .btn-primary:hover { background-color: #f59e0b; }
+        .btn-outline { border: 1px solid #4b5563; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+        .btn-outline:hover { border-color: #fbbf24; color: #fbbf24; }
+        .btn-edit { background-color: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+        .btn-danger { background-color: #ef4444; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+    </style>
 </head>
-<body class="bg-gray-900 text-gray-200">
+<body class="bg-gray-900 text-gray-200 overflow-hidden h-screen flex flex-col">
 
-    <!-- شاشة التحميل الأولية -->
-    <div id="global-loader" class="fixed inset-0 bg-gray-900 z-50 flex flex-col items-center justify-center">
-        <div class="loading-spinner w-12 h-12 mb-4"></div>
-        <p class="text-yellow-400 font-bold">جاري الاتصال بقاعدة البيانات...</p>
-    </div>
+    <!-- رسائل الخطأ العامة -->
+    <div id="globalError" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all"></div>
 
-    <!-- ==================== واجهة الدخول والتسجيل ==================== -->
-    <div id="auth-view" class="hidden min-h-screen flex items-center justify-center p-4">
-        <div class="bg-gray-800 border border-yellow-500 rounded-2xl shadow-2xl w-full max-w-md p-8">
-            <div class="text-center mb-6">
-                <h1 class="text-2xl font-bold text-yellow-400"><i class="fas fa-satellite-dish mr-2"></i> تتبع مسار</h1>
-                <p class="text-gray-400 text-sm mt-1">المنصة الأذكى لإدارة أسطولك</p>
+    <!-- ==================== شاشة تسجيل الدخول ==================== -->
+    <div id="loginScreen" class="min-h-screen flex flex-col items-center justify-center p-4">
+        <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-md p-8">
+            <div class="text-center mb-8">
+                <h1 class="text-3xl font-bold text-yellow-400"><i class="fas fa-satellite-dish mr-2"></i> تتبع مسار</h1>
+                <p class="text-gray-400 text-sm mt-2">نظام إدارة الأسطول الذكي</p>
             </div>
             
-            <div class="flex border-b border-gray-700 mb-6">
-                <button id="tab-login" class="flex-1 py-3 text-center text-yellow-400 font-bold border-b-2 border-yellow-400" onclick="switchAuthTab('login')">تسجيل الدخول</button>
-                <button id="tab-register" class="flex-1 py-3 text-center text-gray-400 font-bold hover:text-yellow-400 transition" onclick="switchAuthTab('register')">حساب جديد</button>
-            </div>
+            <div id="loginError" class="hidden bg-red-900/50 border border-red-500 text-red-200 p-3 rounded-lg mb-4 text-sm text-center"></div>
 
-            <!-- نموذج تسجيل الدخول -->
-            <form id="login-form">
-                <div class="mb-4">
-                    <label class="block text-gray-400 mb-2">البريد الإلكتروني</label>
-                    <input type="email" id="login-email" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-yellow-400" required>
-                </div>
-                <div class="mb-6">
-                    <label class="block text-gray-400 mb-2">كلمة المرور</label>
-                    <input type="password" id="login-password" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-yellow-400" required>
-                </div>
-                <button type="submit" id="btn-login" class="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold rounded-lg px-4 py-3 transition mb-3">تسجيل الدخول</button>
-                
-                <div class="flex items-center my-4">
-                    <div class="flex-grow border-t border-gray-700"></div>
-                    <span class="px-3 text-gray-500 text-sm">أو</span>
-                    <div class="flex-grow border-t border-gray-700"></div>
-                </div>
-                
-                <button type="button" id="btn-google-login" class="w-full bg-white hover:bg-gray-100 text-gray-900 font-bold rounded-lg px-4 py-3 transition flex items-center justify-center gap-2">
-                    <img src="https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg" alt="Google" class="w-5 h-5">
-                    الدخول بحساب جوجل
-                </button>
-            </form>
-
-            <!-- نموذج إنشاء حساب جديد -->
-            <form id="register-form" class="hidden">
-                <div class="grid grid-cols-2 gap-4 mb-4">
-                    <div>
-                        <label class="block text-gray-400 mb-2 text-sm">الاسم بالكامل</label>
-                        <input type="text" id="reg-name" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:border-yellow-400" required>
-                    </div>
-                    <div>
-                        <label class="block text-gray-400 mb-2 text-sm">اسم الشركة</label>
-                        <input type="text" id="reg-company" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:border-yellow-400" required>
-                    </div>
-                </div>
-                <div class="mb-4">
+            <form onsubmit="handleLogin(event)" class="space-y-4">
+                <div>
                     <label class="block text-gray-400 mb-2 text-sm">البريد الإلكتروني</label>
-                    <input type="email" id="reg-email" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:border-yellow-400" required>
+                    <input type="email" id="loginEmail" class="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-yellow-400" placeholder="admin@system.com">
                 </div>
-                <div class="mb-4">
+                <div>
                     <label class="block text-gray-400 mb-2 text-sm">كلمة المرور</label>
-                    <input type="password" id="reg-password" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:border-yellow-400" required minlength="6">
+                    <input type="password" id="loginPassword" class="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-yellow-400" placeholder="••••••••">
                 </div>
-                <div class="mb-6">
-                    <label class="block text-gray-400 mb-2 text-sm">خطة الاشتراك (تُدفع بعد التجربة)</label>
-                    <select id="reg-plan" class="w-full bg-gray-900 border border-gray-700 text-white rounded-lg px-4 py-2 focus:outline-none focus:border-yellow-400">
-                        <option value="monthly">اشتراك شهري</option>
-                        <option value="yearly">اشتراك سنوي (خصم خاص)</option>
-                    </select>
-                </div>
-                
-                <div class="bg-blue-900/30 border border-blue-500 rounded-lg p-3 mb-6 text-sm text-blue-200">
-                    <i class="fas fa-gift text-yellow-400 ml-1"></i> ستحصل على <strong>15 يوم مجاناً</strong> لتجربة النظام، يبدأ الدفع بعد انتهاء الفترة.
-                </div>
-
-                <button type="submit" id="btn-register" class="w-full bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold rounded-lg px-4 py-3 transition">إنشاء الحساب وبدء التجربة</button>
+                <button type="submit" class="w-full btn-primary py-3 mt-4 text-lg">تسجيل الدخول</button>
             </form>
-        </div>
-    </div>
 
-    <!-- ==================== واجهة انتهاء الاشتراك ==================== -->
-    <div id="expired-view" class="hidden min-h-screen flex flex-col items-center justify-center p-4">
-        <div class="bg-gray-800 border border-red-500 rounded-2xl shadow-2xl w-full max-w-lg p-10 text-center">
-            <div class="text-red-500 text-6xl mb-4"><i class="fas fa-lock"></i></div>
-            <h2 class="text-2xl font-bold text-white mb-2">عفواً، انتهت صلاحية حسابك!</h2>
-            <p class="text-gray-400 mb-6">لقد انتهت فترة الاشتراك لشركة (<span id="expired-company" class="text-yellow-400 font-bold"></span>). يرجى تحديد طريقة الدفع لاستعادة الوصول للوحة التحكم.</p>
-            
-            <div class="bg-gray-900 rounded-lg p-4 mb-6 text-right border border-gray-700">
-                <p class="text-sm text-gray-400 mb-2">خطة الاشتراك الحالية: <span id="expired-plan" class="text-white font-bold"></span></p>
-                <div class="flex items-center gap-3">
-                    <input type="radio" name="payment" id="pay-visa" checked class="accent-yellow-400">
-                    <label for="pay-visa" class="text-white flex items-center gap-2"><i class="fab fa-cc-visa text-blue-500 text-xl"></i> بطاقة ائتمانية (فيزا / ماستركارد)</label>
-                </div>
-                <div class="flex items-center gap-3 mt-3">
-                    <input type="radio" name="payment" id="pay-paypal" class="accent-yellow-400">
-                    <label for="pay-paypal" class="text-white flex items-center gap-2"><i class="fab fa-paypal text-blue-400 text-xl"></i> باي بال (PayPal)</label>
-                </div>
+            <div class="mt-6 flex flex-col gap-3 border-t border-gray-700 pt-6">
+                <button onclick="quickLoginAdmin()" class="btn-outline w-full text-sm"><i class="fas fa-user-shield ml-2"></i>دخول سريع كمدير النظام</button>
+                <button onclick="createDemoAccount()" class="btn-outline w-full text-sm text-blue-400 hover:border-blue-400 hover:text-blue-400"><i class="fas fa-user-plus ml-2"></i>إنشاء حساب شركة تجريبي</button>
             </div>
-
-            <button id="btn-pay-now" class="bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-bold rounded-lg px-8 py-3 mb-4 transition w-full shadow-lg shadow-yellow-500/20">تأكيد الدفع والتجديد</button>
-            <button id="btn-logout-expired" class="text-gray-500 hover:text-white underline transition">تسجيل الخروج</button>
         </div>
     </div>
 
     <!-- ==================== لوحة التحكم الأساسية ==================== -->
-    <div id="dashboard-view" class="hidden h-screen overflow-hidden">
+    <div id="dashboardScreen" class="hidden flex-1 flex overflow-hidden">
         
         <!-- الشريط الجانبي -->
         <aside class="w-64 bg-gray-800 border-l border-gray-700 flex flex-col hidden md:flex z-20">
@@ -131,15 +80,23 @@
             </div>
             
             <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-                <button onclick="switchTab('dashboard')" class="nav-btn active w-full flex items-center p-3 rounded-lg transition-colors">
+                <button class="nav-btn active w-full flex items-center p-3 rounded-lg transition-colors text-gray-400" data-page="dashboard" onclick="showPage('dashboard')">
                     <span class="w-6"><i class="fas fa-home"></i></span><span class="mr-3">الرئيسية</span>
                 </button>
-                <button onclick="switchTab('vehicles')" class="nav-btn w-full flex items-center p-3 rounded-lg transition-colors text-gray-400">
-                    <span class="w-6"><i class="fas fa-truck"></i></span><span class="mr-3">إدارة المركبات</span>
+                <button class="nav-btn w-full flex items-center p-3 rounded-lg transition-colors text-gray-400" data-page="vehicles" onclick="showPage('vehicles')">
+                    <span class="w-6"><i class="fas fa-truck"></i></span><span class="mr-3">سياراتي</span>
                 </button>
-                <button onclick="switchTab('drivers')" class="nav-btn w-full flex items-center p-3 rounded-lg transition-colors text-gray-400">
-                    <span class="w-6"><i class="fas fa-users"></i></span><span class="mr-3">السائقين</span>
+                <button class="nav-btn w-full flex items-center p-3 rounded-lg transition-colors text-gray-400" data-page="map" onclick="showPage('map')">
+                    <span class="w-6"><i class="fas fa-map-marked-alt"></i></span><span class="mr-3">الخريطة المباشرة</span>
                 </button>
+                
+                <!-- قائمة الإدارة تظهر فقط للأدمن -->
+                <div id="adminMenu" class="hidden">
+                    <div class="mt-6 mb-2 px-3 text-xs font-bold text-gray-500 uppercase">إدارة النظام</div>
+                    <button class="nav-btn w-full flex items-center p-3 rounded-lg transition-colors text-gray-400" data-page="admin-companies" onclick="showPage('admin-companies')">
+                        <span class="w-6"><i class="fas fa-building"></i></span><span class="mr-3">الشركات المشتركة</span>
+                    </button>
+                </div>
             </nav>
         </aside>
 
@@ -148,297 +105,49 @@
             <!-- الشريط العلوي -->
             <header class="h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-6 z-10 shadow-md">
                 <div class="flex items-center">
-                    <button class="md:hidden text-gray-400 hover:text-yellow-400 mr-4"><i class="fas fa-bars text-xl"></i></button>
-                    <h2 class="text-lg font-bold text-white">الرئيسية</h2>
+                    <!-- زر القائمة للموبايل -->
+                    <button class="md:hidden text-gray-400 hover:text-yellow-400 ml-4"><i class="fas fa-bars text-xl"></i></button>
                 </div>
+                
                 <div class="flex items-center gap-4">
-                    <!-- عداد الأيام المتبقية -->
-                    <div id="trial-counter" class="hidden items-center gap-2 bg-yellow-900/30 border border-yellow-600 text-yellow-400 px-3 py-1 rounded-lg text-sm">
-                        <i class="fas fa-clock"></i>
-                        <span id="subscription-status-text">متبقي <span id="days-left" class="font-bold"></span> يوم للتجربة</span>
-                    </div>
-
                     <div class="flex items-center gap-3 border-r border-gray-700 pr-4">
                         <div class="text-left">
-                            <div id="user-display-name" class="text-sm font-bold text-white">جاري التحميل...</div>
-                            <div id="user-display-company" class="text-xs text-yellow-400">---</div>
+                            <div id="userName" class="text-sm font-bold text-white">جاري التحميل...</div>
+                            <div id="userRole" class="text-xs text-yellow-400">---</div>
                         </div>
-                        <button id="btn-logout" class="h-10 w-10 rounded-full bg-gray-700 hover:bg-red-500/20 flex items-center justify-center text-yellow-400 hover:text-red-500 cursor-pointer transition" title="تسجيل الخروج">
+                        <button onclick="handleLogout()" class="h-10 w-10 rounded-full bg-gray-700 hover:bg-red-500/20 flex items-center justify-center text-yellow-400 hover:text-red-500 cursor-pointer transition" title="تسجيل الخروج">
                             <i class="fas fa-sign-out-alt"></i>
                         </button>
                     </div>
                 </div>
             </header>
 
-            <!-- حاوية الخريطة -->
+            <!-- حاويات الصفحات (سيتم ملؤها من خلال app.js) -->
             <div id="main-content" class="flex-1 overflow-y-auto p-6">
-                <!-- خريطة تجريبية للواجهة -->
-                <div class="bg-gray-800 border border-gray-700 p-4 rounded-xl shadow-lg mb-6 flex justify-between items-center">
-                    <h3 class="text-lg text-white font-bold"><i class="fas fa-map-marked-alt text-yellow-400 ml-2"></i>خريطة التتبع المباشر</h3>
-                </div>
-                <div id="map-container" class="w-full h-[500px] rounded-xl border border-gray-700 z-0 relative"></div>
+                <div id="page-dashboard" class="page-content h-full"></div>
+                <div id="page-vehicles" class="page-content hidden h-full"></div>
+                <div id="page-map" class="page-content hidden h-full"></div>
+                <div id="page-tracking" class="page-content hidden h-full"></div>
+                <div id="page-admin-companies" class="page-content hidden h-full"></div>
+                <div id="page-admin-vehicles" class="page-content hidden h-full"></div>
+                <div id="page-admin-subscriptions" class="page-content hidden h-full"></div>
             </div>
         </main>
     </div>
 
-    <!-- Leaflet JS -->
+    <!-- ==================== استدعاء المكتبات والسكربتات ==================== -->
+    
+    <!-- مكتبة Leaflet للخريطة -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-    <!-- UI Scripts (Switch tabs) -->
-    <script>
-        function switchAuthTab(tab) {
-            document.getElementById('login-form').classList.toggle('hidden', tab !== 'login');
-            document.getElementById('register-form').classList.toggle('hidden', tab !== 'register');
-            
-            document.getElementById('tab-login').className = tab === 'login' 
-                ? 'flex-1 py-3 text-center text-yellow-400 font-bold border-b-2 border-yellow-400' 
-                : 'flex-1 py-3 text-center text-gray-400 font-bold hover:text-yellow-400 transition';
-            document.getElementById('tab-register').className = tab === 'register' 
-                ? 'flex-1 py-3 text-center text-yellow-400 font-bold border-b-2 border-yellow-400' 
-                : 'flex-1 py-3 text-center text-gray-400 font-bold hover:text-yellow-400 transition';
-        }
+    <!-- مكتبات Firebase (الإصدار Compat 9 ليتوافق مع app.js) -->
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
-        function switchTab(tabName) {
-            document.querySelectorAll('.nav-btn').forEach(btn => {
-                btn.classList.remove('active', 'text-gray-400');
-                if(btn.id === `nav-${tabName}`) {
-                    btn.classList.add('active');
-                } else {
-                    btn.classList.add('text-gray-400');
-                }
-            });
-        }
-    </script>
+    <!-- ملف الجافاسكريبت الخاص بك (app.js) -->
+    <script src="app.js"></script>
 
-    <!-- ==================== Firebase Logic (Auth & Database) ==================== -->
-    <script type="module">
-        // استيراد مكتبات فايربيس (الإصدار 10 الحديث)
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-        import { 
-            getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, 
-            signOut, onAuthStateChanged, GoogleAuthProvider, signInWithPopup 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-        import { 
-            getFirestore, doc, setDoc, getDoc, collection 
-        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
-        // بيانات Firebase 
-        const firebaseConfig = {
-            apiKey: "AIzaSyBgRkceRq7FRbhCevLlULYNy-A5Tl_cr0w",
-            authDomain: "sr-test-c9e06.firebaseapp.com",
-            databaseURL: "https://sr-test-c9e06-default-rtdb.firebaseio.com",
-            projectId: "sr-test-c9e06",
-            storageBucket: "sr-test-c9e06.firebasestorage.app",
-            messagingSenderId: "658396508062",
-            appId: "1:658396508062:web:c56cd84f93daa2e176308f",
-            measurementId: "G-3ZZV344NDK"
-        };
-
-        // تهيئة فايربيس
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const googleProvider = new GoogleAuthProvider();
-
-        // المتغيرات العامة
-        let currentUserData = null;
-
-        // التعامل مع واجهة المستخدم
-        const ui = {
-            loader: document.getElementById('global-loader'),
-            authView: document.getElementById('auth-view'),
-            dashboardView: document.getElementById('dashboard-view'),
-            expiredView: document.getElementById('expired-view')
-        };
-
-        // مراقبة حالة الدخول 
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                // المستخدم مسجل دخول -> جلب بياناته
-                try {
-                    const userDocRef = doc(db, "users", user.uid);
-                    const userDoc = await getDoc(userDocRef);
-                    
-                    if (userDoc.exists()) {
-                        currentUserData = userDoc.data();
-                        currentUserData.uid = user.uid; 
-                        checkSubscriptionStatus();
-                    } else {
-                        ui.loader.classList.add('hidden');
-                        Swal.fire('مرحباً!', 'يرجى استكمال بيانات شركتك لإنهاء التسجيل.', 'info');
-                        auth.signOut(); 
-                    }
-                } catch (error) {
-                    // ====== هنا تم إضافة التعديل لحل مشكلة التعليق ======
-                    console.error("خطأ في جلب البيانات:", error);
-                    ui.loader.classList.add('hidden');
-                    ui.authView.classList.remove('hidden');
-                    Swal.fire('خطأ في الصلاحيات', 'يرجى تعديل قواعد Firestore (Rules) للسماح بقراءة البيانات.', 'error');
-                    auth.signOut();
-                }
-            } else {
-                // غير مسجل دخول
-                ui.loader.classList.add('hidden');
-                ui.authView.classList.remove('hidden');
-                ui.dashboardView.classList.add('hidden');
-                ui.expiredView.classList.add('hidden');
-            }
-        });
-
-        // دالة فحص حالة الاشتراك
-        function checkSubscriptionStatus() {
-            const now = new Date();
-            const trialStart = new Date(currentUserData.trialStartDate);
-            const diffTime = Math.abs(now - trialStart);
-            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            
-            const TRIAL_PERIOD = 15;
-
-            ui.loader.classList.add('hidden');
-
-            if (currentUserData.status === 'expired' || (currentUserData.status === 'trial' && diffDays > TRIAL_PERIOD)) {
-                
-                if(currentUserData.status !== 'expired') {
-                    setDoc(doc(db, "users", currentUserData.uid), { status: 'expired' }, { merge: true });
-                }
-
-                ui.authView.classList.add('hidden');
-                ui.dashboardView.classList.add('hidden');
-                ui.expiredView.classList.remove('hidden');
-                
-                document.getElementById('expired-company').innerText = currentUserData.companyName;
-                document.getElementById('expired-plan').innerText = currentUserData.planType === 'monthly' ? 'شهري' : 'سنوي';
-            
-            } else {
-                ui.authView.classList.add('hidden');
-                ui.expiredView.classList.add('hidden');
-                ui.dashboardView.classList.remove('hidden');
-
-                document.getElementById('user-display-name').innerText = currentUserData.fullName;
-                document.getElementById('user-display-company').innerText = currentUserData.companyName;
-
-                const counterDiv = document.getElementById('trial-counter');
-                const statusText = document.getElementById('subscription-status-text');
-
-                counterDiv.classList.remove('hidden');
-                counterDiv.classList.add('flex');
-
-                if (currentUserData.status === 'active') {
-                    counterDiv.className = 'flex items-center gap-2 bg-green-900/30 border border-green-600 text-green-400 px-3 py-1 rounded-lg text-sm';
-                    statusText.innerHTML = `حساب مفعل (خطة ${currentUserData.planType === 'monthly' ? 'شهرية' : 'سنوية'})`;
-                } else {
-                    const daysLeft = TRIAL_PERIOD - diffDays;
-                    document.getElementById('days-left').innerText = daysLeft;
-                }
-
-                setTimeout(() => {
-                    if(!window.mapInstance) {
-                        window.mapInstance = L.map('map-container').setView([30.0444, 31.2357], 10);
-                        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(window.mapInstance);
-                    }
-                }, 300);
-            }
-        }
-
-        // عمليات التسجيل والدخول
-        document.getElementById('register-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('btn-register');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الإنشاء...';
-            btn.disabled = true;
-
-            const name = document.getElementById('reg-name').value;
-            const company = document.getElementById('reg-company').value;
-            const email = document.getElementById('reg-email').value;
-            const password = document.getElementById('reg-password').value;
-            const plan = document.getElementById('reg-plan').value;
-
-            try {
-                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-                const user = userCredential.user;
-
-                await setDoc(doc(db, "users", user.uid), {
-                    fullName: name,
-                    companyName: company,
-                    email: email,
-                    planType: plan,
-                    trialStartDate: new Date().toISOString(),
-                    status: 'trial', 
-                    createdAt: new Date().toISOString()
-                });
-
-                Swal.fire({
-                    icon: 'success',
-                    title: 'تم إنشاء الحساب!',
-                    text: 'مرحباً بك، بدأت فترة الـ 15 يوم التجريبية.',
-                    confirmButtonColor: '#fbbf24'
-                });
-
-            } catch (error) {
-                Swal.fire('خطأ', error.message, 'error');
-                btn.innerHTML = 'إنشاء الحساب وبدء التجربة';
-                btn.disabled = false;
-            }
-        });
-
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById('btn-login');
-            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> جاري الدخول...';
-            btn.disabled = true;
-
-            const email = document.getElementById('login-email').value;
-            const password = document.getElementById('login-password').value;
-
-            try {
-                await signInWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                Swal.fire('خطأ', 'بيانات الدخول غير صحيحة!', 'error');
-                btn.innerHTML = 'تسجيل الدخول';
-                btn.disabled = false;
-            }
-        });
-
-        document.getElementById('btn-google-login').addEventListener('click', async () => {
-            try {
-                const result = await signInWithPopup(auth, googleProvider);
-                const user = result.user;
-                
-                const docRef = doc(db, "users", user.uid);
-                const docSnap = await getDoc(docRef);
-                
-                if (!docSnap.exists()) {
-                    await setDoc(docRef, {
-                        fullName: user.displayName || 'عميل جديد',
-                        companyName: 'شركة جديدة (يرجى التعديل)', 
-                        email: user.email,
-                        planType: 'monthly',
-                        trialStartDate: new Date().toISOString(),
-                        status: 'trial',
-                        createdAt: new Date().toISOString()
-                    });
-                }
-            } catch (error) {
-                console.error(error);
-            }
-        });
-
-        const logoutHandler = async () => {
-            await signOut(auth);
-            window.location.reload();
-        };
-        document.getElementById('btn-logout').addEventListener('click', logoutHandler);
-        document.getElementById('btn-logout-expired').addEventListener('click', logoutHandler);
-
-        document.getElementById('btn-pay-now').addEventListener('click', () => {
-            Swal.fire({
-                icon: 'info',
-                title: 'بوابة الدفع',
-                text: 'سيتم تحويلك إلى بوابة الدفع الآمنة...',
-                confirmButtonColor: '#fbbf24'
-            });
-        });
-
-    </script>
 </body>
 </html>
