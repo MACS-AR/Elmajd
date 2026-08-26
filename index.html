@@ -3,151 +3,211 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام تتبع المركبات الذكي | المنصة</title>
-    
+    <title>منصة تتبع المركبات</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- Leaflet CSS للخريطة -->
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
-    <!-- FontAwesome للأيقونات -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- SweetAlert2 للتنبيهات -->
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-
-    <!-- Custom CSS لتنسيق الواجهة -->
+    <!-- خط Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
     <style>
-        .page-content { animation: fadeIn 0.3s ease-in-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        .nav-btn.active { background-color: #374151; border-right: 4px solid #fbbf24; color: #fbbf24; }
-        .vehicle-card { transition: all 0.2s; border: 1px solid #374151; background: #1f2937; }
-        .vehicle-card:hover { transform: translateY(-2px); border-color: #fbbf24; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1); }
-        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
-        .status-dot.online { background-color: #22c55e; box-shadow: 0 0 8px #22c55e; }
-        .status-dot.moving { background-color: #fbbf24; box-shadow: 0 0 8px #fbbf24; }
-        .status-dot.offline { background-color: #ef4444; }
-        .btn-primary { background-color: #fbbf24; color: #111827; padding: 0.5rem 1rem; border-radius: 0.5rem; font-weight: bold; transition: all 0.2s; }
-        .btn-primary:hover { background-color: #f59e0b; }
-        .btn-outline { border: 1px solid #4b5563; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
-        .btn-outline:hover { border-color: #fbbf24; color: #fbbf24; }
-        .btn-edit { background-color: #3b82f6; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
-        .btn-danger { background-color: #ef4444; color: white; padding: 0.5rem 1rem; border-radius: 0.5rem; transition: all 0.2s; }
+        * { font-family: 'Cairo', sans-serif; }
+        .leaflet-container { z-index: 0; }
+        .map-popup { font-family: 'Cairo', sans-serif; }
+        .custom-leaflet-marker { background: transparent; border: none; }
+        .page-content { display: block; }
+        .hidden { display: none !important; }
     </style>
 </head>
-<body class="bg-gray-900 text-gray-200 overflow-hidden h-screen flex flex-col">
+<body class="bg-gray-900 text-gray-100 min-h-screen">
 
-    <!-- رسائل الخطأ العامة -->
-    <div id="globalError" class="hidden fixed top-4 left-1/2 transform -translate-x-1/2 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 transition-all"></div>
-
-    <!-- ==================== شاشة تسجيل الدخول ==================== -->
-    <div id="loginScreen" class="min-h-screen flex flex-col items-center justify-center p-4">
-        <div class="bg-gray-800 border border-gray-700 rounded-2xl shadow-2xl w-full max-w-md p-8">
+    <!-- ==================== شاشة تسجيل الدخول / إنشاء حساب ==================== -->
+    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-700">
             <div class="text-center mb-8">
-                <h1 class="text-3xl font-bold text-yellow-400"><i class="fas fa-satellite-dish mr-2"></i> تتبع مسار</h1>
-                <p class="text-gray-400 text-sm mt-2">نظام إدارة الأسطول الذكي</p>
+                <div class="text-5xl mb-3">🚗</div>
+                <h1 class="text-3xl font-bold text-yellow-500">منصة التتبع</h1>
+                <p class="text-gray-400 mt-2">نظام تتبع المركبات وإدارة الأساطيل</p>
             </div>
-            
-            <div id="loginError" class="hidden bg-red-900/50 border border-red-500 text-red-200 p-3 rounded-lg mb-4 text-sm text-center"></div>
 
-            <form onsubmit="handleLogin(event)" class="space-y-4">
-                <div>
-                    <label class="block text-gray-400 mb-2 text-sm">البريد الإلكتروني</label>
-                    <input type="email" id="loginEmail" class="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-yellow-400" placeholder="admin@system.com">
-                </div>
-                <div>
-                    <label class="block text-gray-400 mb-2 text-sm">كلمة المرور</label>
-                    <input type="password" id="loginPassword" class="w-full bg-gray-900 border border-gray-600 text-white rounded-lg px-4 py-3 focus:outline-none focus:border-yellow-400" placeholder="••••••••">
-                </div>
-                <button type="submit" class="w-full btn-primary py-3 mt-4 text-lg">تسجيل الدخول</button>
-            </form>
+            <!-- التبويبات -->
+            <div class="flex mb-6 bg-gray-700 rounded-lg p-1">
+                <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2 px-4 rounded-lg font-bold bg-yellow-500 text-black transition">تسجيل الدخول</button>
+                <button id="tabSignup" onclick="switchAuthTab('signup')" class="flex-1 py-2 px-4 rounded-lg font-bold text-gray-300 hover:text-white transition">إنشاء حساب</button>
+            </div>
 
-            <div class="mt-6 flex flex-col gap-3 border-t border-gray-700 pt-6">
-                <button onclick="quickLoginAdmin()" class="btn-outline w-full text-sm"><i class="fas fa-user-shield ml-2"></i>دخول سريع كمدير النظام</button>
-                <button onclick="createDemoAccount()" class="btn-outline w-full text-sm text-blue-400 hover:border-blue-400 hover:text-blue-400"><i class="fas fa-user-plus ml-2"></i>إنشاء حساب شركة تجريبي</button>
+            <!-- نموذج تسجيل الدخول -->
+            <div id="loginForm">
+                <div class="mb-4">
+                    <label class="block text-sm mb-1 text-gray-400">نوع الدخول</label>
+                    <select id="loginType" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
+                        <option value="firebase">بريد إلكتروني وكلمة مرور</option>
+                        <option value="custom">اسم مستخدم وكلمة مرور</option>
+                    </select>
+                </div>
+                <div class="mb-4">
+                    <label class="block text-sm mb-1 text-gray-400">البريد الإلكتروني / اسم المستخدم</label>
+                    <input type="text" id="loginEmail" placeholder="أدخل البريد أو اسم المستخدم" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-500">
+                </div>
+                <div class="mb-6">
+                    <label class="block text-sm mb-1 text-gray-400">كلمة المرور</label>
+                    <input type="password" id="loginPassword" placeholder="********" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-500">
+                </div>
+                <div id="loginError" class="hidden bg-red-900/50 text-red-300 p-3 rounded-lg mb-4 text-sm"></div>
+                <button onclick="handleLogin(event)" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-lg transition">دخول</button>
+                <button onclick="quickLoginAdmin()" class="w-full mt-3 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm transition">دخول سريع كأدمن</button>
+            </div>
+
+            <!-- نموذج إنشاء حساب -->
+            <div id="signupForm" class="hidden">
+                <div class="grid grid-cols-1 gap-4">
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">اسم العميل *</label>
+                        <input type="text" id="signupFullName" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">اسم الشركة *</label>
+                        <input type="text" id="signupCompanyName" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">رقم الهاتف *</label>
+                        <input type="tel" id="signupPhone" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" dir="ltr">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">اليوزر نيم (يمكن أن يكون بريد أو اسم مستخدم) *</label>
+                        <input type="text" id="signupUsername" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" dir="ltr">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">البريد الإلكتروني *</label>
+                        <input type="email" id="signupEmail" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" dir="ltr">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">كلمة المرور *</label>
+                        <input type="password" id="signupPassword" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm mb-1 text-gray-400">مدة الاشتراك</label>
+                        <select id="signupSubscriptionPeriod" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
+                            <option value="month">شهر</option>
+                            <option value="year">سنة</option>
+                        </select>
+                    </div>
+                    <div id="signupError" class="hidden bg-red-900/50 text-red-300 p-3 rounded-lg text-sm"></div>
+                    <button onclick="handleSignup(event)" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition">إنشاء الحساب</button>
+                    <p class="text-xs text-gray-500 text-center">سيتم منحك فترة تجريبية مجانية لمدة 15 يوم</p>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- ==================== لوحة التحكم الأساسية ==================== -->
-    <div id="dashboardScreen" class="hidden flex-1 flex overflow-hidden">
-        
-        <!-- الشريط الجانبي -->
-        <aside class="w-64 bg-gray-800 border-l border-gray-700 flex flex-col hidden md:flex z-20">
-            <div class="h-16 flex items-center justify-center border-b border-gray-700 shadow-sm">
-                <h1 class="text-xl font-bold text-yellow-400"><i class="fas fa-satellite-dish ml-2"></i>تتبع مسار</h1>
+    <!-- ==================== شاشة انتهاء الاشتراك ==================== -->
+    <div id="subscriptionExpiredScreen" class="hidden min-h-screen bg-gray-900 flex items-center justify-center p-4">
+        <div class="bg-gray-800 rounded-xl shadow-lg p-8 max-w-md w-full border border-gray-700">
+            <div class="text-center mb-6">
+                <div class="text-6xl mb-4">⏰</div>
+                <h2 class="text-2xl font-bold text-yellow-500 mb-2">انتهاء الاشتراك</h2>
+                <p class="text-gray-400">عذراً، انتهت فترة الاشتراك الخاصة بكم</p>
             </div>
             
-            <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
-                <button class="nav-btn active w-full flex items-center p-3 rounded-lg transition-colors text-gray-400" data-page="dashboard" onclick="showPage('dashboard')">
-                    <span class="w-6"><i class="fas fa-home"></i></span><span class="mr-3">الرئيسية</span>
-                </button>
-                <button class="nav-btn w-full flex items-center p-3 rounded-lg transition-colors text-gray-400" data-page="vehicles" onclick="showPage('vehicles')">
-                    <span class="w-6"><i class="fas fa-truck"></i></span><span class="mr-3">سياراتي</span>
-                </button>
-                <button class="nav-btn w-full flex items-center p-3 rounded-lg transition-colors text-gray-400" data-page="map" onclick="showPage('map')">
-                    <span class="w-6"><i class="fas fa-map-marked-alt"></i></span><span class="mr-3">الخريطة المباشرة</span>
-                </button>
-                
-                <!-- قائمة الإدارة تظهر فقط للأدمن -->
-                <div id="adminMenu" class="hidden">
-                    <div class="mt-6 mb-2 px-3 text-xs font-bold text-gray-500 uppercase">إدارة النظام</div>
-                    <button class="nav-btn w-full flex items-center p-3 rounded-lg transition-colors text-gray-400" data-page="admin-companies" onclick="showPage('admin-companies')">
-                        <span class="w-6"><i class="fas fa-building"></i></span><span class="mr-3">الشركات المشتركة</span>
-                    </button>
-                </div>
-            </nav>
-        </aside>
+            <div class="bg-gray-900 rounded-lg p-4 mb-6">
+                <h3 class="font-bold text-yellow-500 mb-2">بيانات الاشتراك:</h3>
+                <p class="text-gray-300">الشركة: <span id="subscriptionCompanyName"></span></p>
+                <p class="text-gray-300">الحالة: <span id="subscriptionStatus" class="text-red-500"></span></p>
+            </div>
+            
+            <div class="mb-6">
+                <h3 class="font-bold text-yellow-500 mb-3">اختر طريقة الدفع للتجديد:</h3>
+                <div id="paymentMethodsContainer"></div>
+            </div>
+            
+            <button onclick="handleLogout()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg">
+                تسجيل الخروج
+            </button>
+        </div>
+    </div>
 
-        <!-- المحتوى الرئيسي -->
-        <main class="flex-1 flex flex-col h-full bg-gray-900 relative">
-            <!-- الشريط العلوي -->
-            <header class="h-16 bg-gray-800 border-b border-gray-700 flex items-center justify-between px-6 z-10 shadow-md">
-                <div class="flex items-center">
-                    <!-- زر القائمة للموبايل -->
-                    <button class="md:hidden text-gray-400 hover:text-yellow-400 ml-4"><i class="fas fa-bars text-xl"></i></button>
-                </div>
-                
-                <div class="flex items-center gap-4">
-                    <div class="flex items-center gap-3 border-r border-gray-700 pr-4">
-                        <div class="text-left">
-                            <div id="userName" class="text-sm font-bold text-white">جاري التحميل...</div>
-                            <div id="userRole" class="text-xs text-yellow-400">---</div>
-                        </div>
-                        <button onclick="handleLogout()" class="h-10 w-10 rounded-full bg-gray-700 hover:bg-red-500/20 flex items-center justify-center text-yellow-400 hover:text-red-500 cursor-pointer transition" title="تسجيل الخروج">
-                            <i class="fas fa-sign-out-alt"></i>
-                        </button>
+    <!-- ==================== شاشة لوحة التحكم ==================== -->
+    <div id="dashboardScreen" class="hidden min-h-screen bg-gray-900">
+        <!-- الشريط العلوي -->
+        <nav class="bg-gray-800 shadow-md border-b border-gray-700 sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center flex-wrap gap-2">
+                <div class="flex items-center gap-3">
+                    <span class="text-2xl">🚗</span>
+                    <div>
+                        <h1 class="font-bold text-yellow-500">منصة التتبع</h1>
+                        <p class="text-xs text-gray-400" id="userName">مرحباً</p>
                     </div>
                 </div>
-            </header>
-
-            <!-- حاويات الصفحات (سيتم ملؤها من خلال app.js) -->
-            <div id="main-content" class="flex-1 overflow-y-auto p-6">
-                <div id="page-dashboard" class="page-content h-full"></div>
-                <div id="page-vehicles" class="page-content hidden h-full"></div>
-                <div id="page-map" class="page-content hidden h-full"></div>
-                <div id="page-tracking" class="page-content hidden h-full"></div>
-                <div id="page-admin-companies" class="page-content hidden h-full"></div>
-                <div id="page-admin-vehicles" class="page-content hidden h-full"></div>
-                <div id="page-admin-subscriptions" class="page-content hidden h-full"></div>
+                <div class="flex items-center gap-3">
+                    <span id="userRole" class="text-xs bg-gray-700 px-3 py-1 rounded-full"></span>
+                    <button onclick="handleLogout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition">تسجيل الخروج</button>
+                </div>
             </div>
+            <!-- أزرار التنقل -->
+            <div class="bg-gray-800 border-t border-gray-700 overflow-x-auto">
+                <div class="max-w-7xl mx-auto flex gap-1 px-2 py-2">
+                    <button class="nav-btn active bg-gray-700 text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="dashboard" onclick="showPage('dashboard')">📊 لوحة التحكم</button>
+                    <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="vehicles" onclick="showPage('vehicles')">🚗 سياراتي</button>
+                    <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="map" onclick="showPage('map')">🗺️ الخريطة</button>
+                    <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="tracking" onclick="showPage('tracking')">📈 التقارير</button>
+                    <div class="admin-only hidden">
+                        <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-companies" onclick="showPage('admin-companies')">🏢 الشركات</button>
+                        <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-vehicles" onclick="showPage('admin-vehicles')">👑 المركبات</button>
+                        <button class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-subscriptions" onclick="showPage('admin-subscriptions')">💳 الاشتراكات</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- محتوى الصفحات -->
+        <main class="max-w-7xl mx-auto p-6">
+            <div id="page-dashboard" class="page-content"></div>
+            <div id="page-vehicles" class="page-content hidden"></div>
+            <div id="page-map" class="page-content hidden"></div>
+            <div id="page-tracking" class="page-content hidden"></div>
+            <div id="page-admin-companies" class="page-content hidden"></div>
+            <div id="page-admin-vehicles" class="page-content hidden"></div>
+            <div id="page-admin-subscriptions" class="page-content hidden"></div>
         </main>
     </div>
 
-    <!-- ==================== استدعاء المكتبات والسكربتات ==================== -->
-    
-    <!-- مكتبة Leaflet للخريطة -->
+    <!-- ==================== رسالة خطأ عامة ==================== -->
+    <div id="globalError" class="hidden fixed bottom-4 left-4 right-4 md:left-auto bg-red-600 text-white p-4 rounded-lg shadow-lg z-[100] max-w-md mx-auto"></div>
+
+    <!-- ==================== المودالات ==================== -->
+    <!-- مودال سجل الرحلة سيتم إنشاؤه ديناميكياً -->
+
+    <!-- ==================== السكربتات ==================== -->
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    <!-- مكتبات Firebase (الإصدار Compat 9 ليتوافق مع app.js) -->
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-
-    <!-- ملف الجافاسكريبت الخاص بك (app.js) -->
+    <!-- ملف الجافاسكربت الرئيسي -->
     <script src="app.js"></script>
 
+    <script>
+        // دالة التبديل بين تبويبات تسجيل الدخول وإنشاء حساب
+        function switchAuthTab(tab) {
+            const loginForm = document.getElementById('loginForm');
+            const signupForm = document.getElementById('signupForm');
+            const tabLogin = document.getElementById('tabLogin');
+            const tabSignup = document.getElementById('tabSignup');
+
+            if (tab === 'login') {
+                loginForm.classList.remove('hidden');
+                signupForm.classList.add('hidden');
+                tabLogin.className = 'flex-1 py-2 px-4 rounded-lg font-bold bg-yellow-500 text-black transition';
+                tabSignup.className = 'flex-1 py-2 px-4 rounded-lg font-bold text-gray-300 hover:text-white transition';
+            } else {
+                loginForm.classList.add('hidden');
+                signupForm.classList.remove('hidden');
+                tabLogin.className = 'flex-1 py-2 px-4 rounded-lg font-bold text-gray-300 hover:text-white transition';
+                tabSignup.className = 'flex-1 py-2 px-4 rounded-lg font-bold bg-yellow-500 text-black transition';
+            }
+        }
+    </script>
 </body>
 </html>
