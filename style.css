@@ -1,5 +1,11 @@
+/* =========================================
+   استيراد الخطوط
+========================================= */
 @import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap');
 
+/* =========================================
+   التنسيقات الأساسية
+========================================= */
 * {
     font-family: 'Cairo', sans-serif;
 }
@@ -11,7 +17,59 @@ body {
     color: #e5e7eb;
 }
 
-/* ===== الشريط الجانبي ===== */
+/* تخصيص شريط التمرير (Scrollbar) */
+::-webkit-scrollbar { 
+    width: 6px; 
+    height: 6px;
+}
+::-webkit-scrollbar-track { 
+    background: #1f2937; 
+    border-radius: 10px; 
+}
+::-webkit-scrollbar-thumb { 
+    background: #374151; 
+    border-radius: 10px; 
+}
+::-webkit-scrollbar-thumb:hover { 
+    background: #fbbf24; 
+}
+
+/* =========================================
+   شاشات النظام (SaaS Views)
+========================================= */
+/* خلفية شاشة الدخول والتسجيل */
+#auth-view {
+    background: radial-gradient(circle at top right, #1f2937, #111827);
+}
+
+#auth-view input {
+    transition: all 0.3s ease;
+}
+
+#auth-view input:focus {
+    box-shadow: 0 0 10px rgba(251, 191, 36, 0.2);
+    transform: translateY(-1px);
+}
+
+/* خلفية شاشة انتهاء الاشتراك */
+#expired-view {
+    background: repeating-linear-gradient(
+        45deg,
+        #111827,
+        #111827 20px,
+        #1f2937 20px,
+        #1f2937 40px
+    );
+}
+
+/* شاشة التحميل الأولية */
+#global-loader {
+    backdrop-filter: blur(5px);
+}
+
+/* =========================================
+   الشريط الجانبي ولوحة التحكم
+========================================= */
 .nav-btn.active {
     background-color: #374151;
     color: #fbbf24;
@@ -20,11 +78,14 @@ body {
 .nav-btn.active span:first-child {
     color: #fbbf24;
 }
-.nav-btn:hover {
+.nav-btn:hover:not(.active) {
     background-color: #1f2937;
+    color: #e5e7eb;
 }
 
-/* ===== بطاقات الإحصائيات ===== */
+/* =========================================
+   البطاقات (الإحصائيات، المركبات، السائقين)
+========================================= */
 .stat-card {
     transition: transform 0.2s, box-shadow 0.2s;
     border: 1px solid #374151;
@@ -47,14 +108,7 @@ body {
     background: #374151;
     color: #fbbf24;
 }
-.stat-card .stat-value {
-    color: #fbbf24;
-}
-.stat-card .stat-label {
-    color: #9ca3af;
-}
 
-/* ===== بطاقة السيارة ===== */
 .vehicle-card {
     border-right: 4px solid #fbbf24;
     transition: all 0.3s;
@@ -74,31 +128,56 @@ body {
 .vehicle-card.moving {
     border-right-color: #fbbf24;
 }
-.vehicle-card .status-dot {
+
+.status-dot {
     width: 10px;
     height: 10px;
     border-radius: 50%;
     display: inline-block;
 }
-.vehicle-card .status-dot.online { background: #22c55e; }
-.vehicle-card .status-dot.offline { background: #6b7280; }
-.vehicle-card .status-dot.moving { background: #fbbf24; animation: pulse-dot 1.5s infinite; }
+.status-dot.online { background: #22c55e; }
+.status-dot.offline { background: #6b7280; }
+.status-dot.moving { background: #fbbf24; animation: pulse-dot 1.5s infinite; }
 
-@keyframes pulse-dot {
-    0%, 100% { opacity: 1; transform: scale(1); }
-    50% { opacity: 0.5; transform: scale(1.3); }
+/* بيانات السائقين */
+.driver-detail {
+    background: #1f2937;
+    border: 1px solid #fbbf24;
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 12px;
+}
+.driver-detail .label {
+    color: #9ca3af;
+    font-size: 12px;
+}
+.driver-detail .value {
+    color: #fbbf24;
+    font-weight: 600;
+    font-size: 14px;
 }
 
-/* ===== الخريطة ===== */
-#map-container {
+/* =========================================
+   الخريطة (Leaflet)
+========================================= */
+#map-container, #history-map-container {
     width: 100%;
     height: 550px;
     border-radius: 12px;
     overflow: hidden;
     border: 1px solid #374151;
+    z-index: 1; /* لمنع تعارض الخريطة مع النوافذ المنبثقة العلوية */
 }
 
-/* ===== علامة الخريطة ===== */
+/* خريطة مسار الرحلة داخل النافذة */
+#history-map-container {
+    height: calc(100% - 60px);
+    border-radius: 0 0 12px 12px;
+    border: none;
+    border-top: 1px solid #374151;
+}
+
+/* علامات الخريطة (Markers) */
 .map-marker {
     width: 36px;
     height: 36px;
@@ -115,39 +194,44 @@ body {
     height: 36px;
     filter: drop-shadow(0 2px 6px rgba(0,0,0,0.5));
 }
-.map-marker.online svg .car-body {
-    fill: #22c55e;
+.map-marker.online svg .car-body { fill: #22c55e; }
+.map-marker.offline svg .car-body { fill: #6b7280; }
+.map-marker.moving svg .car-body { 
+    fill: #fbbf24; 
+    animation: pulse-car 1.5s infinite; 
 }
-.map-marker.offline svg .car-body {
-    fill: #6b7280;
-}
-.map-marker.moving svg .car-body {
-    fill: #fbbf24;
-    animation: pulse-car 1.5s infinite;
-}
-.map-marker.moving svg .car-light {
-    fill: #fbbf24;
-    animation: blink-light 0.8s infinite;
+.map-marker.moving svg .car-light { 
+    fill: #fbbf24; 
+    animation: blink-light 0.8s infinite; 
 }
 
-@keyframes pulse-car {
-    0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.08); }
-}
-@keyframes blink-light {
-    0%, 100% { opacity: 1; }
-    50% { opacity: 0.3; }
+/* إخفاء خلفية أيقونة Leaflet الافتراضية */
+.custom-leaflet-marker {
+    background: transparent;
+    border: none;
 }
 
-/* ===== نافذة المعلومات المنبثقة ===== */
+/* تخصيص النافذة المنبثقة الخاصة بالخريطة (Leaflet Popup) لتناسب الثيم المظلم */
+.leaflet-popup-content-wrapper {
+    background: #1f2937 !important;
+    color: #e5e7eb !important;
+    border: 1px solid #fbbf24;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4) !important;
+    padding: 4px;
+}
+.leaflet-popup-tip {
+    background: #1f2937 !important;
+    border: 1px solid #fbbf24;
+    border-top: none;
+    border-left: none;
+}
 .map-popup {
-    padding: 8px 12px;
+    padding: 8px;
     font-size: 13px;
-    max-width: 220px;
+    min-width: 150px;
     background: #1f2937;
     color: #e5e7eb;
-    border-radius: 8px;
-    border: 1px solid #fbbf24;
 }
 .map-popup .name {
     font-weight: 700;
@@ -158,15 +242,28 @@ body {
     color: #9ca3af;
     font-size: 12px;
 }
-.map-popup .gold-text {
-    color: #fbbf24;
-    font-weight: 600;
-}
+.map-popup .gold-text { color: #fbbf24; font-weight: 600; }
 .map-popup .online-text { color: #22c55e; }
 .map-popup .offline-text { color: #6b7280; }
 .map-popup .moving-text { color: #fbbf24; }
 
-/* ===== أزرار ===== */
+/* قائمة تغيير نوع الخريطة */
+.map-style-select {
+    background: #1f2937;
+    border: 1px solid #fbbf24;
+    color: #fbbf24;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+.map-style-select option {
+    background: #1f2937;
+    color: #e5e7eb;
+}
+
+/* =========================================
+   الأزرار
+========================================= */
 .btn-primary {
     background: #fbbf24;
     color: #111827;
@@ -203,6 +300,30 @@ body {
 }
 .btn-success:hover { background: #16a34a; }
 
+.btn-info {
+    background: #3b82f6;
+    color: white;
+    padding: 4px 14px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+}
+.btn-info:hover { background: #2563eb; }
+
+.btn-edit {
+    background: #6366f1; 
+    color: white;
+    padding: 4px 14px;
+    border-radius: 6px;
+    transition: background 0.2s;
+    border: none;
+    cursor: pointer;
+    font-size: 13px;
+}
+.btn-edit:hover { background: #4f46e5; }
+
 .btn-outline {
     background: transparent;
     color: #fbbf24;
@@ -215,19 +336,9 @@ body {
 }
 .btn-outline:hover { background: #fbbf24; color: #111827; }
 
-.btn-edit {
-    background: #3b82f6;
-    color: white;
-    padding: 4px 14px;
-    border-radius: 6px;
-    transition: background 0.2s;
-    border: none;
-    cursor: pointer;
-    font-size: 13px;
-}
-.btn-edit:hover { background: #2563eb; }
-
-/* ===== الجداول ===== */
+/* =========================================
+   الجداول
+========================================= */
 .table-container {
     overflow-x: auto;
     border-radius: 12px;
@@ -252,13 +363,15 @@ table td {
     color: #e5e7eb;
 }
 table tr:hover td {
-    background: #1f2937;
+    background: #374151;
 }
 table .text-gold {
     color: #fbbf24;
 }
 
-/* ===== مودال ===== */
+/* =========================================
+   النوافذ المنبثقة (Modals)
+========================================= */
 .modal-overlay {
     position: fixed;
     inset: 0;
@@ -280,6 +393,11 @@ table .text-gold {
     animation: modalIn 0.25s ease;
     border: 1px solid #fbbf24;
 }
+
+#historyMapModal > div {
+    animation: modalIn 0.3s ease;
+}
+
 .modal-box h3 {
     color: #fbbf24;
 }
@@ -294,15 +412,12 @@ table .text-gold {
 .modal-box input:focus, .modal-box select:focus {
     border-color: #fbbf24;
     outline: none;
-    ring: 2px solid #fbbf24;
+    box-shadow: 0 0 0 2px rgba(251, 191, 36, 0.2);
 }
 
-@keyframes modalIn {
-    from { opacity: 0; transform: scale(0.95) translateY(20px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-/* ===== تبويبات سجل الحركة ===== */
+/* =========================================
+   التبويبات (Tabs) داخل المودال
+========================================= */
 .tab-btn {
     padding: 8px 20px;
     border-radius: 8px;
@@ -318,47 +433,36 @@ table .text-gold {
     background: #fbbf24;
     color: #111827;
 }
-.tab-btn:hover {
+.tab-btn:hover:not(.active) {
     border-color: #fbbf24;
     color: #fbbf24;
 }
-.tab-btn.active:hover {
-    color: #111827;
+
+/* =========================================
+   الحركات (Animations)
+========================================= */
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.3); }
 }
 
-/* ===== خيارات الخريطة ===== */
-.map-style-select {
-    background: #1f2937;
-    border: 1px solid #fbbf24;
-    color: #fbbf24;
-    padding: 4px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-}
-.map-style-select option {
-    background: #1f2937;
-    color: #e5e7eb;
+@keyframes pulse-car {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.08); }
 }
 
-/* ===== استجابة ===== */
-@media (max-width: 768px) {
-    .stat-card .icon { width: 36px; height: 36px; font-size: 18px; }
-    #map-container { height: 350px; }
-    table { font-size: 12px; }
-    table th, table td { padding: 6px 10px; }
-    .map-marker { width: 28px; height: 28px; }
-    .map-marker svg { width: 28px; height: 28px; }
+@keyframes blink-light {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
 }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #1f2937; border-radius: 10px; }
-::-webkit-scrollbar-thumb { background: #fbbf24; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #f59e0b; }
+@keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95) translateY(20px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+}
 
 .loading-spinner {
     display: inline-block;
-    width: 30px;
-    height: 30px;
     border: 3px solid #374151;
     border-top-color: #fbbf24;
     border-radius: 50%;
@@ -368,20 +472,15 @@ table .text-gold {
     to { transform: rotate(360deg); }
 }
 
-/* ===== نافذة بيانات السائق ===== */
-.driver-detail {
-    background: #1f2937;
-    border: 1px solid #fbbf24;
-    border-radius: 12px;
-    padding: 16px;
-    margin-top: 12px;
-}
-.driver-detail .label {
-    color: #9ca3af;
-    font-size: 12px;
-}
-.driver-detail .value {
-    color: #fbbf24;
-    font-weight: 600;
-    font-size: 14px;
+/* =========================================
+   الاستجابة (Responsive)
+========================================= */
+@media (max-width: 768px) {
+    .stat-card .icon { width: 36px; height: 36px; font-size: 18px; }
+    #map-container { height: 350px; }
+    #history-map-container { height: calc(100% - 100px); } 
+    table { font-size: 12px; }
+    table th, table td { padding: 6px 10px; }
+    .map-marker { width: 28px; height: 28px; }
+    .map-marker svg { width: 28px; height: 28px; }
 }
