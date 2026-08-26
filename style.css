@@ -7,27 +7,44 @@
 body {
     margin: 0;
     padding: 0;
-    background: #f3f4f6;
+    background: #0f0f1a;
+    color: #f5c842;
+}
+
+/* ===== الألوان الأساسية ===== */
+:root {
+    --dark-bg: #0f0f1a;
+    --dark-card: #1a1a2e;
+    --dark-input: #252540;
+    --gold: #d4a017;
+    --gold-hover: #f5c842;
+    --gold-light: #f5c842;
+    --gold-border: rgba(212, 160, 23, 0.3);
 }
 
 /* ===== الشريط الجانبي ===== */
 .nav-btn.active {
-    background-color: #fef3c7;
-    color: #d97706;
+    background-color: rgba(212, 160, 23, 0.15);
+    color: #f5c842;
     font-weight: 700;
 }
 .nav-btn.active span:first-child {
-    color: #d97706;
+    color: #f5c842;
+}
+
+.nav-btn-mobile.active {
+    color: #f5c842 !important;
 }
 
 /* ===== بطاقات الإحصائيات ===== */
 .stat-card {
     transition: transform 0.2s, box-shadow 0.2s;
-    border: 1px solid #e5e7eb;
+    border: 1px solid rgba(212, 160, 23, 0.15);
+    background: #1a1a2e;
 }
 .stat-card:hover {
     transform: translateY(-4px);
-    box-shadow: 0 8px 25px rgba(0,0,0,0.08);
+    box-shadow: 0 8px 25px rgba(212, 160, 23, 0.1);
 }
 .stat-card .icon {
     width: 48px;
@@ -37,22 +54,31 @@ body {
     align-items: center;
     justify-content: center;
     font-size: 24px;
+    background: rgba(212, 160, 23, 0.1);
+    color: #f5c842;
 }
 .stat-card .icon.gold {
-    background: #fef3c7;
-    color: #d97706;
+    background: rgba(212, 160, 23, 0.15);
+    color: #f5c842;
+}
+.stat-card .stat-label {
+    color: #a0a0b8;
+}
+.stat-card .stat-value {
+    color: #f5c842;
 }
 
 /* ===== بطاقة السيارة ===== */
 .vehicle-card {
-    border-right: 4px solid #d97706;
+    border-right: 4px solid #d4a017;
     transition: all 0.3s;
-    background: white;
+    background: #1a1a2e;
     cursor: pointer;
+    border: 1px solid rgba(212, 160, 23, 0.1);
 }
 .vehicle-card:hover {
     transform: translateX(-4px);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+    box-shadow: 0 4px 12px rgba(212, 160, 23, 0.1);
 }
 .vehicle-card.offline {
     border-right-color: #ef4444;
@@ -69,7 +95,13 @@ body {
 }
 .vehicle-card .status-dot.online { background: #22c55e; }
 .vehicle-card .status-dot.offline { background: #ef4444; }
-.vehicle-card .status-dot.moving { background: #d97706; animation: pulse-dot 1.5s infinite; }
+.vehicle-card .status-dot.moving { background: #d4a017; animation: pulse-dot 1.5s infinite; }
+.vehicle-card .vehicle-name {
+    color: #f5c842;
+}
+.vehicle-card .vehicle-info {
+    color: #a0a0b8;
+}
 
 @keyframes pulse-dot {
     0%, 100% { opacity: 1; transform: scale(1); }
@@ -82,7 +114,7 @@ body {
     height: 550px;
     border-radius: 12px;
     overflow: hidden;
-    border: 1px solid #e5e7eb;
+    border: 1px solid rgba(212, 160, 23, 0.15);
 }
 
 /* ===== علامة الخريطة - شكل سيارة ===== */
@@ -100,7 +132,7 @@ body {
 .map-marker svg {
     width: 32px;
     height: 32px;
-    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
 }
 .map-marker.online svg .car-body {
     fill: #22c55e;
@@ -109,13 +141,13 @@ body {
     fill: #ef4444;
 }
 .map-marker.moving svg .car-body {
-    fill: #d97706;
+    fill: #d4a017;
     animation: pulse-car 1.5s infinite;
 }
 
 @keyframes pulse-car {
     0%, 100% { transform: scale(1); }
-    50% { transform: scale(1.1); }
+    50% { transform: scale(1.08); }
 }
 
 /* ===== نافذة المعلومات المنبثقة ===== */
@@ -123,25 +155,37 @@ body {
     padding: 8px 12px;
     font-size: 13px;
     max-width: 220px;
+    background: #1a1a2e;
+    color: #f5c842;
+    border-radius: 8px;
+    border: 1px solid rgba(212, 160, 23, 0.2);
 }
 .map-popup .name {
     font-weight: 700;
     font-size: 15px;
-    color: #1f2937;
+    color: #f5c842;
 }
 .map-popup .detail {
-    color: #6b7280;
+    color: #a0a0b8;
     font-size: 12px;
 }
 .map-popup .gold-text {
-    color: #d97706;
+    color: #d4a017;
     font-weight: 600;
+}
+
+.mapboxgl-popup-content {
+    background: transparent !important;
+    padding: 0 !important;
+}
+.mapboxgl-popup-tip {
+    border-top-color: #1a1a2e !important;
 }
 
 /* ===== أزرار ===== */
 .btn-primary {
-    background: #d97706;
-    color: white;
+    background: #d4a017;
+    color: #0f0f1a;
     padding: 8px 20px;
     border-radius: 8px;
     transition: background 0.2s;
@@ -149,49 +193,50 @@ body {
     cursor: pointer;
     font-weight: 600;
 }
-.btn-primary:hover { background: #b45309; }
+.btn-primary:hover { background: #f5c842; }
 
 .btn-danger {
-    background: #ef4444;
-    color: white;
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
     padding: 4px 14px;
     border-radius: 6px;
     transition: background 0.2s;
-    border: none;
+    border: 1px solid rgba(239, 68, 68, 0.3);
     cursor: pointer;
     font-size: 13px;
 }
-.btn-danger:hover { background: #dc2626; }
+.btn-danger:hover { background: rgba(239, 68, 68, 0.3); }
 
 .btn-success {
-    background: #22c55e;
-    color: white;
+    background: rgba(34, 197, 94, 0.2);
+    color: #22c55e;
     padding: 4px 14px;
     border-radius: 6px;
     transition: background 0.2s;
-    border: none;
+    border: 1px solid rgba(34, 197, 94, 0.3);
     cursor: pointer;
     font-size: 13px;
 }
-.btn-success:hover { background: #16a34a; }
+.btn-success:hover { background: rgba(34, 197, 94, 0.3); }
 
 .btn-outline {
     background: transparent;
-    color: #d97706;
+    color: #d4a017;
     padding: 6px 16px;
     border-radius: 6px;
-    border: 1.5px solid #d97706;
+    border: 1.5px solid #d4a017;
     cursor: pointer;
     transition: all 0.2s;
     font-weight: 600;
 }
-.btn-outline:hover { background: #d97706; color: white; }
+.btn-outline:hover { background: #d4a017; color: #0f0f1a; }
 
 /* ===== الجداول ===== */
 .table-container {
     overflow-x: auto;
     border-radius: 12px;
-    border: 1px solid #e5e7eb;
+    border: 1px solid rgba(212, 160, 23, 0.15);
+    background: #1a1a2e;
 }
 table {
     width: 100%;
@@ -199,26 +244,27 @@ table {
     font-size: 14px;
 }
 table th {
-    background: #fef3c7;
+    background: rgba(212, 160, 23, 0.1);
     text-align: right;
     padding: 12px 16px;
     font-weight: 700;
-    color: #92400e;
-    border-bottom: 2px solid #fcd34d;
+    color: #f5c842;
+    border-bottom: 2px solid rgba(212, 160, 23, 0.2);
 }
 table td {
     padding: 10px 16px;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid rgba(212, 160, 23, 0.05);
+    color: #c8c8d8;
 }
 table tr:hover td {
-    background: #fffbeb;
+    background: rgba(212, 160, 23, 0.05);
 }
 
 /* ===== مودال ===== */
 .modal-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(0,0,0,0.5);
+    background: rgba(0,0,0,0.7);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -226,7 +272,7 @@ table tr:hover td {
     padding: 16px;
 }
 .modal-box {
-    background: white;
+    background: #1a1a2e;
     border-radius: 16px;
     max-width: 500px;
     width: 100%;
@@ -234,6 +280,26 @@ table tr:hover td {
     max-height: 90vh;
     overflow-y: auto;
     animation: modalIn 0.25s ease;
+    border: 1px solid rgba(212, 160, 23, 0.15);
+}
+.modal-box label {
+    color: #f5c842;
+}
+.modal-box input {
+    background: #252540;
+    border: 1px solid rgba(212, 160, 23, 0.2);
+    color: #f5c842;
+    border-radius: 8px;
+    padding: 10px 14px;
+    width: 100%;
+}
+.modal-box input:focus {
+    outline: none;
+    border-color: #d4a017;
+    box-shadow: 0 0 0 2px rgba(212, 160, 23, 0.2);
+}
+.modal-box input::placeholder {
+    color: #666680;
 }
 @keyframes modalIn {
     from { opacity: 0; transform: scale(0.95) translateY(20px); }
@@ -244,19 +310,36 @@ table tr:hover td {
 .tab-btn {
     padding: 8px 20px;
     border-radius: 8px;
-    border: 2px solid #e5e7eb;
-    background: white;
+    border: 2px solid rgba(212, 160, 23, 0.2);
+    background: transparent;
     cursor: pointer;
     transition: all 0.2s;
     font-weight: 600;
+    color: #a0a0b8;
 }
 .tab-btn.active {
-    border-color: #d97706;
-    background: #fef3c7;
-    color: #d97706;
+    border-color: #d4a017;
+    background: rgba(212, 160, 23, 0.1);
+    color: #f5c842;
 }
 .tab-btn:hover {
-    border-color: #d97706;
+    border-color: #d4a017;
+    color: #f5c842;
+}
+
+/* ===== ألوان النصوص ===== */
+.text-gold { color: #d4a017; }
+.text-gold-light { color: #f5c842; }
+.bg-dark-bg { background: #0f0f1a; }
+.bg-dark-card { background: #1a1a2e; }
+.bg-dark-input { background: #252540; }
+.border-gold-border { border-color: rgba(212, 160, 23, 0.2); }
+
+/* ===== حالة الاتصال ===== */
+#onlineStatus.offline {
+    background: rgba(239, 68, 68, 0.2) !important;
+    color: #ef4444 !important;
+    border-color: rgba(239, 68, 68, 0.3) !important;
 }
 
 /* ===== استجابة ===== */
@@ -267,22 +350,38 @@ table tr:hover td {
     table th, table td { padding: 6px 10px; }
     .map-marker { width: 24px; height: 24px; }
     .map-marker svg { width: 24px; height: 24px; }
+    .modal-box { margin: 16px; padding: 16px; }
 }
 
+/* ===== شريط التمرير ===== */
 ::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-::-webkit-scrollbar-thumb { background: #fcd34d; border-radius: 10px; }
-::-webkit-scrollbar-thumb:hover { background: #d97706; }
+::-webkit-scrollbar-track { background: #1a1a2e; border-radius: 10px; }
+::-webkit-scrollbar-thumb { background: #d4a017; border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: #f5c842; }
 
+/* ===== تحميل ===== */
 .loading-spinner {
     display: inline-block;
     width: 30px;
     height: 30px;
-    border: 3px solid #e5e7eb;
-    border-top-color: #d97706;
+    border: 3px solid rgba(212, 160, 23, 0.1);
+    border-top-color: #d4a017;
     border-radius: 50%;
     animation: spin 0.8s linear infinite;
 }
 @keyframes spin {
     to { transform: rotate(360deg); }
+}
+
+/* ===== الخلفية المظلمة للخرائط ===== */
+.mapboxgl-ctrl-group {
+    background: #1a1a2e !important;
+    border-color: rgba(212, 160, 23, 0.2) !important;
+}
+.mapboxgl-ctrl-group button {
+    background: #1a1a2e !important;
+    color: #f5c842 !important;
+}
+.mapboxgl-ctrl-group button:hover {
+    background: rgba(212, 160, 23, 0.1) !important;
 }
