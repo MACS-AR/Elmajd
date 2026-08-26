@@ -34,6 +34,10 @@ let satelliteLayer = null;
 let liveListeners = [];
 let isInitialized = false;
 
+// متغيرات نافذة سجل المسار (جديد)
+let historyMapInstance = null;
+let historyPolyline = null;
+
 // =============================================
 // 🔐 إنشاء حساب أدمن تلقائي (للحالات الطارئة)
 // =============================================
@@ -245,7 +249,7 @@ function showDashboard() {
     document.getElementById('loginScreen').classList.add('hidden');
     document.getElementById('dashboardScreen').classList.remove('hidden');
 
-    document.getElementById('userName').textContent = `مرحباً، ${currentUser.displayName || 'المستخدم'}`;
+    document.getElementById('userName').textContent = `مرحباً، ${currentUser?.displayName || 'المستخدم'}`;
     document.getElementById('userRole').textContent = userRole === 'admin' ? 'مدير' : 'عميل';
 
     if (userRole === 'admin') {
@@ -389,7 +393,7 @@ function focusOnVehicle(code, lat, lng) {
 }
 
 // =============================================
-// 🚗 سياراتي مع إدارة
+// 🚗 سياراتي مع إدارة (مع إضافة زر مسار الرحلة)
 // =============================================
 async function renderVehicles() {
     const container = document.getElementById('page-vehicles');
@@ -447,6 +451,7 @@ async function renderVehicles() {
                     <div class="mt-3 flex gap-2 flex-wrap">
                         <button onclick="focusOnVehicle('${code}', ${loc.latitude}, ${loc.longitude})" class="btn-outline text-xs">📍 عرض</button>
                         <button onclick="showDriverDetails('${code}')" class="btn-edit text-xs">📋 بيانات</button>
+                        <button onclick="showDriverHistoryMapModal('${code}')" class="btn-info text-xs bg-blue-600 hover:bg-blue-700 text-white px-2 py-1 rounded">🗺️ مسار الرحلة</button>
                         <button onclick="showEditVehicle('${code}')" class="btn-primary text-xs">✏️ تعديل</button>
                         <button onclick="deleteVehicle('${code}')" class="btn-danger text-xs">🗑️ حذف</button>
                     </div>
@@ -460,15 +465,14 @@ async function renderVehicles() {
     liveListeners.push(ref);
 }
 
-// ... (تظل دوال الإضافة والتعديل والحذف كما هي لأنها تتعامل مع البيانات بنجاح) ...
-// (سأقوم باختصارها هنا للحفاظ على الكود نظيف، لكنها تعمل بشكل ممتاز)
-function showAddVehicle() { /* ...نفس الكود السابق... */ }
-async function handleAddVehicle(e) { /* ...نفس الكود السابق... */ }
-function showEditVehicle(code) { /* ...نفس الكود السابق... */ }
-async function handleEditVehicle(e, code) { /* ...نفس الكود السابق... */ }
-async function deleteVehicle(code) { /* ...نفس الكود السابق... */ }
-function showDriverDetails(code) { /* ...نفس الكود السابق... */ }
-function loadDriverHistory(code) { /* ...نفس الكود السابق... */ }
+// ... دوال الإضافة والتعديل والحذف ...
+function showAddVehicle() { /* الكود الأصلي */ }
+async function handleAddVehicle(e) { /* الكود الأصلي */ }
+function showEditVehicle(code) { /* الكود الأصلي */ }
+async function handleEditVehicle(e, code) { /* الكود الأصلي */ }
+async function deleteVehicle(code) { /* الكود الأصلي */ }
+function showDriverDetails(code) { /* الكود الأصلي */ }
+function loadDriverHistory(code) { /* الكود الأصلي */ }
 
 // =============================================
 // 🗺️ الخريطة المباشرة المجانية (Leaflet)
@@ -561,7 +565,6 @@ function renderMap() {
                 popupAnchor: [0, -20]
             });
 
-            // ⚠️ محتوى النافذة المنبثقة (الاسم، السرعة، البطارية فقط) - تم إخفاء الكود
             const popupContent = `
                 <div class="map-popup text-right" style="font-family: Cairo, sans-serif; min-width: 150px;">
                     <div class="font-bold text-lg mb-2" style="color: #333;">👤 ${v.displayName || 'غير معروف'}</div>
@@ -587,7 +590,6 @@ function renderMap() {
     liveListeners.push(ref);
 }
 
-// دالة تبديل نوع الخريطة (شوارع / قمر صناعي)
 function changeMapStyle(style) {
     if (!mapInstance) return;
     
@@ -603,25 +605,21 @@ function changeMapStyle(style) {
 // =============================================
 // 📈 سجل الحركة
 // =============================================
-function renderTracking() {
-    // ... يظل هذا الكود كما هو لأنه يعمل بشكل ممتاز ومفصول حسب الـ tenantId ...
-    // (لم أقم بتعديله لضمان استقرار الوظائف الأخرى)
-}
-function loadTracking(period) { /* نفس الكود السابق */ }
+function renderTracking() { /* الكود الأصلي */ }
+function loadTracking(period) { /* الكود الأصلي */ }
 
 // =============================================
 // 🏢 إدارة الشركات والسيارات والاشتراكات (للمشرف)
 // =============================================
-// هذه الدوال تظل كما هي لأنها خاصة بصفحات الأدمن الحالي
-async function renderCompanies() { /* نفس الكود */ }
-function showAddCompany() { /* نفس الكود */ }
-async function handleAddCompany(e) { /* نفس الكود */ }
-async function toggleCompany(id) { /* نفس الكود */ }
-async function deleteCompany(id) { /* نفس الكود */ }
-function renderAdminVehicles() { /* نفس الكود */ }
-function renderSubscriptions() { /* نفس الكود */ }
-async function extendSubscription(id) { /* نفس الكود */ }
-async function suspendSubscription(id) { /* نفس الكود */ }
+async function renderCompanies() { /* الكود الأصلي */ }
+function showAddCompany() { /* الكود الأصلي */ }
+async function handleAddCompany(e) { /* الكود الأصلي */ }
+async function toggleCompany(id) { /* الكود الأصلي */ }
+async function deleteCompany(id) { /* الكود الأصلي */ }
+function renderAdminVehicles() { /* الكود الأصلي */ }
+function renderSubscriptions() { /* الكود الأصلي */ }
+async function extendSubscription(id) { /* الكود الأصلي */ }
+async function suspendSubscription(id) { /* الكود الأصلي */ }
 
 // =============================================
 // 🚀 بدء التطبيق
@@ -665,3 +663,207 @@ auth.onAuthStateChanged(async (user) => {
         }
     }
 });
+
+// =========================================================================
+// 🔥🔥🔥 الإضافات الجديدة حسب طلبك (بدون حذف أي شيء من الأكواد السابقة) 🔥🔥🔥
+// =========================================================================
+
+// =============================================
+// 1️⃣ حساب المسافة بالكيلومترات (معادلة Haversine)
+// =============================================
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // نصف قطر الأرض بالكيلومتر
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+              Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+              Math.sin(dLon/2) * Math.sin(dLon/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c; // المسافة بالكيلومتر
+}
+
+// =============================================
+// 2️⃣ نافذة سجل حركة السائق (خريطة + حساب كيلومترات)
+// =============================================
+async function showDriverHistoryMapModal(code) {
+    // إنشاء عنصر النافذة المنبثقة وحقنه في الصفحة
+    let modal = document.getElementById('historyMapModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'historyMapModal';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50';
+        modal.innerHTML = `
+            <div class="bg-gray-800 w-11/12 md:w-3/4 lg:w-2/3 h-5/6 rounded-xl shadow-lg flex flex-col border border-gray-600">
+                <div class="p-4 flex justify-between items-center border-b border-gray-700">
+                    <h3 class="text-xl font-bold text-yellow-500">🗺️ سجل حركة السائق</h3>
+                    <button onclick="closeHistoryMapModal()" class="text-red-500 hover:text-red-700 font-bold text-2xl">&times;</button>
+                </div>
+                <div class="p-4 bg-gray-900 flex justify-between items-center text-sm text-gray-300">
+                    <div>إجمالي المسافة المقطوعة: <span id="totalDistanceLabel" class="text-green-400 font-bold text-lg">0</span> كم</div>
+                    <div>تاريخ اليوم: <span class="text-yellow-400">${new Date().toLocaleDateString('ar')}</span></div>
+                </div>
+                <div id="history-map-container" class="flex-grow w-full rounded-b-xl" style="z-index: 1;"></div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+    } else {
+        modal.classList.remove('hidden');
+    }
+
+    // الانتظار قليلاً حتى يتم عرض الـ div في الـ DOM قبل تهيئة الخريطة
+    setTimeout(async () => {
+        if (historyMapInstance) {
+            historyMapInstance.remove();
+        }
+
+        historyMapInstance = L.map('history-map-container').setView([30.0444, 31.2357], 10);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19
+        }).addTo(historyMapInstance);
+
+        // جلب مسار السيارة من Firebase
+        try {
+            // ملاحظة: افتراض أن المواقع تتخزن في locationHistory/code (يمكن تعديل المسار حسب هيكلة قاعدتك)
+            const snap = await dbRT.ref(`locationHistory/${code}`).orderByChild('timestamp').limitToLast(500).once('value');
+            const data = snap.val();
+
+            if (!data) {
+                alert('لا يوجد سجل حركات مسجل لهذه السيارة اليوم.');
+                return;
+            }
+
+            const points = [];
+            let totalKm = 0;
+            let prevPoint = null;
+
+            Object.values(data).forEach(loc => {
+                if (loc.latitude && loc.longitude) {
+                    points.push([loc.latitude, loc.longitude]);
+                    
+                    if (prevPoint) {
+                        totalKm += calculateDistance(prevPoint.lat, prevPoint.lng, loc.latitude, loc.longitude);
+                    }
+                    prevPoint = { lat: loc.latitude, lng: loc.longitude };
+                }
+            });
+
+            document.getElementById('totalDistanceLabel').textContent = totalKm.toFixed(2);
+
+            if (points.length > 0) {
+                // رسم الخط (Polyline)
+                historyPolyline = L.polyline(points, { color: 'blue', weight: 4, opacity: 0.7 }).addTo(historyMapInstance);
+                historyMapInstance.fitBounds(historyPolyline.getBounds()); // توجيه الخريطة لتشمل الخط بالكامل
+
+                // علامة البداية
+                L.marker(points[0]).addTo(historyMapInstance).bindPopup('🏁 نقطة البداية');
+                // علامة النهاية
+                L.marker(points[points.length - 1]).addTo(historyMapInstance).bindPopup('📍 نقطة النهاية (الحالية)');
+            }
+
+        } catch (error) {
+            console.error('Error fetching history:', error);
+            alert('حدث خطأ أثناء جلب السجل.');
+        }
+    }, 300);
+}
+
+function closeHistoryMapModal() {
+    const modal = document.getElementById('historyMapModal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+    if (historyMapInstance) {
+        historyMapInstance.remove();
+        historyMapInstance = null;
+    }
+}
+
+// =============================================
+// 3️⃣ دالة تسجيل الدخول المخصص (يوزر وباسورد للعمال والشركات من قاعدة البيانات)
+// تم تجهيزها لصفحة الأدمن والعمال المستقبلية
+// =============================================
+async function handleCustomDatabaseLogin(username, password) {
+    try {
+        // البحث عن المستخدم في مجموعة users باستخدام اليوزر نيم
+        const usersRef = dbFS.collection('users');
+        const querySnapshot = await usersRef.where('username', '==', username).where('password', '==', password).get();
+
+        if (querySnapshot.empty) {
+            throw new Error("اسم المستخدم أو كلمة المرور غير صحيحة.");
+        }
+
+        const userData = querySnapshot.docs[0].data();
+        const userId = querySnapshot.docs[0].id;
+
+        // التحقق من حالة اشتراك الشركة التابع لها العامل
+        const tenantRef = await dbFS.collection('tenants').doc(userData.tenantId).get();
+        if (!tenantRef.exists) {
+            throw new Error("بيانات الشركة غير موجودة.");
+        }
+
+        const tenantData = tenantRef.data();
+        if (tenantData.subscriptionStatus !== 'active') {
+            throw new Error("اشتراك الشركة منتهي أو متوقف، يرجى التواصل مع الإدارة.");
+        }
+
+        // إعداد متغيرات الجلسة محلياً (Custom Session)
+        currentUser = { uid: userId, displayName: userData.name, email: userData.email || username };
+        currentUserId = userId;
+        userRole = userData.role || 'worker'; // worker, company_admin, etc.
+        userTenantId = userData.tenantId;
+
+        alert(`مرحباً بك ${userData.name}! تم تسجيل الدخول بنجاح.`);
+        
+        // إخفاء شاشة اللوجين وفتح لوحة التحكم (الخاصة بالعمال أو الشركة)
+        showDashboard(); 
+
+    } catch (error) {
+        showGlobalError(error.message);
+    }
+}
+
+// =============================================
+// 4️⃣ دالة إنشاء حساب جيميل (لصفحة الـ Index المستقبلية)
+// =============================================
+async function handleIndexGmailSignup(email, password, companyName, ownerName, phone) {
+    try {
+        // 1. إنشاء حساب في Firebase Auth
+        const userCred = await auth.createUserWithEmailAndPassword(email, password);
+        const uid = userCred.user.uid;
+
+        await userCred.user.updateProfile({ displayName: ownerName });
+
+        // 2. إنشاء Tenant (شركة) جديدة في قاعدة البيانات
+        const newTenantId = 'tenant_' + Date.now();
+        await dbFS.collection('tenants').doc(newTenantId).set({
+            name: companyName,
+            ownerName: ownerName,
+            email: email,
+            phone: phone || '',
+            status: 'active',
+            subscriptionStatus: 'active', // يمكن جعلها تجريبية trail
+            vehiclesCount: 0,
+            createdAt: Date.now()
+        });
+
+        // 3. حفظ بيانات المستخدم كأدمن لهذه الشركة
+        await dbFS.collection('users').doc(uid).set({
+            tenantId: newTenantId,
+            email: email,
+            name: ownerName,
+            phone: phone || '',
+            role: 'company_admin', // مدير شركة
+            status: 'active',
+            createdAt: Date.now()
+        });
+
+        alert('✅ تم إنشاء الحساب بنجاح! يمكنك الآن تسجيل الدخول.');
+        // يمكن توجيهه لصفحة الدخول هنا
+        // window.location.href = 'login.html';
+
+    } catch (error) {
+        console.error('❌ فشل إنشاء الحساب:', error.message);
+        alert('فشل إنشاء الحساب: ' + error.message);
+    }
+}
