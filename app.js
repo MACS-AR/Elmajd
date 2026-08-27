@@ -40,6 +40,18 @@ let historyPolyline = null;
 let selectedPaymentMethod = null;
 
 // =============================================
+// 🧹 دالة مساعدة لتنظيف مستمعي اللحظي لمنع تسريب الذاكرة (Memory Leaks)
+// =============================================
+function clearLiveListeners() {
+    liveListeners.forEach(ref => {
+        if (ref && typeof ref.off === 'function') {
+            ref.off();
+        }
+    });
+    liveListeners = [];
+}
+
+// =============================================
 // 🔧 دالة مساعدة لتوليد UUID
 // =============================================
 function generateUUID() {
@@ -53,7 +65,7 @@ function generateUUID() {
 }
 
 // =============================================
-// 🔐 التأكد من وجود حساب الأدمن (بدون فرض الدخول)
+// 🔐 التأكد من وجود حساب الأدمن (أمان أفرز: بدون تخزين كلمة المرور نصياً)
 // =============================================
 async function ensureAdminAccount() {
     const adminEmail = 'admin@system.com';
@@ -74,7 +86,6 @@ async function ensureAdminAccount() {
                 name: adminName,
                 phone: '0100000000',
                 username: 'admin',
-                password: adminPassword,
                 role: 'admin',
                 status: 'active',
                 createdAt: Date.now()
@@ -86,7 +97,6 @@ async function ensureAdminAccount() {
                 email: adminEmail,
                 phone: '0100000000',
                 username: 'admin',
-                password: adminPassword,
                 status: 'active',
                 subscriptionStatus: 'active',
                 subscriptionPeriod: 'year',
@@ -119,7 +129,7 @@ async function createDemoAccount() {
 
         await userCred.user.updateProfile({ displayName: demoName });
 
-        const tenantId = uid; // اعتماد UID كالرمز المرجعي للشركة
+        const tenantId = uid;
         const now = Date.now();
         await dbFS.collection('tenants').doc(tenantId).set({
             name: 'شركة تجريبية',
@@ -127,7 +137,6 @@ async function createDemoAccount() {
             email: demoEmail,
             phone: '0100000000',
             username: demoEmail,
-            password: demoPassword,
             status: 'active',
             subscriptionStatus: 'trial',
             subscriptionPeriod: 'month',
@@ -146,7 +155,6 @@ async function createDemoAccount() {
             name: demoName,
             phone: '0100000000',
             username: demoEmail,
-            password: demoPassword,
             role: 'company_admin',
             status: 'active',
             createdAt: now
@@ -407,8 +415,7 @@ async function submitPaymentRequest() {
 // =============================================
 async function handleLogout() {
     try {
-        liveListeners.forEach(ref => ref.off && ref.off());
-        liveListeners = [];
+        clearLiveListeners();
 
         if (mapInstance) {
             mapInstance.remove();
@@ -518,6 +525,8 @@ async function renderDashboard() {
     const container = document.getElementById('page-dashboard');
     if (!container) return;
 
+    clearLiveListeners();
+
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-bold text-yellow-500">📊 لوحة التحكم</h2>
@@ -542,7 +551,6 @@ async function renderDashboard() {
         ref = dbRT.ref('vehicleDrivers').orderByChild('tenantId').equalTo(userTenantId || currentUserId);
     }
 
-    ref.off();
     ref.on('value', (snap) => {
         const data = snap.val();
         if (!data) { updateStats(0, 0, 0, 0); renderRecent([]); return; }
@@ -617,6 +625,8 @@ async function renderVehicles() {
     const container = document.getElementById('page-vehicles');
     if (!container) return;
 
+    clearLiveListeners();
+
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
             <h2 class="text-2xl font-bold text-yellow-500">🚗 سائقين الشركة</h2>
@@ -634,7 +644,6 @@ async function renderVehicles() {
         ref = dbRT.ref('vehicleDrivers').orderByChild('tenantId').equalTo(userTenantId || currentUserId);
     }
 
-    ref.off();
     ref.on('value', (snap) => {
         const data = snap.val();
         const list = document.getElementById('vehiclesList');
@@ -781,7 +790,6 @@ function submitNewVehicle() {
         return;
     }
 
-    // التأكد التلقائي من تعيين Tenant ID للمستخدم الحالي
     const targetTenantId = userTenantId || (currentUser ? currentUser.uid : null);
 
     if (!targetTenantId) {
@@ -798,17 +806,14 @@ function submitNewVehicle() {
         status: 'offline'
     };
 
-    // 1. حفظ بيانات السائق بالجدول الرئيسي
     dbRT.ref(`vehicleDrivers/${code}`).set(payload)
         .then(() => {
-            // 2. ربط كود التفعيل لتسهيل دخول تطبيق الأندرويد
             return dbRT.ref(`activationCodes/${activationCode}`).set({
                 tenantId: targetTenantId,
                 vehicleCode: code
             });
         })
         .then(() => {
-            // 3. حفظ السائق تحت شجرة الشركة في الفايربيس (tenants/{tenantId}/drivers)
             return dbRT.ref(`tenants/${targetTenantId}/drivers/${code}`).set({
                 displayName: name,
                 phone: phone || '',
@@ -908,6 +913,8 @@ function renderMap() {
     const container = document.getElementById('page-map');
     if (!container) return;
 
+    clearLiveListeners();
+
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
             <h2 class="text-2xl font-bold text-yellow-500">🗺️ الخريطة المباشرة للسيارات</h2>
@@ -951,15 +958,14 @@ function renderMap() {
         ref = dbRT.ref('vehicleDrivers').orderByChild('tenantId').equalTo(userTenantId || currentUserId);
     }
 
-    ref.off();
     ref.on('value', (snap) => {
         const data = snap.val();
         if (!data) return;
 
-        Object.values(mapMarkers).forEach(m => mapInstance.removeLayer(m));
+        Object.values(mapMarkers).forEach(m => mapInstance && mapInstance.removeLayer(m));
         mapMarkers = {};
 
-        Object.values(livePathPolylines).forEach(p => mapInstance.removeLayer(p));
+        Object.values(livePathPolylines).forEach(p => mapInstance && mapInstance.removeLayer(p));
         livePathPolylines = {};
 
         let count = 0;
@@ -1012,7 +1018,7 @@ function renderMap() {
 
             mapMarkers[code] = marker;
 
-            // 🟦 رسم خط سير الحركة الحي (Blue Polyline) باللون الأزرق من نقطة البداية للموقع الحالي
+            // 🟦 رسم خط سير الحركة الحي (Blue Polyline)
             const pathData = v.livePath;
             if (pathData && Array.isArray(pathData) && pathData.length > 1) {
                 const pathPoints = pathData.map(p => [p.latitude, p.longitude]);
@@ -1215,7 +1221,7 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 // =============================================
-// 🗺️ نافذة سجل حركة السائق اليومي + رسم الخط وحساب المدة والكيلوات
+// 🗺️ نافذة سجل حركة السائق اليومي + إزالة الخريطة القديمة بأمان لمنع الأخطاء
 // =============================================
 async function showDriverHistoryMapModal(code) {
     const driverSnap = await dbRT.ref(`vehicleDrivers/${code}`).once('value');
@@ -1231,10 +1237,9 @@ async function showDriverHistoryMapModal(code) {
         return;
     }
 
-    let modal = document.getElementById('historyMapModal');
-    if (modal) modal.remove();
+    closeHistoryMapModal();
 
-    modal = document.createElement('div');
+    const modal = document.createElement('div');
     modal.id = 'historyMapModal';
     modal.className = 'fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-3';
     modal.innerHTML = `
@@ -1260,9 +1265,15 @@ async function showDriverHistoryMapModal(code) {
     document.body.appendChild(modal);
 
     setTimeout(async () => {
+        const containerEl = document.getElementById('history-map-container');
+        if (!containerEl) return;
+        
         if (historyMapInstance) {
             historyMapInstance.remove();
             historyMapInstance = null;
+        }
+        if (containerEl._leaflet_id) {
+            containerEl._leaflet_id = null;
         }
 
         historyMapInstance = L.map('history-map-container').setView([30.0444, 31.2357], 12);
@@ -1270,7 +1281,6 @@ async function showDriverHistoryMapModal(code) {
             attribution: '© OpenStreetMap'
         }).addTo(historyMapInstance);
 
-        // جلب مسار وسجل الحركة المسجل للسائق
         const historySnap = await dbRT.ref(`locationHistory/${code}`).once('value');
         let points = [];
         const historyVal = historySnap.val();
@@ -1292,7 +1302,6 @@ async function showDriverHistoryMapModal(code) {
             return;
         }
 
-        // ترتيب النقاط بالزمن
         points.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
 
         let totalDistance = 0;
@@ -1316,13 +1325,11 @@ async function showDriverHistoryMapModal(code) {
             durationMinutes = Math.round((endTime - startTime) / (1000 * 60));
         }
 
-        // تحديث إحصائيات السجل اليومي
         document.getElementById('histDist').textContent = totalDistance.toFixed(2) + ' كم';
         document.getElementById('histDuration').textContent = durationMinutes >= 60 ? `${Math.floor(durationMinutes/60)} ساعة و ${durationMinutes%60} دقيقة` : `${durationMinutes} دقيقة`;
         document.getElementById('histStart').textContent = startTime ? startTime.toLocaleTimeString('ar') : '-';
         document.getElementById('histEnd').textContent = endTime ? endTime.toLocaleTimeString('ar') : '-';
 
-        // 🟦 رسم خط السير الأزرق (Blue Polyline)
         if (latLngs.length > 1) {
             historyPolyline = L.polyline(latLngs, { color: '#0066ff', weight: 6, opacity: 0.9, lineJoin: 'round' }).addTo(historyMapInstance);
             historyMapInstance.fitBounds(historyPolyline.getBounds(), { padding: [30, 30] });
@@ -1330,7 +1337,6 @@ async function showDriverHistoryMapModal(code) {
             historyMapInstance.setView(latLngs[0], 16);
         }
 
-        // إضافة علامات البداية والنهاية
         if (latLngs.length > 0) {
             L.marker(latLngs[0]).addTo(historyMapInstance).bindPopup('🏁 نقطة بداية الرحلة').openPopup();
             if (latLngs.length > 1) {
