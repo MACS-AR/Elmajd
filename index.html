@@ -3,201 +3,411 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>منصة تتبع المركبات</title>
+    <title>منصة تتبع المركبات والسائقين - Multi-Tenant Platform</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
-    <style>
-        * { font-family: 'Cairo', sans-serif; }
-        .leaflet-container { z-index: 0; }
-        .map-popup { font-family: 'Cairo', sans-serif; }
-        .custom-leaflet-marker { background: transparent; border: none; }
-        .page-content { display: block; }
-        .hidden { display: none !important; }
-        input, select { direction: ltr; text-align: right; }
-    </style>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen">
+<body class="bg-gray-900 text-gray-100 font-sans antialiased">
 
-    <!-- شاشة تسجيل الدخول / إنشاء حساب -->
-    <div id="loginScreen" class="min-h-screen flex items-center justify-center p-4">
-        <div class="bg-gray-800 rounded-2xl shadow-2xl p-8 max-w-md w-full border border-gray-700">
-            <div class="text-center mb-8">
-                <div class="text-5xl mb-3">🚗</div>
-                <h1 class="text-3xl font-bold text-yellow-500">منصة التتبع</h1>
-                <p class="text-gray-400 mt-2">نظام تتبع المركبات وإدارة الأساطيل</p>
+    <!-- Auth & Subscription Check Overlay -->
+    <div id="authScreen" class="fixed inset-0 z-50 bg-gray-900 flex items-center justify-center p-4">
+        <div class="bg-gray-800 p-8 rounded-2xl shadow-2xl border border-gray-700 w-full max-w-md">
+            <h2 class="text-2xl font-bold text-center mb-6 text-blue-400">تطبيق تتبع المركبات</h2>
+            
+            <div id="loginForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm mb-1 text-gray-300">البريد الإلكتروني</label>
+                    <input type="email" id="emailInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <div>
+                    <label class="block text-sm mb-1 text-gray-300">كلمة المرور</label>
+                    <input type="password" id="passInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:outline-none focus:border-blue-500">
+                </div>
+                <button onclick="handleLogin()" class="w-full bg-blue-600 hover:bg-blue-500 font-bold py-3 rounded-lg transition">تسجيل الدخول</button>
+                <button onclick="toggleAuthMode('register')" class="w-full bg-transparent hover:bg-gray-700 text-sm py-2 rounded-lg text-gray-400">إنشاء حساب شركة/فرد جديد (15 يوم مجاناً)</button>
             </div>
 
-            <div class="flex mb-6 bg-gray-700 rounded-lg p-1">
-                <button id="tabLogin" onclick="switchAuthTab('login')" class="flex-1 py-2 px-4 rounded-lg font-bold bg-yellow-500 text-black transition">تسجيل الدخول</button>
-                <button id="tabSignup" onclick="switchAuthTab('signup')" class="flex-1 py-2 px-4 rounded-lg font-bold text-gray-300 hover:text-white transition">إنشاء حساب</button>
-            </div>
-
-            <!-- نموذج تسجيل الدخول -->
-            <div id="loginForm">
-                <div class="mb-4">
-                    <label class="block text-sm mb-1 text-gray-400">نوع الدخول</label>
-                    <select id="loginType" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
-                        <option value="firebase">بريد إلكتروني وكلمة مرور</option>
-                        <option value="custom">اسم مستخدم وكلمة مرور</option>
-                    </select>
+            <div id="registerForm" class="space-y-4 hidden">
+                <div>
+                    <label class="block text-sm mb-1 text-gray-300">اسم الشركة / الفرد</label>
+                    <input type="text" id="regCompanyInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white">
                 </div>
-                <div class="mb-4">
-                    <label class="block text-sm mb-1 text-gray-400">البريد الإلكتروني / اسم المستخدم</label>
-                    <input type="text" id="loginEmail" placeholder="أدخل البريد أو اسم المستخدم" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-500">
+                <div>
+                    <label class="block text-sm mb-1 text-gray-300">البريد الإلكتروني</label>
+                    <input type="email" id="regEmailInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white">
                 </div>
-                <div class="mb-6">
-                    <label class="block text-sm mb-1 text-gray-400">كلمة المرور</label>
-                    <input type="password" id="loginPassword" placeholder="********" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white placeholder-gray-500">
+                <div>
+                    <label class="block text-sm mb-1 text-gray-300">كلمة المرور</label>
+                    <input type="password" id="regPassInput" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white">
                 </div>
-                <div id="loginError" class="hidden bg-red-900/50 text-red-300 p-3 rounded-lg mb-4 text-sm"></div>
-                <button type="button" onclick="handleLogin(event)" class="w-full bg-yellow-500 hover:bg-yellow-600 text-black font-bold py-3 rounded-lg transition">دخول</button>
-                <button type="button" onclick="quickLoginAdmin()" class="w-full mt-3 bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg text-sm transition">دخول سريع كأدمن</button>
-            </div>
-
-            <!-- نموذج إنشاء حساب -->
-            <div id="signupForm" class="hidden">
-                <div class="grid grid-cols-1 gap-4">
-                    <div>
-                        <label class="block text-sm mb-1 text-gray-400">اسم العميل *</label>
-                        <input type="text" id="signupFullName" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1 text-gray-400">اسم الشركة *</label>
-                        <input type="text" id="signupCompanyName" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1 text-gray-400">رقم الهاتف *</label>
-                        <input type="tel" id="signupPhone" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" dir="ltr">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1 text-gray-400">اليوزر نيم *</label>
-                        <input type="text" id="signupUsername" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" dir="ltr">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1 text-gray-400">البريد الإلكتروني *</label>
-                        <input type="email" id="signupEmail" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" dir="ltr">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1 text-gray-400">كلمة المرور *</label>
-                        <input type="password" id="signupPassword" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
-                    </div>
-                    <div>
-                        <label class="block text-sm mb-1 text-gray-400">مدة الاشتراك</label>
-                        <select id="signupSubscriptionPeriod" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
-                            <option value="month">شهر</option>
-                            <option value="year">سنة</option>
-                        </select>
-                    </div>
-                    <div id="signupError" class="hidden bg-red-900/50 text-red-300 p-3 rounded-lg text-sm"></div>
-                    <button type="button" onclick="handleSignup(event)" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-lg transition">إنشاء الحساب</button>
-                    <p class="text-xs text-gray-500 text-center">سيتم منحك فترة تجريبية مجانية لمدة 15 يوم</p>
-                </div>
+                <button onclick="handleRegister()" class="w-full bg-green-600 hover:bg-green-500 font-bold py-3 rounded-lg transition">بدء الفترة التجريبية (15 يوم)</button>
+                <button onclick="toggleAuthMode('login')" class="w-full bg-transparent hover:bg-gray-700 text-sm py-2 rounded-lg text-gray-400">لديك حساب بالفعل؟ تسجيل الدخول</button>
             </div>
         </div>
     </div>
 
-    <!-- شاشة انتهاء الاشتراك -->
-    <div id="subscriptionExpiredScreen" class="hidden min-h-screen bg-gray-900 flex items-center justify-center p-4">
-        <div class="bg-gray-800 rounded-xl shadow-lg p-8 max-w-md w-full border border-gray-700">
-            <div class="text-center mb-6">
-                <div class="text-6xl mb-4">⏰</div>
-                <h2 class="text-2xl font-bold text-yellow-500 mb-2">انتهاء الاشتراك</h2>
-                <p class="text-gray-400">عذراً، انتهت فترة الاشتراك الخاصة بكم</p>
+    <!-- Subscription Expired Modal -->
+    <div id="subscriptionModal" class="fixed inset-0 z-50 bg-black/90 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-800 p-8 rounded-2xl border border-red-500 text-center max-w-lg w-full space-y-4">
+            <i class="fa-solid fa-triangle-exclamation text-5xl text-red-500"></i>
+            <h2 class="text-2xl font-bold">انتهت الفترة التجريبية / الاشتراك</h2>
+            <p class="text-gray-300 text-sm">تواصل مع إدارة المنصة لتجديد الاشتراك وتفعيل الحساب لاستمرار التتبع اللحظي.</p>
+            
+            <div class="grid grid-cols-2 gap-4 mt-6">
+                <div class="bg-gray-700 p-4 rounded-xl border border-gray-600">
+                    <div class="text-sm text-gray-400">الاشتراك الشهري</div>
+                    <div id="displayMonthlyPrice" class="text-xl font-bold text-blue-400">-- ج.م</div>
+                </div>
+                <div class="bg-gray-700 p-4 rounded-xl border border-gray-600">
+                    <div class="text-sm text-gray-400">الاشتراك السنوي</div>
+                    <div id="displayAnnualPrice" class="text-xl font-bold text-green-400">-- ج.م</div>
+                </div>
             </div>
-            <div class="bg-gray-900 rounded-lg p-4 mb-6">
-                <h3 class="font-bold text-yellow-500 mb-2">بيانات الاشتراك:</h3>
-                <p class="text-gray-300">الشركة: <span id="subscriptionCompanyName"></span></p>
-                <p class="text-gray-300">الحالة: <span id="subscriptionStatus" class="text-red-500"></span></p>
-            </div>
-            <div class="mb-6">
-                <h3 class="font-bold text-yellow-500 mb-3">اختر طريقة الدفع للتجديد:</h3>
-                <div id="paymentMethodsContainer"></div>
-            </div>
-            <button type="button" onclick="handleLogout()" class="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 rounded-lg">تسجيل الخروج</button>
+            
+            <div id="paymentInstructions" class="text-xs text-gray-400 mt-4 bg-gray-900 p-3 rounded-lg"></div>
+            <button onclick="auth.signOut()" class="w-full bg-gray-700 hover:bg-gray-600 py-2 rounded-lg text-sm mt-4">تسجيل الخروج</button>
         </div>
     </div>
 
-    <!-- لوحة التحكم -->
-    <div id="dashboardScreen" class="hidden min-h-screen bg-gray-900">
-        <nav class="bg-gray-800 shadow-md border-b border-gray-700 sticky top-0 z-50">
-            <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center flex-wrap gap-2">
-                <div class="flex items-center gap-3">
-                    <span class="text-2xl">🚗</span>
-                    <div>
-                        <h1 class="font-bold text-yellow-500">منصة التتبع</h1>
-                        <p class="text-xs text-gray-400" id="userName">مرحباً</p>
-                    </div>
+    <!-- Main Application UI -->
+    <div id="mainApp" class="flex h-screen overflow-hidden hidden">
+        <!-- Sidebar -->
+        <aside class="w-80 bg-gray-800 border-l border-gray-700 flex flex-col z-10">
+            <!-- Header -->
+            <div class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <div>
+                    <h1 id="companyTitle" class="font-bold text-lg text-blue-400">جاري التحميل...</h1>
+                    <span id="tenantStatusBadge" class="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded-full">نشط</span>
                 </div>
-                <div class="flex items-center gap-3">
-                    <span id="userRole" class="text-xs bg-gray-700 px-3 py-1 rounded-full"></span>
-                    <button type="button" onclick="handleLogout()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition">تسجيل الخروج</button>
-                </div>
+                <button onclick="auth.signOut()" title="تسجيل الخروج" class="text-gray-400 hover:text-red-400">
+                    <i class="fa-solid fa-right-from-bracket"></i>
+                </button>
             </div>
-            <div class="bg-gray-800 border-t border-gray-700 overflow-x-auto">
-                <div class="max-w-7xl mx-auto flex gap-1 px-2 py-2">
-                    <button type="button" class="nav-btn active bg-gray-700 text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="dashboard" onclick="showPage('dashboard')">📊 لوحة التحكم</button>
-                    <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="vehicles" onclick="showPage('vehicles')">🚗 سياراتي</button>
-                    <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="map" onclick="showPage('map')">🗺️ الخريطة</button>
-                    <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="tracking" onclick="showPage('tracking')">📈 التقارير</button>
-                    <div class="admin-only hidden">
-                        <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-companies" onclick="showPage('admin-companies')">🏢 الشركات</button>
-                        <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-vehicles" onclick="showPage('admin-vehicles')">👑 المركبات</button>
-                        <button type="button" class="nav-btn text-gray-400 hover:bg-gray-700 hover:text-white px-4 py-2 rounded-lg text-sm whitespace-nowrap" data-page="admin-subscriptions" onclick="showPage('admin-subscriptions')">💳 الاشتراكات</button>
-                    </div>
-                </div>
+
+            <!-- Driver Management Controls -->
+            <div class="p-4 border-b border-gray-700 space-y-2">
+                <button onclick="openAddDriverModal()" class="w-full bg-blue-600 hover:bg-blue-500 text-sm py-2 rounded-lg font-semibold flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-plus"></i> إضافة سائق جديد
+                </button>
+                <button id="superAdminBtn" onclick="toggleSuperAdminPanel()" class="w-full bg-purple-600 hover:bg-purple-500 text-sm py-2 rounded-lg font-semibold hidden">
+                    <i class="fa-solid fa-user-shield"></i> لوحة Super Admin
+                </button>
             </div>
-        </nav>
-        <main class="max-w-7xl mx-auto p-6">
-            <div id="page-dashboard" class="page-content"></div>
-            <div id="page-vehicles" class="page-content hidden"></div>
-            <div id="page-map" class="page-content hidden"></div>
-            <div id="page-tracking" class="page-content hidden"></div>
-            <div id="page-admin-companies" class="page-content hidden"></div>
-            <div id="page-admin-vehicles" class="page-content hidden"></div>
-            <div id="page-admin-subscriptions" class="page-content hidden"></div>
+
+            <!-- Driver List -->
+            <div class="flex-1 overflow-y-auto p-4 space-y-3" id="driversList">
+                <!-- Drivers dynamically populated -->
+            </div>
+        </aside>
+
+        <!-- Map Container -->
+        <main class="flex-1 relative">
+            <div id="map" class="w-full h-full"></div>
+            
+            <!-- Map Layer Switcher -->
+            <div class="absolute top-4 left-4 z-[400] bg-gray-800/90 backdrop-blur p-2 rounded-lg border border-gray-700 flex gap-2">
+                <button onclick="switchTileLayer('streets')" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs">شوارع</button>
+                <button onclick="switchTileLayer('satellite')" class="px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs">قمر صناعي</button>
+            </div>
         </main>
     </div>
 
-    <div id="globalError" class="hidden fixed bottom-4 left-4 right-4 md:left-auto bg-red-600 text-white p-4 rounded-lg shadow-lg z-[100] max-w-md mx-auto"></div>
+    <!-- Super Admin Drawer/Modal -->
+    <div id="superAdminPanel" class="fixed inset-0 z-50 bg-black/80 hidden flex items-center justify-center p-4">
+        <div class="bg-gray-800 p-6 rounded-xl border border-purple-500 max-w-2xl w-full space-y-4">
+            <div class="flex justify-between items-center border-b border-gray-700 pb-3">
+                <h3 class="text-xl font-bold text-purple-400">لوحة تحكم المنصة (Super Admin)</h3>
+                <button onclick="toggleSuperAdminPanel()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">سعر الاشتراك الشهري (ج.م)</label>
+                    <input type="number" id="adminMonthlyPrice" class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs text-gray-400 mb-1">سعر الاشتراك السنوي (ج.م)</label>
+                    <input type="number" id="adminAnnualPrice" class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm">
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs text-gray-400 mb-1">تعليمات وتفاصيل الدفع (فودافون كاش / انستا باي)</label>
+                <textarea id="adminPaymentDetails" class="w-full bg-gray-700 p-2 rounded border border-gray-600 text-sm h-20"></textarea>
+            </div>
+            <button onclick="savePlatformSettings()" class="bg-purple-600 hover:bg-purple-500 w-full py-2 rounded font-bold text-sm">حفظ إعدادات الأسعار</button>
 
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-auth.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
-    <!-- Leaflet -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- التطبيق -->
-    <script src="app.js"></script>
+            <div class="mt-6">
+                <h4 class="font-bold text-sm mb-2 text-gray-300">الشركات والاشتراكات المسجلة</h4>
+                <div class="max-h-48 overflow-y-auto space-y-2 text-xs" id="tenantsAdminList">
+                    <!-- Dynamic Tenants -->
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <script>
-        function switchAuthTab(tab) {
-            const loginForm = document.getElementById('loginForm');
-            const signupForm = document.getElementById('signupForm');
-            const tabLogin = document.getElementById('tabLogin');
-            const tabSignup = document.getElementById('tabSignup');
+    <!-- Firebase Modular Setup -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc, collection, query, where, onSnapshot, updateDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+        import { getDatabase, ref, onValue } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-database.js";
 
-            if (tab === 'login') {
-                loginForm.classList.remove('hidden');
-                signupForm.classList.add('hidden');
-                tabLogin.className = 'flex-1 py-2 px-4 rounded-lg font-bold bg-yellow-500 text-black transition';
-                tabSignup.className = 'flex-1 py-2 px-4 rounded-lg font-bold text-gray-300 hover:text-white transition';
+        // Firebase Configuration (تستخدم قيم المشروع الخاصة بك)
+        const firebaseConfig = {
+            apiKey: "YOUR_API_KEY",
+            authDomain: "YOUR_PROJECT.firebaseapp.com",
+            databaseURL: "https://YOUR_PROJECT-default-rtdb.firebaseio.com",
+            projectId: "YOUR_PROJECT",
+            storageBucket: "YOUR_PROJECT.appspot.com",
+            messagingSenderId: "YOUR_SENDER_ID",
+            appId: "YOUR_APP_ID"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const rtdb = getDatabase(app);
+
+        window.auth = auth; // Expose for signout
+
+        // State Management
+        let currentUser = null;
+        let currentTenant = null;
+        let map = null;
+        let activeTileLayer = null;
+        let driverMarkers = {};
+        let driverPaths = {};
+
+        // Leaflet Tiles Setup
+        const tileLayers = {
+            streets: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+            satellite: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'
+        };
+
+        // Initialize Map
+        function initMap() {
+            if (map) return;
+            map = L.map('map').setView([30.0444, 31.2357], 11);
+            activeTileLayer = L.tileLayer(tileLayers.streets, { maxZoom: 19 }).addTo(map);
+        }
+
+        window.switchTileLayer = (type) => {
+            if (activeTileLayer) map.removeLayer(activeTileLayer);
+            activeTileLayer = L.tileLayer(tileLayers[type], { maxZoom: 19 }).addTo(map);
+        };
+
+        // Authentication Handlers
+        window.toggleAuthMode = (mode) => {
+            document.getElementById('loginForm').classList.toggle('hidden', mode === 'register');
+            document.getElementById('registerForm').classList.toggle('hidden', mode === 'login');
+        };
+
+        window.handleLogin = async () => {
+            const email = document.getElementById('emailInput').value;
+            const pass = document.getElementById('passInput').value;
+            try {
+                await signInWithEmailAndPassword(auth, email, pass);
+            } catch (e) {
+                alert("خطأ في تسجيل الدخول: " + e.message);
+            }
+        };
+
+        window.handleRegister = async () => {
+            const companyName = document.getElementById('regCompanyInput').value;
+            const email = document.getElementById('regEmailInput').value;
+            const pass = document.getElementById('regPassInput').value;
+
+            if (!companyName || !email || !pass) return alert("رجاءً ملء جميع الحقول");
+
+            try {
+                const cred = await createUserWithEmailAndPassword(auth, email, pass);
+                const tenantId = cred.user.uid;
+                
+                // Set Trial Expiration Date (15 Days)
+                const now = new Date();
+                const trialEndsAt = new Date(now.setDate(now.getDate() + 15)).toISOString();
+
+                // Create Tenant Record
+                await setDoc(doc(db, "tenants", tenantId), {
+                    name: companyName,
+                    email: email,
+                    planType: 'trial',
+                    status: 'active',
+                    trialEndsAt: trialEndsAt,
+                    createdAt: new Date().toISOString()
+                });
+
+                // Create User Record
+                await setDoc(doc(doc(db, "users", cred.user.uid)), {
+                    name: companyName,
+                    email: email,
+                    role: 'company_admin',
+                    tenantId: tenantId
+                });
+
+            } catch (e) {
+                alert("خطأ في إنشاء الحساب: " + e.message);
+            }
+        };
+
+        // Haversine Distance Calculation (كيلومترات)
+        function calculateDistance(lat1, lon1, lat2, lon2) {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * Math.PI / 180;
+            const dLon = (lon2 - lon1) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            return R * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)));
+        }
+
+        // Auth State & Subscription Engine
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                const userDoc = await getDoc(doc(db, "users", user.uid));
+                if (!userDoc.exists()) return;
+                currentUser = userDoc.data();
+
+                // Fetch System Settings (Prices)
+                const sysDoc = await getDoc(doc(db, "system_settings", "config"));
+                if (sysDoc.exists()) {
+                    const sys = sysDoc.data();
+                    document.getElementById('displayMonthlyPrice').innerText = `${sys.monthlyPrice || 0} ج.م`;
+                    document.getElementById('displayAnnualPrice').innerText = `${sys.annualPrice || 0} ج.م`;
+                    document.getElementById('paymentInstructions').innerText = sys.paymentInfo || 'تواصل مع الإدارة للدفع';
+                }
+
+                // Check Super Admin
+                if (currentUser.role === 'super_admin') {
+                    document.getElementById('superAdminBtn').classList.remove('hidden');
+                }
+
+                // Verify Tenant Subscription Status
+                const tenantDoc = await getDoc(doc(db, "tenants", currentUser.tenantId));
+                if (tenantDoc.exists()) {
+                    currentTenant = tenantDoc.data();
+                    const now = new Date();
+                    const trialEnd = new Date(currentTenant.trialEndsAt);
+                    const isExpired = currentTenant.status === 'expired' || (currentTenant.planType === 'trial' && now > trialEnd);
+
+                    if (isExpired && currentUser.role !== 'super_admin') {
+                        document.getElementById('authScreen').classList.add('hidden');
+                        document.getElementById('subscriptionModal').classList.remove('hidden');
+                        return;
+                    }
+
+                    // Activate Main UI
+                    document.getElementById('companyTitle').innerText = currentTenant.name;
+                    document.getElementById('authScreen').classList.add('hidden');
+                    document.getElementById('subscriptionModal').classList.add('hidden');
+                    document.getElementById('mainApp').classList.remove('hidden');
+
+                    initMap();
+                    startTrackingEngine(currentUser.tenantId);
+                }
             } else {
-                loginForm.classList.add('hidden');
-                signupForm.classList.remove('hidden');
-                tabLogin.className = 'flex-1 py-2 px-4 rounded-lg font-bold text-gray-300 hover:text-white transition';
-                tabSignup.className = 'flex-1 py-2 px-4 rounded-lg font-bold bg-yellow-500 text-black transition';
+                document.getElementById('mainApp').classList.add('hidden');
+                document.getElementById('subscriptionModal').classList.add('hidden');
+                document.getElementById('authScreen').classList.remove('hidden');
+            }
+        });
+
+        // Driver Realtime Tracking Subscriptions (Strict Tenant Isolation)
+        function startTrackingEngine(tenantId) {
+            // Listen to Drivers Firestore Collection for Metadata
+            const q = query(collection(db, "drivers"), where("tenantId", "==", tenantId));
+            onSnapshot(q, (snapshot) => {
+                const driversListEl = document.getElementById('driversList');
+                driversListEl.innerHTML = '';
+
+                snapshot.forEach(docSnap => {
+                    const driver = docSnap.data();
+                    const driverId = docSnap.id;
+
+                    // UI Card Construction
+                    const card = document.createElement('div');
+                    card.className = "bg-gray-700/50 p-3 rounded-xl border border-gray-600 space-y-2";
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-sm">${driver.name}</span>
+                            <span id="status-${driverId}" class="text-xs px-2 py-0.5 rounded bg-gray-600">منفصل</span>
+                        </div>
+                        <div class="text-xs text-gray-400">رقم المركبة: ${driver.vehiclePlate || 'غير مخصص'}</div>
+                        <div class="text-xs text-gray-400">الكود (App ID): <code class="bg-gray-800 px-1 rounded text-blue-300">${driverId}</code></div>
+                        <div class="flex justify-between text-[10px] text-gray-400 pt-1 border-t border-gray-600">
+                            <span>السرعة: <b id="speed-${driverId}">0</b> كم/س</span>
+                            <span>البطارية: <b id="batt-${driverId}">0%</b></span>
+                        </div>
+                    `;
+                    driversListEl.appendChild(card);
+
+                    // Connect to Realtime Database (RTDB) for Live Coordinates
+                    const liveRef = ref(rtdb, `tracking/${tenantId}/${driverId}/live`);
+                    onValue(liveRef, (rtSnap) => {
+                        const data = rtSnap.val();
+                        if (data && data.latitude && data.longitude) {
+                            updateDriverMapLocation(driverId, driver.name, data);
+                        }
+                    });
+                });
+            });
+        }
+
+        // Render Driver Position & Route History on Leaflet
+        function updateDriverMapLocation(driverId, name, data) {
+            const { latitude, longitude, speed, battery, timestamp } = data;
+            const latLng = [latitude, longitude];
+
+            // Update UI Counters
+            document.getElementById(`speed-${driverId}`).innerText = speed || 0;
+            document.getElementById(`batt-${driverId}`).innerText = battery || 0;
+            
+            const statusEl = document.getElementById(`status-${driverId}`);
+            statusEl.innerText = "متصل";
+            statusEl.className = "text-xs px-2 py-0.5 rounded bg-green-500/20 text-green-400";
+
+            // Update Map Marker
+            if (!driverMarkers[driverId]) {
+                driverMarkers[driverId] = L.marker(latLng).addTo(map).bindPopup(`<b>${name}</b>`);
+                driverPaths[driverId] = L.polyline([latLng], { color: '#3b82f6', weight: 4 }).addTo(map);
+            } else {
+                driverMarkers[driverId].setLatLng(latLng);
+                driverPaths[driverId].addLatLng(latLng);
             }
         }
 
-        // اختبار تحميل app.js
-        window.addEventListener('load', function() {
-            if (typeof handleLogin === 'undefined') {
-                document.getElementById('globalError').textContent = '⚠️ فشل تحميل app.js، تأكد من وجود الملف.';
-                document.getElementById('globalError').classList.remove('hidden');
+        // Super Admin Management Actions
+        window.toggleSuperAdminPanel = () => {
+            const panel = document.getElementById('superAdminPanel');
+            panel.classList.toggle('hidden');
+            if (!panel.classList.contains('hidden')) loadTenantsForAdmin();
+        };
+
+        window.savePlatformSettings = async () => {
+            const monthlyPrice = Number(document.getElementById('adminMonthlyPrice').value);
+            const annualPrice = Number(document.getElementById('adminAnnualPrice').value);
+            const paymentInfo = document.getElementById('adminPaymentDetails').value;
+
+            await setDoc(doc(db, "system_settings", "config"), {
+                monthlyPrice, annualPrice, paymentInfo
+            }, { merge: true });
+
+            alert("تم حفظ إعدادات الاشتراكات بنجاح!");
+        };
+
+        async function loadTenantsForAdmin() {
+            const snap = await getDoc(doc(db, "system_settings", "config"));
+            if (snap.exists()) {
+                document.getElementById('adminMonthlyPrice').value = snap.data().monthlyPrice || 0;
+                document.getElementById('adminAnnualPrice').value = snap.data().annualPrice || 0;
+                document.getElementById('adminPaymentDetails').value = snap.data().paymentInfo || '';
             }
-        });
+        }
     </script>
 </body>
 </html>
