@@ -11,7 +11,9 @@ const firebaseConfig = {
     appId: "1:658396508062:web:c56cd84f93daa2e176308f"
 };
 
-firebase.initializeApp(firebaseConfig);
+if (!firebase.apps.length) {
+    firebase.initializeApp(firebaseConfig);
+}
 const auth = firebase.auth();
 const dbRT = firebase.database();
 const dbFS = firebase.firestore();
@@ -31,7 +33,6 @@ let satelliteLayer = null;
 let livePathPolylines = {};
 
 let liveListeners = [];
-let isInitialized = false;
 
 let historyMapInstance = null;
 let historyPolyline = null;
@@ -41,11 +42,9 @@ let selectedPaymentMethod = null;
 // 🔧 دالة مساعدة لتوليد UUID
 // =============================================
 function generateUUID() {
-    // استخدام crypto.randomUUID() إن وجد، وإلا توليد يدوي (للتوافق)
     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
         return crypto.randomUUID();
     }
-    // Fallback بسيط (ليس UUID حقيقي لكنه عشوائي)
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
         var r = Math.random() * 16 | 0, v = c == 'x' ? r : (r & 0x3 | 0x8);
         return v.toString(16);
@@ -53,80 +52,60 @@ function generateUUID() {
 }
 
 // =============================================
-// 🔐 إنشاء حساب أدمن تلقائي (بـ UUID ثابت)
+// 🔐 التأكد من وجود حساب الأدمن (بدون فرض الدخول)
 // =============================================
 async function ensureAdminAccount() {
     const adminEmail = 'admin@system.com';
     const adminPassword = '123456';
     const adminName = 'المدير العام';
-    // نستخدم UUID ثابت لتجنب تكرار الحساب
-    const adminTenantId = 'admin-tenant-' + generateUUID(); // يمكن جعله ثابتاً مثل 'admin_tenant'
+    const adminTenantId = 'admin_tenant_primary';
 
     try {
-        await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
-        console.log('✅ تم تسجيل الدخول بحساب الأدمن الموجود');
-        return true;
-    } catch (err) {
-        if (err.code === 'auth/user-not-found') {
-            try {
-                const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
-                const uid = userCred.user.uid;
+        const adminDoc = await dbFS.collection('users').where('email', '==', adminEmail).get();
+        if (adminDoc.empty) {
+            const userCred = await auth.createUserWithEmailAndPassword(adminEmail, adminPassword);
+            const uid = userCred.user.uid;
+            await userCred.user.updateProfile({ displayName: adminName });
 
-                await userCred.user.updateProfile({ displayName: adminName });
+            await dbFS.collection('users').doc(uid).set({
+                tenantId: adminTenantId,
+                email: adminEmail,
+                name: adminName,
+                phone: '0100000000',
+                username: 'admin',
+                password: adminPassword,
+                role: 'admin',
+                status: 'active',
+                createdAt: Date.now()
+            });
 
-                await dbFS.collection('users').doc(uid).set({
-                    tenantId: adminTenantId,
-                    email: adminEmail,
-                    name: adminName,
-                    phone: '0100000000',
-                    username: 'admin',
-                    password: adminPassword,
-                    role: 'admin',
-                    status: 'active',
-                    createdAt: Date.now()
-                });
-
-                const tenantRef = dbFS.collection('tenants').doc(adminTenantId);
-                const tenantSnap = await tenantRef.get();
-                if (!tenantSnap.exists) {
-                    await tenantRef.set({
-                        name: 'منصة التتبع',
-                        ownerName: adminName,
-                        email: adminEmail,
-                        phone: '0100000000',
-                        username: 'admin',
-                        password: adminPassword,
-                        status: 'active',
-                        subscriptionStatus: 'active',
-                        subscriptionPeriod: 'year',
-                        trialEndDate: 0,
-                        subscriptionEndDate: Date.now() + (365 * 24 * 60 * 60 * 1000),
-                        paymentMethod: null,
-                        paymentStatus: 'paid',
-                        lastPaymentDate: Date.now(),
-                        vehiclesCount: 0,
-                        createdAt: Date.now()
-                    });
-                }
-
-                console.log('✅ تم إنشاء حساب الأدمن التلقائي');
-                await auth.signInWithEmailAndPassword(adminEmail, adminPassword);
-                return true;
-            } catch (createErr) {
-                console.error('❌ فشل إنشاء حساب الأدمن:', createErr.message);
-                showGlobalError('فشل إنشاء حساب الأدمن التلقائي: ' + createErr.message);
-                return false;
-            }
-        } else {
-            console.error('❌ خطأ في تسجيل الدخول:', err.message);
-            showGlobalError('خطأ في تسجيل الدخول: ' + err.message);
-            return false;
+            await dbFS.collection('tenants').doc(adminTenantId).set({
+                name: 'منصة التتبع الرئيسية',
+                ownerName: adminName,
+                email: adminEmail,
+                phone: '0100000000',
+                username: 'admin',
+                password: adminPassword,
+                status: 'active',
+                subscriptionStatus: 'active',
+                subscriptionPeriod: 'year',
+                trialEndDate: 0,
+                subscriptionEndDate: Date.now() + (365 * 24 * 60 * 60 * 1000),
+                paymentMethod: null,
+                paymentStatus: 'paid',
+                lastPaymentDate: Date.now(),
+                vehiclesCount: 0,
+                createdAt: Date.now()
+            });
+            console.log('✅ تم إنشاء حساب الأدمن التلقائي بنجاح');
         }
+    } catch (err) {
+        console.log('ℹ️ حساب الأدمن موجود أو حدث تنبيه:', err.message);
     }
 }
 
 // =============================================
-// 🔐 إنشاء حساب تجريبي (بـ UUID)
+// 🔐 إنشاء حساب تجريبي
 // =============================================
 async function createDemoAccount() {
     const demoEmail = `demo_${Date.now()}@gmail.com`;
@@ -139,7 +118,7 @@ async function createDemoAccount() {
 
         await userCred.user.updateProfile({ displayName: demoName });
 
-        const tenantId = generateUUID(); // ✅ UUID فريد
+        const tenantId = generateUUID();
         const now = Date.now();
         await dbFS.collection('tenants').doc(tenantId).set({
             name: 'شركة تجريبية',
@@ -149,12 +128,12 @@ async function createDemoAccount() {
             username: demoEmail,
             password: demoPassword,
             status: 'active',
-            subscriptionStatus: 'active',
+            subscriptionStatus: 'trial',
             subscriptionPeriod: 'month',
-            trialEndDate: 0,
-            subscriptionEndDate: now + (30 * 24 * 60 * 60 * 1000),
+            trialEndDate: now + (15 * 24 * 60 * 60 * 1000),
+            subscriptionEndDate: now + (15 * 24 * 60 * 60 * 1000),
             paymentMethod: null,
-            paymentStatus: 'paid',
+            paymentStatus: 'none',
             lastPaymentDate: now,
             vehiclesCount: 0,
             createdAt: now
@@ -167,13 +146,12 @@ async function createDemoAccount() {
             phone: '0100000000',
             username: demoEmail,
             password: demoPassword,
-            role: 'customer',
+            role: 'company_admin',
             status: 'active',
             createdAt: now
         });
 
         alert(`✅ تم إنشاء الحساب التجريبي بنجاح!\nالبريد: ${demoEmail}\nكلمة المرور: ${demoPassword}`);
-        await auth.signInWithEmailAndPassword(demoEmail, demoPassword);
 
     } catch (err) {
         alert('❌ فشل إنشاء الحساب التجريبي: ' + err.message);
@@ -195,10 +173,10 @@ function showGlobalError(message) {
 }
 
 // =============================================
-// 🔐 تسجيل الدخول (مع التحقق من الاشتراك)
+// 🔐 تسجيل الدخول
 // =============================================
 async function handleLogin(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const loginType = document.getElementById('loginType')?.value || 'firebase';
     const loginInput = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value.trim();
@@ -208,7 +186,7 @@ async function handleLogin(e) {
 
     if (!loginInput || !password) {
         if (errorEl) {
-            errorEl.textContent = 'الرجاء إدخال البيانات المطلوب إكمالها';
+            errorEl.textContent = 'الرجاء إدخال البيانات المطلوبة كاملة';
             errorEl.classList.remove('hidden');
         }
         return;
@@ -225,16 +203,16 @@ async function handleLogin(e) {
             const userDoc = await dbFS.collection('users').doc(currentUser.uid).get();
             if (userDoc.exists) {
                 const data = userDoc.data();
-                userRole = data.role || 'customer';
+                userRole = data.role || 'company_admin';
                 userTenantId = data.tenantId || null;
             } else {
-                userRole = 'customer';
-                userTenantId = 'default';
+                userRole = 'company_admin';
+                userTenantId = generateUUID();
                 await dbFS.collection('users').doc(currentUser.uid).set({
-                    tenantId: 'default',
+                    tenantId: userTenantId,
                     email: currentUser.email,
-                    name: currentUser.displayName || 'مستخدم',
-                    role: 'customer',
+                    name: currentUser.displayName || 'مستخدم جديد',
+                    role: 'company_admin',
                     status: 'active',
                     createdAt: Date.now()
                 });
@@ -251,7 +229,7 @@ async function handleLogin(e) {
             showDashboard();
         } catch (err) {
             if (errorEl) {
-                errorEl.textContent = err.message || 'فشل تسجيل الدخول';
+                errorEl.textContent = 'بيانات الدخول غير صحيحة أو الحساب غير موجود';
                 errorEl.classList.remove('hidden');
             }
         }
@@ -270,6 +248,10 @@ async function checkSubscriptionStatus(tenantId) {
 
         const tenantData = tenantDoc.data();
         const now = Date.now();
+
+        if (tenantData.subscriptionStatus === 'suspended') {
+            return { valid: false, reason: 'suspended', tenantData };
+        }
 
         if (tenantData.subscriptionStatus === 'trial') {
             if (now > tenantData.trialEndDate) {
@@ -311,25 +293,29 @@ function showSubscriptionExpiredScreen(tenantData) {
     document.getElementById('dashboardScreen').classList.add('hidden');
     document.getElementById('subscriptionExpiredScreen').classList.remove('hidden');
 
-    document.getElementById('subscriptionCompanyName').textContent = tenantData?.name || '';
-    document.getElementById('subscriptionStatus').textContent =
-        tenantData?.subscriptionStatus === 'trial' ? 'انتهت الفترة التجريبية' : 'انتهى الاشتراك';
+    document.getElementById('subscriptionCompanyName').textContent = tenantData?.name || 'شركتك';
+    
+    let reasonText = 'انتهى اشتراكك';
+    if (tenantData?.subscriptionStatus === 'trial') reasonText = 'انتهت الفترة التجريبية (15 يوم)';
+    else if (tenantData?.subscriptionStatus === 'suspended') reasonText = 'تم إيقاف حسابك من قِبل الإدارة';
+
+    document.getElementById('subscriptionStatus').textContent = reasonText;
 
     const paymentMethodsHTML = `
         <div class="grid grid-cols-2 gap-4 mt-4">
-            <button onclick="selectPaymentMethod('vodafone_cash')" class="bg-red-600 hover:bg-red-700 text-white p-4 rounded-xl">
-                📱 فودافون كاش
+            <button onclick="selectPaymentMethod('vodafone_cash')" class="bg-red-600 hover:bg-red-700 text-white p-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2">
+                <span class="text-2xl">📱</span> فودافون كاش
             </button>
-            <button onclick="selectPaymentMethod('instapay')" class="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-xl">
-                🏦 انستا باي
+            <button onclick="selectPaymentMethod('instapay')" class="bg-purple-600 hover:bg-purple-700 text-white p-4 rounded-xl font-bold flex flex-col items-center justify-center gap-2">
+                <span class="text-2xl">🏦</span> انستا باي
             </button>
         </div>
-        <div id="paymentDetails" class="mt-4 hidden">
-            <h4 class="font-bold text-yellow-500 mb-2">بيانات الدفع:</h4>
-            <div id="paymentAccountDetails" class="bg-gray-900 p-3 rounded"></div>
-            <input type="text" id="transactionNumber" placeholder="رقم التحويل" class="w-full mt-3 p-2 rounded bg-gray-700 text-white">
-            <button onclick="submitPaymentRequest()" class="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded">
-                ✅ تأكيد الدفع
+        <div id="paymentDetails" class="mt-4 hidden bg-gray-900 p-4 rounded-xl border border-gray-700">
+            <h4 class="font-bold text-yellow-500 mb-2">بيانات التحويل:</h4>
+            <div id="paymentAccountDetails" class="text-sm text-gray-300"></div>
+            <input type="text" id="transactionNumber" placeholder="أدخل رقم عملية التحويل / الإشعار" class="w-full mt-3 p-2 rounded bg-gray-800 text-white border border-gray-600">
+            <button onclick="submitPaymentRequest()" class="w-full mt-3 bg-green-600 hover:bg-green-700 text-white font-bold p-2 rounded-lg">
+                ✅ تأكيد وإرسال طلب التفعيل
             </button>
         </div>
     `;
@@ -349,13 +335,13 @@ function selectPaymentMethod(method) {
 
     if (method === 'vodafone_cash') {
         paymentAccountDetails.innerHTML = `
-            <p>رقم فودافون كاش: <strong>01000000000</strong></p>
-            <p class="text-sm text-gray-400">يرجى التحويل ثم إدخال رقم التحويل</p>
+            <p>رقم فودافون كاش للتحويل: <strong class="text-yellow-400 text-base">01000000000</strong></p>
+            <p class="text-xs text-gray-400 mt-1">يرجى تحويل مبلغ الاشتراك ثم إدخال رقم العملية للتأكيد.</p>
         `;
     } else if (method === 'instapay') {
         paymentAccountDetails.innerHTML = `
-            <p>حساب انستا باي: <strong>tracking@instapay.com</strong></p>
-            <p class="text-sm text-gray-400">يرجى التحويل ثم إدخال رقم التحويل</p>
+            <p>عنوان انستا باي (IPA): <strong class="text-yellow-400 text-base">tracking@instapay</strong></p>
+            <p class="text-xs text-gray-400 mt-1">يرجى تحويل مبلغ الاشتراك ثم إدخال مرجع التحويل للتأكيد.</p>
         `;
     }
 }
@@ -377,7 +363,7 @@ async function submitPaymentRequest() {
     }
 
     if (!userTenantId) {
-        alert('لا يمكن تحديد الاشتراك الحالي');
+        alert('تعذر تحديد معرف الشركة');
         return;
     }
 
@@ -393,16 +379,15 @@ async function submitPaymentRequest() {
             type: 'payment_request',
             tenantId: userTenantId,
             tenantName: document.getElementById('subscriptionCompanyName').textContent,
-            amount: getSubscriptionAmount(),
+            amount: 500,
             paymentMethod: selectedPaymentMethod,
             transactionNumber: transactionNumber,
             status: 'pending',
             createdAt: Date.now()
         });
 
-        alert('✅ تم إرسال طلب الدفع بنجاح!\nسيتم تفعيل اشتراكك بعد تأكيد الإدارة.');
-        document.getElementById('subscriptionExpiredScreen').classList.add('hidden');
-        document.getElementById('loginScreen').classList.remove('hidden');
+        alert('✅ تم إرسال طلب التجديد بنجاح!\nسيتم مراجعته وتفعيل الحساب في أقرب وقت.');
+        handleLogout();
 
     } catch (error) {
         console.error('❌ فشل إرسال طلب الدفع:', error);
@@ -411,22 +396,10 @@ async function submitPaymentRequest() {
 }
 
 // =============================================
-// 💰 حساب قيمة الاشتراك
-// =============================================
-function getSubscriptionAmount() {
-    const prices = {
-        month: 500,
-        year: 5000
-    };
-    return prices.month;
-}
-
-// =============================================
 // 🔐 تسجيل الخروج
 // =============================================
 async function handleLogout() {
     try {
-        await auth.signOut();
         liveListeners.forEach(ref => ref.off && ref.off());
         liveListeners = [];
 
@@ -434,6 +407,8 @@ async function handleLogout() {
             mapInstance.remove();
             mapInstance = null;
         }
+
+        await auth.signOut();
 
         currentUser = null;
         currentUserId = null;
@@ -451,27 +426,6 @@ async function handleLogout() {
 }
 
 // =============================================
-// 🔐 تسجيل الدخول السريع (أدمن)
-// =============================================
-async function quickLoginAdmin() {
-    if (document.getElementById('loginEmail')) document.getElementById('loginEmail').value = 'admin@system.com';
-    if (document.getElementById('loginPassword')) document.getElementById('loginPassword').value = '123456';
-    const errorEl = document.getElementById('loginError');
-    if (errorEl) errorEl.classList.add('hidden');
-
-    try {
-        await auth.signInWithEmailAndPassword('admin@system.com', '123456');
-    } catch (err) {
-        await ensureAdminAccount();
-        try {
-            await auth.signInWithEmailAndPassword('admin@system.com', '123456');
-        } catch (e) {
-            alert('فشل تسجيل الدخول السريع: ' + e.message);
-        }
-    }
-}
-
-// =============================================
 // 🖥️ عرض لوحة التحكم وتحديث الواجهة
 // =============================================
 function showDashboard() {
@@ -481,10 +435,9 @@ function showDashboard() {
 
     document.getElementById('userName').textContent = `مرحباً، ${currentUser?.displayName || 'المستخدم'}`;
 
-    let roleText = 'عميل';
-    if (userRole === 'admin') roleText = 'مدير عام';
-    else if (userRole === 'company_admin') roleText = 'مدير شركة';
-    else if (userRole === 'worker') roleText = 'موظف/عامل';
+    let roleText = 'شركة / فرد';
+    if (userRole === 'admin') roleText = 'المدير العام';
+    else if (userRole === 'worker') roleText = 'موظف';
 
     document.getElementById('userRole').textContent = roleText;
 
@@ -506,8 +459,8 @@ function showPage(page) {
     const target = document.getElementById(`page-${page}`);
     if (target) {
         target.classList.remove('hidden');
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        document.querySelectorAll(`.nav-btn[data-page="${page}"]`).forEach(b => b.classList.add('active'));
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active', 'bg-yellow-500', 'text-black'));
+        document.querySelectorAll(`.nav-btn[data-page="${page}"]`).forEach(b => b.classList.add('active', 'bg-yellow-500', 'text-black'));
     }
 
     switch (page) {
@@ -522,7 +475,7 @@ function showPage(page) {
 }
 
 // =============================================
-// 📊 عرض وتحديث إحصائيات لوحة التحكم
+// 📊 عرض وتحديث إحصائيات لوحة التحكم (معزولة لكل شركة)
 // =============================================
 async function renderDashboard() {
     const container = document.getElementById('page-dashboard');
@@ -534,22 +487,29 @@ async function renderDashboard() {
             <span class="text-sm text-gray-400">آخر تحديث: ${new Date().toLocaleTimeString('ar')}</span>
         </div>
         <div id="statsContainer" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div class="stat-card rounded-xl p-4 bg-gray-800 shadow-sm border border-gray-700"><div class="flex items-center gap-3"><div class="icon text-yellow-500 text-2xl">🚗</div><div><p class="stat-label text-sm text-gray-400">المركبات</p><p id="stat-total" class="stat-value text-2xl font-bold text-white">0</p></div></div></div>
-            <div class="stat-card rounded-xl p-4 bg-gray-800 shadow-sm border border-gray-700"><div class="flex items-center gap-3"><div class="icon text-green-500 text-2xl">📶</div><div><p class="stat-label text-sm text-gray-400">متصل</p><p id="stat-online" class="stat-value text-2xl font-bold text-white">0</p></div></div></div>
-            <div class="stat-card rounded-xl p-4 bg-gray-800 shadow-sm border border-gray-700"><div class="flex items-center gap-3"><div class="icon text-yellow-400 text-2xl">🔄</div><div><p class="stat-label text-sm text-gray-400">متحرك</p><p id="stat-moving" class="stat-value text-2xl font-bold text-white">0</p></div></div></div>
-            <div class="stat-card rounded-xl p-4 bg-gray-800 shadow-sm border border-gray-700"><div class="flex items-center gap-3"><div class="icon text-red-500 text-2xl">⏸️</div><div><p class="stat-label text-sm text-gray-400">متوقف</p><p id="stat-stopped" class="stat-value text-2xl font-bold text-white">0</p></div></div></div>
+            <div class="stat-card rounded-xl p-4 bg-gray-800 shadow-sm border border-gray-700"><div class="flex items-center gap-3"><div class="icon text-yellow-500 text-2xl">🚗</div><div><p class="stat-label text-sm text-gray-400">إجمالي السيارات</p><p id="stat-total" class="stat-value text-2xl font-bold text-white">0</p></div></div></div>
+            <div class="stat-card rounded-xl p-4 bg-gray-800 shadow-sm border border-gray-700"><div class="flex items-center gap-3"><div class="icon text-green-500 text-2xl">📶</div><div><p class="stat-label text-sm text-gray-400">متصل الآن</p><p id="stat-online" class="stat-value text-2xl font-bold text-white">0</p></div></div></div>
+            <div class="stat-card rounded-xl p-4 bg-gray-800 shadow-sm border border-gray-700"><div class="flex items-center gap-3"><div class="icon text-yellow-400 text-2xl">🔄</div><div><p class="stat-label text-sm text-gray-400">في حالة حركة</p><p id="stat-moving" class="stat-value text-2xl font-bold text-white">0</p></div></div></div>
+            <div class="stat-card rounded-xl p-4 bg-gray-800 shadow-sm border border-gray-700"><div class="flex items-center gap-3"><div class="icon text-red-500 text-2xl">⏸️</div><div><p class="stat-label text-sm text-gray-400">متوقف / غير متصل</p><p id="stat-stopped" class="stat-value text-2xl font-bold text-white">0</p></div></div></div>
         </div>
         <div class="bg-gray-800 rounded-xl shadow-sm p-4 border border-gray-700">
-            <h3 class="font-bold text-yellow-500 mb-3">📍 آخر المواقع <span class="text-xs text-gray-500 font-normal">(اضغط لعرض على الخريطة)</span></h3>
+            <h3 class="font-bold text-yellow-500 mb-3">📍 التتبع المباشر للسائقين <span class="text-xs text-gray-400 font-normal">(اضغط للتركيز على الخريطة)</span></h3>
             <div id="recentLocations" class="space-y-2 text-sm text-gray-300"></div>
         </div>
     `;
 
-    const ref = dbRT.ref('vehicleDrivers');
+    // 🔒 استعلام معزول بـ tenantId
+    let ref;
+    if (userRole === 'admin') {
+        ref = dbRT.ref('vehicleDrivers');
+    } else {
+        ref = dbRT.ref('vehicleDrivers').orderByChild('tenantId').equalTo(userTenantId);
+    }
+
     ref.off();
     ref.on('value', (snap) => {
         const data = snap.val();
-        if (!data) { updateStats(0, 0, 0, 0); return; }
+        if (!data) { updateStats(0, 0, 0, 0); renderRecent([]); return; }
 
         let total = 0, online = 0, moving = 0, stopped = 0;
         const recent = [];
@@ -557,14 +517,12 @@ async function renderDashboard() {
 
         Object.keys(data).forEach(code => {
             const v = data[code];
-            if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
-
             total++;
             const lastUpdate = v.liveLocation?.timestamp || 0;
-            const isOnline = (now - lastUpdate) < 10000;
-            const status = v.status || 'offline';
+            const isOnline = (now - lastUpdate) < 15000;
+            const isMoving = isOnline && (v.liveLocation?.speed > 2 || v.status === 'moving');
 
-            if (isOnline && status === 'moving') { moving++; online++; }
+            if (isMoving) { moving++; online++; }
             else if (isOnline) { online++; }
             else { stopped++; }
 
@@ -599,15 +557,15 @@ function renderRecent(list) {
     const container = document.getElementById('recentLocations');
     if (!container) return;
     if (list.length === 0) {
-        container.innerHTML = '<p class="text-gray-500">لا توجد مواقع حالية</p>';
+        container.innerHTML = '<p class="text-gray-500 py-4 text-center">لا يوجد سائقين نشطين حالياً</p>';
         return;
     }
-    container.innerHTML = list.slice(0, 10).map(item => `
-        <div class="flex justify-between items-center border-b border-gray-700 py-2 cursor-pointer hover:bg-gray-700 px-2 rounded" onclick="focusOnVehicle('${item.code}', ${item.lat}, ${item.lng})">
-            <span class="font-medium text-yellow-500">${item.name}</span>
+    container.innerHTML = list.map(item => `
+        <div class="flex justify-between items-center border-b border-gray-700 py-2 cursor-pointer hover:bg-gray-700 px-3 rounded-lg transition" onclick="focusOnVehicle('${item.code}', ${item.lat}, ${item.lng})">
+            <span class="font-bold text-yellow-500">${item.name}</span>
             <span class="text-xs ${item.isOnline ? 'text-green-400' : 'text-gray-500'}">${item.isOnline ? '🟢 متصل' : '🔴 غير متصل'}</span>
-            <span class="text-xs text-yellow-600">${item.speed.toFixed(1)} كم/س</span>
-            <span class="text-xs text-gray-500">${item.time ? new Date(item.time).toLocaleTimeString('ar') : '-'}</span>
+            <span class="text-xs text-yellow-400 font-mono">${item.speed.toFixed(1)} كم/س</span>
+            <span class="text-xs text-gray-400">${item.time ? new Date(item.time).toLocaleTimeString('ar') : '-'}</span>
         </div>
     `).join('');
 }
@@ -623,11 +581,11 @@ function focusOnVehicle(code, lat, lng) {
                 mapMarkers[code].openPopup();
             }
         }
-    }, 500);
+    }, 400);
 }
 
 // =============================================
-// 🚗 سياراتي مع إدارة (نافذة منبثقة للإضافة)
+// 🚗 قائمة سيارات الشركة وإدارتها
 // =============================================
 async function renderVehicles() {
     const container = document.getElementById('page-vehicles');
@@ -635,13 +593,22 @@ async function renderVehicles() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6 flex-wrap gap-2">
-            <h2 class="text-2xl font-bold text-yellow-500">🚗 سياراتي</h2>
-            <button onclick="showAddVehicleModal()" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg">➕ إضافة سائق</button>
+            <h2 class="text-2xl font-bold text-yellow-500">🚗 سائقين الشركة</h2>
+            <button onclick="showAddVehicleModal()" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded-lg flex items-center gap-2">
+                <span>➕</span> إضافة سائق جديد
+            </button>
         </div>
         <div id="vehiclesList" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
     `;
 
-    const ref = dbRT.ref('vehicleDrivers');
+    // 🔒 استعلام معزول بـ tenantId
+    let ref;
+    if (userRole === 'admin') {
+        ref = dbRT.ref('vehicleDrivers');
+    } else {
+        ref = dbRT.ref('vehicleDrivers').orderByChild('tenantId').equalTo(userTenantId);
+    }
+
     ref.off();
     ref.on('value', (snap) => {
         const data = snap.val();
@@ -649,7 +616,7 @@ async function renderVehicles() {
         if (!list) return;
 
         if (!data) {
-            list.innerHTML = '<p class="text-gray-500 col-span-full text-center py-8">لا توجد سيارات مسجلة</p>';
+            list.innerHTML = '<p class="text-gray-500 col-span-full text-center py-8">لا يوجد سائقين مسجلين لهذه الشركة بعد.</p>';
             return;
         }
 
@@ -657,81 +624,80 @@ async function renderVehicles() {
         let html = '';
         Object.keys(data).forEach(code => {
             const v = data[code];
-            if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
-
             const lastUpdate = v.liveLocation?.timestamp || 0;
-            const isOnline = (now - lastUpdate) < 10000;
-            const status = isOnline ? (v.status === 'moving' ? 'moving' : 'online') : 'offline';
-
-            const statusText = status === 'online' ? 'متصل' : status === 'moving' ? 'متحرك' : 'غير متصل';
-            const statusColor = status === 'moving' ? 'bg-yellow-400' : isOnline ? 'bg-green-500' : 'bg-red-500';
+            const isOnline = (now - lastUpdate) < 15000;
+            const statusText = isOnline ? (v.liveLocation?.speed > 2 ? 'متحرك' : 'متصل') : 'غير متصل';
+            const statusColor = isOnline ? (v.liveLocation?.speed > 2 ? 'bg-yellow-400' : 'bg-green-500') : 'bg-red-500';
             const loc = v.liveLocation || {};
 
             html += `
-                <div class="bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-700">
-                    <div class="flex justify-between items-start">
-                        <div>
-                            <h4 class="font-bold text-gray-200">السائق: ${v.displayName || 'غير معروف'}</h4>
-                            <p class="text-sm text-gray-400">الكود: ${code}</p>
-                            <p class="text-sm text-gray-400">الهاتف: ${v.phone || 'لا يوجد هاتف'}</p>
+                <div class="bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-700 flex flex-col justify-between">
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <div>
+                                <h4 class="font-bold text-white text-lg">${v.displayName || 'سائق'}</h4>
+                                <p class="text-xs text-yellow-500 font-mono">كود الدخول: ${code}</p>
+                                <p class="text-xs text-gray-400 font-mono">كود التفعيل: ${v.activationCode || code}</p>
+                            </div>
+                            <span class="w-3 h-3 rounded-full ${statusColor}" title="${statusText}"></span>
                         </div>
-                        <span class="w-3 h-3 rounded-full ${statusColor}"></span>
+                        <div class="text-xs text-gray-300 grid grid-cols-2 gap-2 bg-gray-900 p-2 rounded-lg my-3">
+                            <span>📱 ${v.phone || 'بدون هاتف'}</span>
+                            <span>🚀 ${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</span>
+                            <span>🔋 البطارية: ${v.deviceHealth?.battery || '?'}%</span>
+                            <span class="${isOnline ? 'text-green-400' : 'text-gray-500'}">${statusText}</span>
+                        </div>
                     </div>
-                    <div class="mt-3 text-sm text-gray-300 grid grid-cols-2 gap-1 bg-gray-900 p-2 rounded">
-                        <span>🚀 ${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</span>
-                        <span>🔋 ${v.deviceHealth?.battery || '?'}%</span>
-                        <span class="text-xs ${status === 'online' ? 'text-green-400' : status === 'moving' ? 'text-yellow-400' : 'text-gray-500'} col-span-2">${statusText}</span>
-                    </div>
-                    <div class="mt-4 flex gap-2 flex-wrap">
-                        <button onclick="focusOnVehicle('${code}', ${loc.latitude}, ${loc.longitude})" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded">📍 عرض</button>
-                        <button onclick="showDriverDetails('${code}')" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1 rounded">📋 بيانات</button>
-                        <button onclick="showDriverHistoryMapModal('${code}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded">🗺️ مسار الرحلة</button>
-                        <button onclick="showEditVehicleModal('${code}')" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-2 py-1 rounded">✏️ تعديل</button>
-                        <button onclick="deleteVehicle('${code}')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded">🗑️ حذف</button>
+                    <div class="flex gap-1 flex-wrap mt-2">
+                        <button onclick="focusOnVehicle('${code}', ${loc.latitude}, ${loc.longitude})" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1.5 rounded">📍 خريطة</button>
+                        <button onclick="showDriverDetails('${code}')" class="bg-gray-700 hover:bg-gray-600 text-white text-xs px-2 py-1.5 rounded">📋 تفاصيل</button>
+                        <button onclick="showDriverHistoryMapModal('${code}')" class="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1.5 rounded">🗺️ المسار</button>
+                        <button onclick="showEditVehicleModal('${code}')" class="bg-yellow-600 hover:bg-yellow-700 text-white text-xs px-2 py-1.5 rounded">✏️ تعديل</button>
+                        <button onclick="deleteVehicle('${code}')" class="bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1.5 rounded">🗑️ حذف</button>
                     </div>
                 </div>
             `;
         });
 
-        list.innerHTML = html || '<p class="text-gray-500 col-span-full text-center py-8">لا توجد سيارات مسجلة</p>';
+        list.innerHTML = html || '<p class="text-gray-500 col-span-full text-center py-8">لا يوجد سائقين مسجلين لهذه الشركة بعد.</p>';
     });
 
     liveListeners.push(ref);
 }
 
 // =============================================
-// 🪟 نافذة منبثقة لإضافة سائق
+// 🪟 نافذة إضافة سائق
 // =============================================
 function showAddVehicleModal() {
-    closeModal('vehicleModal'); // إغلاق أي مودال سابق
+    closeModal('vehicleModal');
     const modal = document.createElement('div');
     modal.id = 'vehicleModal';
     modal.className = 'fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4';
     modal.innerHTML = `
-        <div class="bg-gray-800 w-full max-w-md rounded-xl shadow-lg border border-gray-600">
-            <div class="p-4 flex justify-between items-center border-b border-gray-700">
-                <h3 class="text-xl font-bold text-yellow-500">➕ إضافة سائق جديد</h3>
+        <div class="bg-gray-800 w-full max-w-md rounded-xl shadow-lg border border-gray-600 overflow-hidden">
+            <div class="p-4 flex justify-between items-center border-b border-gray-700 bg-gray-900">
+                <h3 class="text-lg font-bold text-yellow-500">➕ إضافة سائق جديد لشركتك</h3>
                 <button onclick="closeModal('vehicleModal')" class="text-red-500 hover:text-red-700 font-bold text-2xl">&times;</button>
             </div>
-            <div class="p-4 space-y-4">
+            <div class="p-4 space-y-3">
                 <div>
-                    <label class="block text-sm mb-1 text-gray-400">اسم السائق *</label>
-                    <input type="text" id="vehicleName" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
+                    <label class="block text-xs mb-1 text-gray-400">اسم السائق *</label>
+                    <input type="text" id="vehicleName" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white text-sm" placeholder="مثال: أحمد محمود">
                 </div>
                 <div>
-                    <label class="block text-sm mb-1 text-gray-400">رقم الهاتف</label>
-                    <input type="tel" id="vehiclePhone" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white">
+                    <label class="block text-xs mb-1 text-gray-400">رقم الهاتف</label>
+                    <input type="tel" id="vehiclePhone" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white text-sm" placeholder="010xxxxxxxx">
                 </div>
                 <div>
-                    <label class="block text-sm mb-1 text-gray-400">كود الدخول (يستخدمه التطبيق) *</label>
-                    <input type="text" id="vehicleCode" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" placeholder="مثال: CAR-101">
+                    <label class="block text-xs mb-1 text-gray-400">كود معرف السائق (Driver Code) *</label>
+                    <input type="text" id="vehicleCode" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white text-sm" placeholder="مثال: DRV-101">
                 </div>
                 <div>
-                    <label class="block text-sm mb-1 text-gray-400">كود التفعيل (اختياري)</label>
-                    <input type="text" id="vehicleActivationCode" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" placeholder="اتركه فارغًا لاستخدام كود الدخول">
+                    <label class="block text-xs mb-1 text-gray-400">كود التفعيل للتطبيق (Activation Code)</label>
+                    <input type="text" id="vehicleActivationCode" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white text-sm" placeholder="اتركه فارغاً ليستنسخ كود المعرف">
                 </div>
-                <button onclick="submitNewVehicle()" class="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg">
-                    حفظ السائق
+                <button onclick="submitNewVehicle()" class="w-full mt-2 bg-green-600 hover:bg-green-700 text-white font-bold py-2 rounded-lg">
+                    حفظ وبيانات السائق
                 </button>
             </div>
         </div>
@@ -740,7 +706,7 @@ function showAddVehicleModal() {
 }
 
 // =============================================
-// 🪟 نافذة منبثقة لتعديل سائق
+// 🪟 نافذة تعديل سائق
 // =============================================
 function showEditVehicleModal(code) {
     dbRT.ref(`vehicleDrivers/${code}`).once('value', snap => {
@@ -752,19 +718,19 @@ function showEditVehicleModal(code) {
         modal.id = 'vehicleModal';
         modal.className = 'fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-4';
         modal.innerHTML = `
-            <div class="bg-gray-800 w-full max-w-md rounded-xl shadow-lg border border-gray-600">
-                <div class="p-4 flex justify-between items-center border-b border-gray-700">
-                    <h3 class="text-xl font-bold text-yellow-500">✏️ تعديل بيانات السائق</h3>
+            <div class="bg-gray-800 w-full max-w-md rounded-xl shadow-lg border border-gray-600 overflow-hidden">
+                <div class="p-4 flex justify-between items-center border-b border-gray-700 bg-gray-900">
+                    <h3 class="text-lg font-bold text-yellow-500">✏️ تعديل بيانات السائق</h3>
                     <button onclick="closeModal('vehicleModal')" class="text-red-500 hover:text-red-700 font-bold text-2xl">&times;</button>
                 </div>
-                <div class="p-4 space-y-4">
+                <div class="p-4 space-y-3">
                     <div>
-                        <label class="block text-sm mb-1 text-gray-400">اسم السائق *</label>
-                        <input type="text" id="vehicleName" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" value="${v.displayName || ''}">
+                        <label class="block text-xs mb-1 text-gray-400">اسم السائق *</label>
+                        <input type="text" id="vehicleName" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white text-sm" value="${v.displayName || ''}">
                     </div>
                     <div>
-                        <label class="block text-sm mb-1 text-gray-400">رقم الهاتف</label>
-                        <input type="tel" id="vehiclePhone" class="w-full bg-gray-700 border border-gray-600 rounded-lg p-2 text-white" value="${v.phone || ''}">
+                        <label class="block text-xs mb-1 text-gray-400">رقم الهاتف</label>
+                        <input type="tel" id="vehiclePhone" class="w-full bg-gray-700 border border-gray-600 rounded p-2 text-white text-sm" value="${v.phone || ''}">
                     </div>
                     <button onclick="submitEditVehicle('${code}')" class="w-full bg-yellow-600 hover:bg-yellow-700 text-white font-bold py-2 rounded-lg">
                         حفظ التعديلات
@@ -777,37 +743,51 @@ function showEditVehicleModal(code) {
 }
 
 // =============================================
-// 🪟 إرسال بيانات السائق الجديد
+// 🪟 حفظ سائق جديد + ربط كود التفعيل بالـ Tenant ID
 // =============================================
 function submitNewVehicle() {
     const name = document.getElementById('vehicleName').value.trim();
     const phone = document.getElementById('vehiclePhone').value.trim();
     const code = document.getElementById('vehicleCode').value.trim();
-    const activationCode = document.getElementById('vehicleActivationCode').value.trim();
+    const activationCode = document.getElementById('vehicleActivationCode').value.trim() || code;
 
     if (!name || !code) {
-        alert('يرجى إدخال اسم السائق وكود الدخول');
+        alert('يرجى إدخال اسم السائق وكود المعرف.');
         return;
     }
 
-    dbRT.ref(`vehicleDrivers/${code}`).set({
+    if (!userTenantId) {
+        alert('حدث خطأ في تحديد رقم الشركة. يرجى تسجيل الدخول مجدداً.');
+        return;
+    }
+
+    const payload = {
         displayName: name,
         phone: phone || '',
         tenantId: userTenantId,
-        activationCode: activationCode || code,
+        activationCode: activationCode,
         createdAt: Date.now(),
         status: 'offline'
-    }).then(() => {
-        closeModal('vehicleModal');
-        alert('✅ تم إضافة السائق بنجاح!');
-    }).catch(err => {
-        alert('❌ خطأ أثناء الإضافة: ' + err.message);
-    });
+    };
+
+    // 1. حفظ بيانات السائق
+    dbRT.ref(`vehicleDrivers/${code}`).set(payload)
+        .then(() => {
+            // 2. ربط كود التفعيل لتسهيل دخول تطبيق الأندرويد
+            return dbRT.ref(`activationCodes/${activationCode}`).set({
+                tenantId: userTenantId,
+                vehicleCode: code
+            });
+        })
+        .then(() => {
+            closeModal('vehicleModal');
+            alert('✅ تم إضافة السائق وربطه بشركتك بنجاح!');
+        })
+        .catch(err => {
+            alert('❌ خطأ أثناء الإضافة: ' + err.message);
+        });
 }
 
-// =============================================
-// 🪟 حفظ تعديلات السائق
-// =============================================
 function submitEditVehicle(code) {
     const name = document.getElementById('vehicleName').value.trim();
     const phone = document.getElementById('vehiclePhone').value.trim();
@@ -824,66 +804,54 @@ function submitEditVehicle(code) {
         closeModal('vehicleModal');
         alert('✅ تم تحديث بيانات السائق!');
     }).catch(err => {
-        alert('❌ حدث خطأ أثناء التعديل: ' + err.message);
+        alert('❌حدث خطأ أثناء التعديل: ' + err.message);
     });
 }
 
-// =============================================
-// 🪟 إغلاق النافذة المنبثقة
-// =============================================
 function closeModal(modalId) {
     const modal = document.getElementById(modalId);
-    if (modal) {
-        modal.remove();
-    }
+    if (modal) modal.remove();
 }
 
-// =============================================
-// 🗑️ حذف سائق (مع التحقق من tenantId)
-// =============================================
 async function deleteVehicle(code) {
-    // التحقق من أن السائق يتبع الحساب الحالي
     const snap = await dbRT.ref(`vehicleDrivers/${code}`).once('value');
     const v = snap.val();
-    if (!v) {
-        alert('السائق غير موجود.');
-        return;
-    }
+    if (!v) return;
+
     if (userRole !== 'admin' && v.tenantId !== userTenantId) {
-        alert('لا تملك صلاحية حذف هذا السائق.');
+        alert('غير مصرح لك بحذف هذا السائق.');
         return;
     }
 
-    if (confirm(`هل أنت متأكد من حذف السائق ذو الكود ${code}؟`)) {
+    if (confirm(`هل أنت متأكد من حذف السائق (${v.displayName || code})؟`)) {
         try {
             await dbRT.ref(`vehicleDrivers/${code}`).remove();
-            alert('✅ تم حذف السائق بنجاح.');
+            if (v.activationCode) {
+                await dbRT.ref(`activationCodes/${v.activationCode}`).remove();
+            }
+            alert('✅ تم الحذف بنجاح.');
         } catch (err) {
             alert('❌ فشل الحذف: ' + err.message);
         }
     }
 }
 
-// =============================================
-// 📋 تفاصيل السائق (مع التحقق من tenantId)
-// =============================================
 function showDriverDetails(code) {
     dbRT.ref(`vehicleDrivers/${code}`).once('value', snap => {
         const v = snap.val();
-        if (!v) { alert('البيانات غير متوفرة.'); return; }
+        if (!v) return;
 
-        // التحقق من أن السائق يتبع الحساب الحالي
         if (userRole !== 'admin' && v.tenantId !== userTenantId) {
-            alert('لا تملك صلاحية عرض بيانات هذا السائق.');
+            alert('غير مصرح لك بفرز بيانات هذا السائق.');
             return;
         }
 
-        alert(`📋 تفاصيل السائق:\n\nكود الدخول: ${code}\nاسم السائق: ${v.displayName || '-'}\nالهاتف: ${v.phone || '-'}\nكود التفعيل: ${v.activationCode || '-'}\nالشركة: ${v.tenantId || '-'}\nالحالة: ${v.status || 'offline'}`);
+        alert(`📋 بيانات السائق الكاملة:\n\n👤 الاسم: ${v.displayName || '-'}\n🔑 كود المعرف: ${code}\n🔓 كود التفعيل: ${v.activationCode || '-'}\n📱 الهاتف: ${v.phone || '-'}\n🏢 معرف الشركة (TenantId): ${v.tenantId || '-'}`);
     });
 }
 
 // =============================================
-// 🗺️ الخريطة المباشرة (مع حالة الاتصال ومسار الحركة)
+// 🗺️ الخريطة المباشرة
 // =============================================
 function renderMap() {
     const container = document.getElementById('page-map');
@@ -891,16 +859,16 @@ function renderMap() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
-            <h2 class="text-2xl font-bold text-yellow-500">🗺️ الخريطة المباشرة</h2>
+            <h2 class="text-2xl font-bold text-yellow-500">🗺️ الخريطة المباشرة للسيارات</h2>
             <div class="flex items-center gap-2">
                 <span id="mapVehiclesCount" class="text-sm text-gray-400">0 مركبة</span>
-                <select id="mapStyleSelect" class="map-style-select bg-gray-700 text-white rounded p-1" onchange="changeMapStyle(this.value)">
-                    <option value="street">🛣️ خريطة الشوارع (مجاني)</option>
-                    <option value="satellite">🛰️ قمر صناعي (مجاني)</option>
+                <select id="mapStyleSelect" class="bg-gray-700 text-white rounded p-1 text-sm border border-gray-600" onchange="changeMapStyle(this.value)">
+                    <option value="street">🛣️ الشوارع</option>
+                    <option value="satellite">🛰️ قمر صناعي</option>
                 </select>
             </div>
         </div>
-        <div id="map-container" style="height: 70vh; width: 100%; border-radius: 15px; z-index: 1;"></div>
+        <div id="map-container" class="w-full rounded-xl border border-gray-700" style="height: 68vh; min-height: 400px; z-index: 1;"></div>
     `;
 
     if (mapInstance) {
@@ -924,17 +892,22 @@ function renderMap() {
 
     streetLayer.addTo(mapInstance);
 
-    const ref = dbRT.ref('vehicleDrivers');
+    // 🔒 استعلام معزول بـ tenantId
+    let ref;
+    if (userRole === 'admin') {
+        ref = dbRT.ref('vehicleDrivers');
+    } else {
+        ref = dbRT.ref('vehicleDrivers').orderByChild('tenantId').equalTo(userTenantId);
+    }
+
     ref.off();
     ref.on('value', (snap) => {
         const data = snap.val();
         if (!data) return;
 
-        // تحديث العلامات
         Object.values(mapMarkers).forEach(m => mapInstance.removeLayer(m));
         mapMarkers = {};
 
-        // إزالة المسارات القديمة
         Object.values(livePathPolylines).forEach(p => mapInstance.removeLayer(p));
         livePathPolylines = {};
 
@@ -943,39 +916,34 @@ function renderMap() {
 
         Object.keys(data).forEach(code => {
             const v = data[code];
-            if (userRole !== 'admin' && v.tenantId !== userTenantId) return;
-
             const loc = v.liveLocation;
             if (!loc || !loc.latitude || !loc.longitude) return;
 
             count++;
             const lastUpdate = loc.timestamp || 0;
-            const isOnline = (now - lastUpdate) < 10000;
-            const status = isOnline ? (v.status === 'moving' ? 'moving' : 'online') : 'offline';
-            const carColor = status === 'moving' ? '#fbbf24' : status === 'online' ? '#22c55e' : '#ef4444';
+            const isOnline = (now - lastUpdate) < 15000;
+            const isMoving = isOnline && (loc.speed > 2 || v.status === 'moving');
+            const carColor = isMoving ? '#f59e0b' : isOnline ? '#22c55e' : '#ef4444';
 
             const customIcon = L.divIcon({
                 className: 'custom-leaflet-marker',
                 html: `
-                    <div style="width:40px; height:40px; border-radius:50%; background-color:rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center;">
-                        <svg viewBox="0 0 40 40" width="30" height="30">
-                            <path d="M5 14 L8 8 L32 8 L35 14 L35 26 L32 28 L28 28 L28 26 L12 26 L12 28 L8 28 L5 26 Z" fill="${carColor}" stroke="#fff" stroke-width="1.5"/>
-                            <path d="M12 8 L14 4 L26 4 L28 8 Z" fill="${carColor}" stroke="#fff" stroke-width="1.5"/>
-                        </svg>
+                    <div style="width:36px; height:36px; border-radius:50%; background-color:rgba(17,24,39,0.85); border:2px solid ${carColor}; display:flex; justify-content:center; align-items:center;">
+                        <span style="font-size:18px;">🚗</span>
                     </div>
                 `,
-                iconSize: [40, 40],
-                iconAnchor: [20, 20],
-                popupAnchor: [0, -20]
+                iconSize: [36, 36],
+                iconAnchor: [18, 18],
+                popupAnchor: [0, -18]
             });
 
             const popupContent = `
-                <div class="map-popup text-right" style="font-family: Cairo, sans-serif; min-width: 150px;">
-                    <div class="font-bold text-lg mb-2" style="color: #333;">👤 ${v.displayName || 'غير معروف'}</div>
-                    <div class="text-sm mb-1" style="color: #666;">🚀 السرعة: ${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</div>
-                    <div class="text-sm mb-1" style="color: #666;">🔋 البطارية: ${v.deviceHealth?.battery || '?'}%</div>
-                    <div class="font-bold mt-2 ${status === 'moving' ? 'text-yellow-600' : isOnline ? 'text-green-600' : 'text-red-600'}">
-                        ${status === 'moving' ? '🟢 متحرك' : isOnline ? '📶 متصل' : '🔴 غير متصل'}
+                <div class="map-popup text-right p-1" style="font-family: Cairo, sans-serif; direction: rtl;">
+                    <div class="font-bold text-base text-gray-900">👤 ${v.displayName || 'سائق'}</div>
+                    <div class="text-xs text-gray-600">🚀 السرعة: ${loc.speed ? loc.speed.toFixed(1) : '0'} كم/س</div>
+                    <div class="text-xs text-gray-600">🔋 البطارية: ${v.deviceHealth?.battery || '?'}%</div>
+                    <div class="font-bold text-xs mt-1 ${isMoving ? 'text-yellow-600' : isOnline ? 'text-green-600' : 'text-red-600'}">
+                        ${isMoving ? '🟡 متحرك' : isOnline ? '🟢 متصل' : '🔴 غير متصل'}
                     </div>
                 </div>
             `;
@@ -986,11 +954,10 @@ function renderMap() {
 
             mapMarkers[code] = marker;
 
-            // رسم المسار الحي إذا وجد
             const pathData = v.livePath;
             if (pathData && Array.isArray(pathData) && pathData.length > 1) {
                 const pathPoints = pathData.map(p => [p.latitude, p.longitude]);
-                livePathPolylines[code] = L.polyline(pathPoints, { color: carColor, weight: 3, opacity: 0.7 }).addTo(mapInstance);
+                livePathPolylines[code] = L.polyline(pathPoints, { color: carColor, weight: 4, opacity: 0.8 }).addTo(mapInstance);
             }
         });
 
@@ -1002,7 +969,6 @@ function renderMap() {
 
 function changeMapStyle(style) {
     if (!mapInstance) return;
-
     if (style === 'street') {
         mapInstance.removeLayer(satelliteLayer);
         streetLayer.addTo(mapInstance);
@@ -1020,12 +986,12 @@ function renderTracking() {
     if (!container) return;
 
     container.innerHTML = `
-        <h2 class="text-2xl font-bold text-yellow-500 mb-6">📈 سجل الحركة والتقارير</h2>
+        <h2 class="text-2xl font-bold text-yellow-500 mb-6">📈 تقارير وسجل حركة المركبات</h2>
         <div class="bg-gray-800 p-4 rounded-xl border border-gray-700">
-            <p class="text-gray-300 mb-4">اختر النطاق الزمني لاستعراض التقرير الإجمالي للمسافات والحركات:</p>
+            <p class="text-gray-300 text-sm mb-4">اختر النطاق الزمني لعرض تقرير حركات وسجلات سائقي الشـركة:</p>
             <div class="flex gap-2">
-                <button onclick="loadTracking('today')" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded">اليوم</button>
-                <button onclick="loadTracking('week')" class="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded">هذا الأسبوع</button>
+                <button onclick="loadTracking('today')" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded text-sm">حركة اليوم</button>
+                <button onclick="loadTracking('week')" class="bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded text-sm">حركة هذا الأسبوع</button>
             </div>
             <div id="trackingReportResults" class="mt-6 text-gray-300"></div>
         </div>
@@ -1035,12 +1001,12 @@ function renderTracking() {
 function loadTracking(period) {
     const res = document.getElementById('trackingReportResults');
     if (res) {
-        res.innerHTML = `<div class="p-4 bg-gray-900 rounded">📊 تم توليد تقرير (${period === 'today' ? 'اليوم' : 'الأسبوع'}). النظام جاهز لتجميع بيانات السجلات من القاعدة.</div>`;
+        res.innerHTML = `<div class="p-4 bg-gray-900 rounded border border-gray-700">📊 تم استخراج تقرير (${period === 'today' ? 'اليوم' : 'الأسبوع'}). يمكنك النقر على زر "المسار" بجانب أي سائق في صفحة السيارات لمعاينة خط السير حياً على الخريطة.</div>`;
     }
 }
 
 // =============================================
-// 👑 إدارة النظام (خاص بالأدمن Admin)
+// 👑 لوحة التحكم للأدمن فقط (Admin Controls)
 // =============================================
 async function renderCompanies() {
     const container = document.getElementById('page-admin-companies');
@@ -1048,8 +1014,8 @@ async function renderCompanies() {
 
     container.innerHTML = `
         <div class="flex justify-between items-center mb-6">
-            <h2 class="text-2xl font-bold text-yellow-500">🏢 إدارة الشركات (Tenants)</h2>
-            <button onclick="showAddCompany()" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded">➕ شركة جديدة</button>
+            <h2 class="text-2xl font-bold text-yellow-500">🏢 إدارة الشركات والاشتراكات</h2>
+            <button onclick="showAddCompany()" class="bg-yellow-500 hover:bg-yellow-600 text-black font-bold px-4 py-2 rounded text-sm">➕ إضافة شركة جديدة</button>
         </div>
         <div id="companiesList" class="space-y-3"></div>
     `;
@@ -1058,23 +1024,26 @@ async function renderCompanies() {
         const snap = await dbFS.collection('tenants').get();
         const list = document.getElementById('companiesList');
         if (snap.empty) {
-            list.innerHTML = '<p class="text-gray-500">لا توجد شركات مسجلة.</p>';
+            list.innerHTML = '<p class="text-gray-500">لا توجد شركات مسجلة بالنظام.</p>';
             return;
         }
 
         let html = '';
         snap.forEach(doc => {
             const c = doc.data();
+            const isSuspended = c.subscriptionStatus === 'suspended';
             html += `
                 <div class="bg-gray-800 p-4 rounded-xl border border-gray-700 flex justify-between items-center flex-wrap gap-2">
                     <div>
-                        <h4 class="font-bold text-yellow-500">${c.name}</h4>
-                        <p class="text-sm text-gray-400">المالك: ${c.ownerName} | البريد: ${c.email}</p>
-                        <p class="text-xs text-gray-500">حالة الاشتراك: ${c.subscriptionStatus || 'active'}</p>
+                        <h4 class="font-bold text-yellow-500 text-lg">${c.name}</h4>
+                        <p class="text-xs text-gray-300">المالك: ${c.ownerName} | البريد: ${c.email} | الهاتف: ${c.phone || '-'}</p>
+                        <p class="text-xs mt-1">الحالة: <span class="${isSuspended ? 'text-red-500 font-bold' : 'text-green-400'}">${c.subscriptionStatus || 'active'}</span></p>
                     </div>
                     <div class="flex gap-2">
-                        <button onclick="toggleCompany('${doc.id}')" class="bg-gray-700 hover:bg-gray-600 text-xs text-white px-3 py-1 rounded">إيقاف/تفعيل</button>
-                        <button onclick="deleteCompany('${doc.id}')" class="bg-red-600 hover:bg-red-700 text-xs text-white px-3 py-1 rounded">حذف</button>
+                        <button onclick="toggleCompany('${doc.id}')" class="${isSuspended ? 'bg-green-600' : 'bg-yellow-600'} hover:opacity-80 text-xs text-white px-3 py-1.5 rounded font-bold">
+                            ${isSuspended ? 'تفعيل الحساب' : 'إيقاف الاشتراك'}
+                        </button>
+                        <button onclick="deleteCompany('${doc.id}')" class="bg-red-600 hover:bg-red-700 text-xs text-white px-3 py-1.5 rounded font-bold">حذف</button>
                     </div>
                 </div>
             `;
@@ -1091,7 +1060,7 @@ function showAddCompany() {
     const email = prompt('البريد الإلكتروني:');
     if (!name || !email) return;
 
-    const id = generateUUID(); // ✅ استخدام UUID
+    const id = generateUUID();
     dbFS.collection('tenants').doc(id).set({
         name, ownerName, email,
         status: 'active',
@@ -1110,13 +1079,13 @@ async function toggleCompany(id) {
         const current = doc.data().subscriptionStatus || 'active';
         const next = current === 'active' ? 'suspended' : 'active';
         await ref.update({ subscriptionStatus: next });
-        alert(`تم تغيير الحالة إلى ${next}`);
+        alert(`تم تغيير حالة الاشتراك إلى: ${next}`);
         renderCompanies();
     }
 }
 
 async function deleteCompany(id) {
-    if (confirm('هل تريد بالتأكيد حذف هذه الشركة؟')) {
+    if (confirm('هل أنت متأكد من حذف هذه الشركة بالكامل؟')) {
         await dbFS.collection('tenants').doc(id).delete();
         renderCompanies();
     }
@@ -1125,23 +1094,19 @@ async function deleteCompany(id) {
 function renderAdminVehicles() {
     const container = document.getElementById('page-admin-vehicles');
     if (container) {
-        container.innerHTML = `<h2 class="text-2xl font-bold text-yellow-500 mb-4">👑 كل المركبات بالنظام</h2><p class="text-gray-400">عرض وإدارة جميع المركبات لدى كافة الشركات المسجلة.</p>`;
+        container.innerHTML = `<h2 class="text-2xl font-bold text-yellow-500 mb-4">👑 كل المركبات بالنظام</h2><p class="text-gray-400">يمكنك مشاهدة وإدارة كافة المركبات المسجلة بجميع الشركات من لوحة التحكم الخاصة بالسيارات.</p>`;
     }
 }
 
 function renderSubscriptions() {
     const container = document.getElementById('page-admin-subscriptions');
     if (container) {
-        container.innerHTML = `<h2 class="text-2xl font-bold text-yellow-500 mb-4">💳 إدارة الاشتراكات والتجديد</h2><p class="text-gray-400">سجل اشتراكات الشركات والعمليات المالية.</p>`;
+        container.innerHTML = `<h2 class="text-2xl font-bold text-yellow-500 mb-4">💳 إشعار عمليات الدفع</h2><p class="text-gray-400">سجل تحويلات فودافون كاش وانستا باي المرسلة من العملاء لتأكيد وتجديد الاشتراكات.</p>`;
     }
 }
 
-// =========================================================================
-// 🔥 الميزات الإضافية
-// =========================================================================
-
 // =============================================
-// حساب المسافة بالكيلومترات (معادلة Haversine)
+// حساب المسافة بالكيلومترات (Haversine Formula)
 // =============================================
 function calculateDistance(lat1, lon1, lat2, lon2) {
     const R = 6371;
@@ -1155,10 +1120,9 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
 }
 
 // =============================================
-// نافذة سجل حركة السائق (خريطة + حساب كيلومترات) مع التحقق من tenantId
+// 🗺️ نافذة سجل حركة السائق بالتفصيل
 // =============================================
 async function showDriverHistoryMapModal(code) {
-    // أولاً، التحقق من أن السائق يتبع الحساب الحالي
     const driverSnap = await dbRT.ref(`vehicleDrivers/${code}`).once('value');
     const driverData = driverSnap.val();
     if (!driverData) {
@@ -1174,18 +1138,18 @@ async function showDriverHistoryMapModal(code) {
     if (!modal) {
         modal = document.createElement('div');
         modal.id = 'historyMapModal';
-        modal.className = 'fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50';
+        modal.className = 'fixed inset-0 bg-black bg-opacity-80 flex justify-center items-center z-50 p-3';
         modal.innerHTML = `
-            <div class="bg-gray-800 w-11/12 md:w-3/4 lg:w-2/3 h-5/6 rounded-xl shadow-lg flex flex-col border border-gray-600">
-                <div class="p-4 flex justify-between items-center border-b border-gray-700">
-                    <h3 class="text-xl font-bold text-yellow-500">🗺️ سجل حركة السائق</h3>
+            <div class="bg-gray-800 w-full max-w-4xl h-5/6 rounded-xl shadow-lg flex flex-col border border-gray-600 overflow-hidden">
+                <div class="p-4 flex justify-between items-center border-b border-gray-700 bg-gray-900">
+                    <h3 class="text-lg font-bold text-yellow-500">🗺️ مسار رحلة السائق (${driverData.displayName || code})</h3>
                     <button onclick="closeHistoryMapModal()" class="text-red-500 hover:text-red-700 font-bold text-2xl">&times;</button>
                 </div>
-                <div class="p-4 bg-gray-900 flex justify-between items-center text-sm text-gray-300">
-                    <div>إجمالي المسافة المقطوعة: <span id="totalDistanceLabel" class="text-green-400 font-bold text-lg">0</span> كم</div>
+                <div class="p-3 bg-gray-900 flex justify-between items-center text-xs text-gray-300 border-b border-gray-800">
+                    <div>إجمالي المسافة المقطوعة اليوم: <span id="totalDistanceLabel" class="text-green-400 font-bold text-sm">0</span> كم</div>
                     <div>تاريخ اليوم: <span class="text-yellow-400">${new Date().toLocaleDateString('ar')}</span></div>
                 </div>
-                <div id="history-map-container" class="flex-grow w-full rounded-b-xl" style="z-index: 1;"></div>
+                <div id="history-map-container" class="flex-grow w-full" style="z-index: 1;"></div>
             </div>
         `;
         document.body.appendChild(modal);
@@ -1203,10 +1167,6 @@ async function showDriverHistoryMapModal(code) {
             attribution: '© OpenStreetMap contributors',
             maxZoom: 19
         }).addTo(historyMapInstance);
-
-        setTimeout(() => {
-            historyMapInstance.invalidateSize();
-        }, 100);
 
         try {
             const snap = await dbRT.ref(`locationHistory/${code}`).orderByChild('timestamp').limitToLast(500).once('value');
@@ -1235,25 +1195,23 @@ async function showDriverHistoryMapModal(code) {
             document.getElementById('totalDistanceLabel').textContent = totalKm.toFixed(2);
 
             if (points.length > 0) {
-                historyPolyline = L.polyline(points, { color: 'blue', weight: 4, opacity: 0.7 }).addTo(historyMapInstance);
+                historyPolyline = L.polyline(points, { color: '#3b82f6', weight: 5, opacity: 0.8 }).addTo(historyMapInstance);
                 historyMapInstance.fitBounds(historyPolyline.getBounds());
 
                 L.marker(points[0]).addTo(historyMapInstance).bindPopup('🏁 نقطة البداية');
-                L.marker(points[points.length - 1]).addTo(historyMapInstance).bindPopup('📍 نقطة النهاية (الحالية)');
+                L.marker(points[points.length - 1]).addTo(historyMapInstance).bindPopup('📍 النقطة الحالية');
             }
 
         } catch (error) {
             console.error('Error fetching history:', error);
-            alert('حدث خطأ أثناء جلب السجل.');
+            alert('حدث خطأ أثناء جلب سجل الحركة.');
         }
     }, 300);
 }
 
 function closeHistoryMapModal() {
     const modal = document.getElementById('historyMapModal');
-    if (modal) {
-        modal.classList.add('hidden');
-    }
+    if (modal) modal.classList.add('hidden');
     if (historyMapInstance) {
         historyMapInstance.remove();
         historyMapInstance = null;
@@ -1261,7 +1219,7 @@ function closeHistoryMapModal() {
 }
 
 // =============================================
-// تسجيل الدخول المخصص للعمال والشركات من Firestore
+// تسجيل الدخول المخصص بالاسم وكلمة المرور
 // =============================================
 async function handleCustomDatabaseLogin(username, password) {
     try {
@@ -1277,7 +1235,7 @@ async function handleCustomDatabaseLogin(username, password) {
 
         const tenantRef = await dbFS.collection('tenants').doc(userData.tenantId).get();
         if (!tenantRef.exists) {
-            throw new Error('بيانات الشركة غير موجودة.');
+            throw new Error('بيانات الشركة الخاصة بك غير موجودة.');
         }
 
         const tenantData = tenantRef.data();
@@ -1290,10 +1248,8 @@ async function handleCustomDatabaseLogin(username, password) {
 
         currentUser = { uid: userId, displayName: userData.name, email: userData.email || username };
         currentUserId = userId;
-        userRole = userData.role || 'worker';
+        userRole = userData.role || 'company_admin';
         userTenantId = userData.tenantId;
-
-        alert(`مرحباً بك ${userData.name}! تم تسجيل الدخول بنجاح.`);
 
         showDashboard();
 
@@ -1303,10 +1259,10 @@ async function handleCustomDatabaseLogin(username, password) {
 }
 
 // =============================================
-// إنشاء حساب جديد مع فترة تجريبية 15 يوم (باستخدام UUID)
+// إنشاء حساب جديد لشركة (مع فترة 15 يوم تجريبية)
 // =============================================
 async function handleSignup(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
 
     const fullName = document.getElementById('signupFullName').value.trim();
     const companyName = document.getElementById('signupCompanyName').value.trim();
@@ -1314,7 +1270,7 @@ async function handleSignup(e) {
     const username = document.getElementById('signupUsername').value.trim();
     const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value.trim();
-    const subscriptionPeriod = document.getElementById('signupSubscriptionPeriod').value;
+    const subscriptionPeriod = document.getElementById('signupSubscriptionPeriod')?.value || 'month';
     const errorEl = document.getElementById('signupError');
 
     if (errorEl) errorEl.classList.add('hidden');
@@ -1334,7 +1290,7 @@ async function handleSignup(e) {
 
         const now = Date.now();
         const trialEndDate = now + (15 * 24 * 60 * 60 * 1000);
-        const newTenantId = generateUUID(); // ✅ UUID فريد
+        const newTenantId = generateUUID();
 
         await dbFS.collection('tenants').doc(newTenantId).set({
             name: companyName,
@@ -1367,9 +1323,7 @@ async function handleSignup(e) {
             createdAt: now
         });
 
-        // رسالة نجاح مفصلة
-        const periodText = subscriptionPeriod === 'month' ? 'شهر' : 'سنة';
-        alert(`✅ تم إنشاء الحساب بنجاح!\n\n📋 بيانات الحساب:\n- الاسم: ${fullName}\n- الشركة: ${companyName}\n- البريد: ${email}\n- اسم المستخدم: ${username}\n- مدة الاشتراك: ${periodText}\n- فترة تجريبية: 15 يوم\n\nيمكنك الآن تسجيل الدخول والبدء في استخدام المنصة.`);
+        alert(`✅ تم إنشاء حساب الشركة بنجاح!\nلديك فترة تجريبية مجانية لمدة 15 يوماً.`);
 
         currentUser = userCred.user;
         currentUserId = uid;
@@ -1388,115 +1342,42 @@ async function handleSignup(e) {
 }
 
 // =============================================
-// إنشاء حساب جيميل وتسجيل شركة جديدة (باستخدام UUID)
-// =============================================
-async function handleIndexGmailSignup(email, password, companyName, ownerName, phone, username = null, subscriptionPeriod = 'month') {
-    try {
-        const userCred = await auth.createUserWithEmailAndPassword(email, password);
-        const uid = userCred.user.uid;
-
-        await userCred.user.updateProfile({ displayName: ownerName });
-
-        const now = Date.now();
-        const trialEndDate = now + (15 * 24 * 60 * 60 * 1000);
-        const newTenantId = generateUUID(); // ✅ UUID فريد
-
-        await dbFS.collection('tenants').doc(newTenantId).set({
-            name: companyName,
-            ownerName: ownerName,
-            email: email,
-            phone: phone || '',
-            username: username || email,
-            password: password,
-            status: 'active',
-            subscriptionStatus: 'trial',
-            subscriptionPeriod: subscriptionPeriod,
-            trialEndDate: trialEndDate,
-            subscriptionEndDate: trialEndDate,
-            paymentMethod: null,
-            paymentStatus: 'none',
-            lastPaymentDate: null,
-            vehiclesCount: 0,
-            createdAt: now
-        });
-
-        await dbFS.collection('users').doc(uid).set({
-            tenantId: newTenantId,
-            email: email,
-            name: ownerName,
-            phone: phone || '',
-            username: username || email,
-            password: password,
-            role: 'company_admin',
-            status: 'active',
-            createdAt: now
-        });
-
-        alert('✅ تم إنشاء الحساب بنجاح!\nلديك فترة تجريبية لمدة 15 يوم.');
-
-        currentUser = userCred.user;
-        currentUserId = uid;
-        userRole = 'company_admin';
-        userTenantId = newTenantId;
-
-        showDashboard();
-
-    } catch (error) {
-        console.error('❌ فشل إنشاء الحساب:', error.message);
-        alert(`فشل إنشاء الحساب: ${error.message}`);
-    }
-}
-
-// =============================================
 // 🚀 بدء التطبيق والتحقق من حالة الدخول
 // =============================================
-auth.onAuthStateChanged(async (user) => {
-    console.log('🔄 حالة المصادقة:', user ? 'مستخدم مسجل' : 'لا يوجد مستخدم');
+window.addEventListener('DOMContentLoaded', () => {
+    ensureAdminAccount();
 
-    if (user) {
-        currentUser = user;
-        currentUserId = user.uid;
-        try {
-            const doc = await dbFS.collection('users').doc(user.uid).get();
-            if (doc.exists) {
-                const data = doc.data();
-                userRole = data.role || 'customer';
-                userTenantId = data.tenantId || null;
-            } else {
-                userRole = 'customer';
-                userTenantId = 'default';
-                await dbFS.collection('users').doc(user.uid).set({
-                    tenantId: 'default',
-                    email: user.email,
-                    name: user.displayName || 'مستخدم',
-                    role: 'customer',
-                    status: 'active',
-                    createdAt: Date.now()
-                });
-            }
-
-            if (userRole !== 'admin' && userTenantId) {
-                const check = await checkSubscriptionStatus(userTenantId);
-                if (!check.valid) {
-                    showSubscriptionExpiredScreen(check.tenantData);
-                    return;
+    auth.onAuthStateChanged(async (user) => {
+        if (user) {
+            currentUser = user;
+            currentUserId = user.uid;
+            try {
+                const doc = await dbFS.collection('users').doc(user.uid).get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    userRole = data.role || 'company_admin';
+                    userTenantId = data.tenantId || null;
+                } else {
+                    userRole = 'company_admin';
+                    userTenantId = generateUUID();
                 }
-            }
 
-            showDashboard();
-        } catch (e) {
-            console.error('❌ خطأ في جلب بيانات المستخدم:', e);
-            userRole = 'customer';
-            userTenantId = 'default';
-            showDashboard();
+                if (userRole !== 'admin' && userTenantId) {
+                    const check = await checkSubscriptionStatus(userTenantId);
+                    if (!check.valid) {
+                        showSubscriptionExpiredScreen(check.tenantData);
+                        return;
+                    }
+                }
+
+                showDashboard();
+            } catch (e) {
+                console.error('❌ خطأ في جلب بيانات المستخدم:', e);
+                showDashboard();
+            }
+        } else {
+            document.getElementById('loginScreen')?.classList.remove('hidden');
+            document.getElementById('dashboardScreen')?.classList.add('hidden');
         }
-    } else {
-        const success = await ensureAdminAccount();
-        if (!success) {
-            const loginScreen = document.getElementById('loginScreen');
-            const dashboardScreen = document.getElementById('dashboardScreen');
-            if (loginScreen) loginScreen.classList.remove('hidden');
-            if (dashboardScreen) dashboardScreen.classList.add('hidden');
-        }
-    }
+    });
 });
